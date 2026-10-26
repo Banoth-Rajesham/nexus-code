@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Exact Microsoft Design System Tokens from Inspection */
+    --ds-color-sky-blue-50: #f4fafd;
+    --ds-color-sky-blue-100: #dceef8;
+    --ds-color-sky-blue-200: #cbe6f4;
+    --ds-color-lavender-100: #ede8f6;
+    --ds-color-brilliant-blue-500: #0078d4;
+    --ds-color-brilliant-blue-600: #006dc1;
+    --ds-color-brilliant-blue-700: #005597;
+    --ds-color-dark-blue-900: #0e1726;
+    --ds-color-dark-blue-800: #17253d;
+    --ds-color-blue-black-400: #3a4c56;
+    --ds-color-blue-black-500: #091f2c;
+    --ds-color-blue-black-200: #8e989e;
+    --ds-color-blue-black-50: #e6e9ea;
+    --ds-app-color-base-special-bg-opt1-left: linear-gradient(90deg, #ede8f6 0%, #f4fafd 50%, #dceef8 100%);
+    --ds-app-color-base-default-fg-heading: #0e1726;
+    --ds-app-color-base-default-fg-body: #3a4c56;
+    --ds-font-family-text: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "SegoeUI Fallback", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --ds-font-family-display: "Segoe UI Variable Display", "Segoe UI", -apple-system, BlinkMacSystemFont, "SegoeUI Fallback", Roboto, "Helvetica Neue", Arial, sans-serif;
+    
+    /* Legacy aliases for backward compatibility */
+    --color-page-bg: #FFFFFF;
+    --color-surface: #FFFFFF;
+    --color-surface-subtle: #F4FAFD;
+    --color-ms-blue: #0078D4;
+    --color-ms-blue-hover: #006DC1;
+    --color-ms-blue-active: #005597;
+    --color-ms-blue-light: #F4FAFD;
+    --color-outlook-blue: #0078D4;
+    --color-text-main: #0e1726;
+    --color-text-sub: #3a4c56;
+    --color-text-muted: #8e989e;
+    --color-border: #E1DFDD;
+    --color-border-subtle: #E6E9EA;
+    --color-footer-bg: #F2F2F2;
+    --font-sans: var(--ds-font-family-text);
+    --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  }
+
+  body {
+    background-color: var(--color-page-bg);
+    color: var(--ds-app-color-base-default-fg-body);
+    font-family: var(--ds-font-family-text);
+    font-weight: 400;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    letter-spacing: -0.03em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--ds-font-family-display);
+    color: var(--ds-app-color-base-default-fg-heading);
+    letter-spacing: -0.025em;
+  }
+
+  ::selection {
+    background-color: rgba(0, 120, 212, 0.2);
+    color: #0078D4;
+  }
+}
+
+/* Minimalist scrollbars matching Microsoft Outlook web interface */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.5);
+}

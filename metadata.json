@@ -1,0 +1,6 @@
+{
+  "name": "BhashaCode",
+  "description": "Multilingual Coding Education Platform - Learn, debug, and understand code in your native language (Telugu, Hindi, Tamil, Kannada, and English).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
