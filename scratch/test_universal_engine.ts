@@ -73,7 +73,7 @@ assert(res5.overview.includes('fetchUserData'), 'Test 5: JS async function analy
 const syntaxError = `def broken_func(x)
     return x * 2`;
 const res6 = analyzeAnyCodeDynamically(syntaxError, 'python', 'telugu');
-assert(res6.syntaxIssues && res6.syntaxIssues.length > 0, 'Test 6: Missing colon syntax issue flagged');
+assert(Boolean(res6.syntaxIssues && res6.syntaxIssues.length > 0), 'Test 6: Missing colon syntax issue flagged');
 assert(res6.syntaxIssues![0].line === 1, 'Test 6: Flagged line 1 correctly');
 
 // ── TEST 7: Multi-language analysis (Telugu, Hindi, Tamil, Kannada) ──
@@ -107,7 +107,7 @@ assert(teluguTrans.translatedCode.includes('మొత్తం'), 'Test 8: Varia
 assert(teluguTrans.translatedCode.includes('జీతం:'), 'Test 8: String label translated to జీతం:');
 
 // Full Bhasha mode
-const teluguFull = translateCodeToNative(arbitraryCode, 'telugu', 'full');
+const teluguFull = translateCodeToNative(arbitraryCode, 'telugu', 'guide');
 console.log('\n--- Translated Code in Telugu (Full Bhasha Mode) ---');
 console.log(teluguFull.translatedCode);
 assert(teluguFull.translatedCode.includes('నిర్వచించు'), 'Test 8b: def translated to నిర్వచించు');

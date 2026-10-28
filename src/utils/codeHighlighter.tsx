@@ -110,7 +110,7 @@ export function tokenizeLine(line: string): HighlightToken[] {
     }
 
     // 3. Numbers: \b\d+(\.\d+)?\b
-    if (/\d/.test(char) && (i === 0 || /[^a-zA-Z0-9_\p{L}]/u.test(line[i - 1]))) {
+    if (/\d/.test(char) && (i === 0 || /[^a-zA-Z0-9_\p{L}\p{M}]/u.test(line[i - 1]))) {
       let start = i;
       while (i < line.length && /[\d.]/.test(line[i])) {
         i++;
@@ -165,9 +165,9 @@ export function tokenizeLine(line: string): HighlightToken[] {
     }
 
     // 7. Words / Identifiers (supports English, Telugu, Hindi, Tamil, Kannada, etc. via Unicode \p{L})
-    if (/[\p{L}_]/u.test(char)) {
+    if (/[\p{L}\p{M}_]/u.test(char)) {
       let start = i;
-      while (i < line.length && /[\p{L}\p{N}_]/u.test(line[i])) {
+      while (i < line.length && /[\p{L}\p{M}\p{N}_]/u.test(line[i])) {
         i++;
       }
       const word = line.slice(start, i);
@@ -226,6 +226,29 @@ export const HighlightedLine: React.FC<{ line: string }> = ({ line }) => {
   );
 };
 
+// Shared VS Code font stack and pixel-perfect editor styles
+export const VSCODE_MONO_FONT = '"Cascadia Code", "Fira Code", Consolas, "Courier New", monospace';
+
+export const CODE_EDITOR_SHARED_STYLE: React.CSSProperties = {
+  fontFamily: VSCODE_MONO_FONT,
+  fontSize: '13px',
+  lineHeight: '24px',
+  letterSpacing: '0px',
+  wordSpacing: '0px',
+  tabSize: 4,
+  MozTabSize: 4,
+  whiteSpace: 'pre',
+  wordBreak: 'normal',
+  wordWrap: 'normal',
+  overflowWrap: 'normal',
+  fontVariantLigatures: 'none',
+  WebkitFontSmoothing: 'antialiased',
+  boxSizing: 'border-box',
+  padding: '12px',
+  margin: 0,
+  border: 0,
+};
+
 /**
  * React Component to render multi-line syntax colored block with line numbers
  */
@@ -237,24 +260,30 @@ export const HighlightedCodeBlock: React.FC<{
   const lines = code.split('\n');
 
   return (
-    <pre className="m-0 font-mono text-xs sm:text-sm leading-6 whitespace-pre">
+    <div style={{ margin: 0, padding: 0, border: 0, fontFamily: VSCODE_MONO_FONT }}>
       {lines.map((line, idx) => {
         const lineNum = idx + 1;
         const isHovered = highlightedLine === lineNum;
         return (
           <div
             key={idx}
-            onMouseEnter={() => onLineHover?.(lineNum)}
-            onMouseLeave={() => onLineHover?.(null)}
-            className={`leading-6 px-1 rounded transition-colors ${
-              isHovered ? 'bg-[#264f78]/40' : ''
-            }`}
+            onMouseEnter={onLineHover ? () => onLineHover(lineNum) : undefined}
+            onMouseLeave={onLineHover ? () => onLineHover(null) : undefined}
+            style={{
+              height: '24px',
+              lineHeight: '24px',
+              padding: 0,
+              margin: 0,
+              whiteSpace: 'pre',
+              backgroundColor: isHovered ? 'rgba(38, 79, 120, 0.4)' : undefined,
+              borderRadius: isHovered ? '2px' : undefined,
+            }}
           >
             <HighlightedLine line={line} />
-            {line === '' && '\n'}
+            {line === '' && '\u00A0'}
           </div>
         );
       })}
-    </pre>
+    </div>
   );
 };

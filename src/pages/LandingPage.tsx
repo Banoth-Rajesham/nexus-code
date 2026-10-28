@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { translateCodeToNative } from '../utils/codeTranslator';
+import { NATIVE_CODE_WORD } from '../utils/codeTransliterator';
+import { HighlightedCodeBlock } from '../utils/codeHighlighter';
 import { useAuth } from '../context/AuthContext';
 import {
   Sparkles,
@@ -588,7 +591,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const [playgroundSnippet, setPlaygroundSnippet] = useState<'loop' | 'condition' | 'function'>('loop');
   const [playgroundCode, setPlaygroundCode] = useState<string>(demoSnippets.loop.code);
   const [playgroundOutput, setPlaygroundOutput] = useState<string>('');
-  const [playgroundTab, setPlaygroundTab] = useState<'explanation' | 'output'>('explanation');
+  const [playgroundTab, setPlaygroundTab] = useState<'explanation' | 'nativeCode' | 'output'>('explanation');
+
+  const transliteratedPlaygroundCode = useMemo(() => {
+    return translateCodeToNative(playgroundCode, selectedLang, 'guide').translatedCode;
+  }, [playgroundCode, selectedLang]);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [runStats, setRunStats] = useState<{ durationMs: number; success: boolean; exitCode: number } | null>(null);
 
@@ -1375,6 +1382,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                         Line-by-Line Explanation
                       </button>
                       <button
+                        id="playground-tab-nativecode"
+                        onClick={() => setPlaygroundTab('nativeCode')}
+                        className={`text-xs font-bold pb-1 transition-colors cursor-pointer ${
+                          playgroundTab === 'nativeCode'
+                            ? 'text-[#0067B8] border-b-2 border-[#0067B8]'
+                            : 'text-[#616161] hover:text-[#0e1726]'
+                        }`}
+                      >
+                        {SUPPORTED_NATIVE_LANGUAGES.find((l) => l.key === selectedLang)?.native || 'తెలుగు'} {NATIVE_CODE_WORD[selectedLang] || 'కోడ్'}
+                      </button>
+                      <button
                         onClick={() => setPlaygroundTab('output')}
                         className={`text-xs font-bold pb-1 transition-colors cursor-pointer flex items-center gap-1.5 ${
                           playgroundTab === 'output'
@@ -1399,7 +1417,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                   </div>
 
                   {/* Tab 1: Line Explanation */}
-                  {playgroundTab === 'explanation' ? (
+                  {playgroundTab === 'explanation' && (
                     <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
                       {playgroundExplanations.map((item, idx) => (
                         <div
@@ -1413,8 +1431,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    /* Tab 2: Terminal Output */
+                  )}
+
+                  {/* Tab 2: Native Code Transliteration */}
+                  {playgroundTab === 'nativeCode' && (
+                    <div className="bg-[#1e1e1e] p-3 rounded-lg font-mono text-xs max-h-[260px] overflow-auto leading-6 text-[#d4d4d4]">
+                      <HighlightedCodeBlock code={transliteratedPlaygroundCode} />
+                    </div>
+                  )}
+
+                  {/* Tab 3: Terminal Output */}
+                  {playgroundTab === 'output' && (
                     <div className="bg-[#121820] p-3 rounded-lg font-mono text-xs min-h-[180px] max-h-[260px] overflow-y-auto flex flex-col justify-between">
                       <div>
                         <div className="text-[11px] text-slate-400 pb-1.5 mb-2 border-b border-slate-700 flex items-center justify-between">

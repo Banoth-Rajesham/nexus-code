@@ -1,13 +1,15 @@
 import { NativeLanguageKey } from '../types';
 import { analyzeCodeRuleBased } from './ruleBasedAnalyzer';
+import { transliterateCode, transliterateWord, transliterateWordToTelugu } from './codeTransliterator';
 
 // ============================================================================
-// BHASHA CODE NATIVE LINE GUIDE & PSEUDOCODE GENERATOR
-// Replaces the old corrupted phonetic transliterator.
-// Preserves code identifiers intact and generates clean, natural native guidance.
+// BHASHA CODE NATIVE TRANSLATOR & CODE TRANSLITERATOR
+// Implements instant local deterministic English-to-Telugu script transliteration.
+// Preserves code keywords and structure while writing identifiers and readable
+// text in Telugu Unicode.
 // ============================================================================
 
-export type TranslationMode = 'guide' | 'pseudocode' | 'identifiers';
+export type TranslationMode = 'guide' | 'pseudocode' | 'identifiers' | 'explanation';
 
 export interface CodeTranslationResult {
   translatedCode: string;
@@ -16,9 +18,18 @@ export interface CodeTranslationResult {
   nativeLanguage: NativeLanguageKey;
 }
 
+export { transliterateCode, transliterateWord, transliterateWordToTelugu };
+
 /**
- * Generates clean, native-language line-by-line guide or pseudocode.
- * NEVER performs destructive phonetic transliteration on English identifiers.
+ * Convenience helper to transliterate a single identifier.
+ */
+export function translateIdentifier(word: string, nativeLang: NativeLanguageKey = 'telugu'): string {
+  return transliterateWord(word, nativeLang);
+}
+
+/**
+ * Translates/transliterates code to target native language (Telugu script by default).
+ * Free, deterministic, 0-latency, instant rule-based engine.
  */
 export function translateCodeToNative(
   code: string,
@@ -34,11 +45,9 @@ export function translateCodeToNative(
     };
   }
 
-  // Use the deterministic rule-based analysis
-  const analysis = analyzeCodeRuleBased(code, 'python', nativeLang);
-
+  // 1. Pseudocode mode
   if (mode === 'pseudocode') {
-    // Generate clean educational pseudocode in the native language
+    const analysis = analyzeCodeRuleBased(code, 'python', nativeLang);
     const pseudoLines = analysis.lineByLine.map((line) => {
       const trimmed = line.codeSnippet.trim();
       if (!trimmed) return '';
@@ -51,7 +60,8 @@ export function translateCodeToNative(
       }
 
       // Format as structured pseudocode step
-      return `${indent}▸ [లైన్ ${line.lineNumber}] ${line.simpleMeaning}`;
+      const lineWord = nativeLang === 'hindi' ? 'लाइन' : nativeLang === 'tamil' ? 'வரி' : nativeLang === 'kannada' ? 'ಸಾಲು' : 'లైన్';
+      return `${indent}▸ [${lineWord} ${line.lineNumber}] ${line.simpleMeaning}`;
     });
 
     return {
@@ -62,27 +72,40 @@ export function translateCodeToNative(
     };
   }
 
-  // Default: Synchronized Line-by-Line Native Guide
-  // Displays clean native-language meaning aligned with each line,
-  // preserving exact identifiers without mixed-script corruption.
-  const guideLines = analysis.lineByLine.map((line) => {
-    const trimmed = line.codeSnippet.trim();
-    if (!trimmed) return '';
+  // 2. Line Guide (Line-by-line explanation comments)
+  if (mode === 'explanation') {
+    const analysis = analyzeCodeRuleBased(code, 'python', nativeLang);
+    const guideLines = analysis.lineByLine.map((line) => {
+      const trimmed = line.codeSnippet.trim();
+      if (!trimmed) return '';
 
-    const indentMatch = line.codeSnippet.match(/^(\s*)/);
-    const indent = indentMatch ? indentMatch[1] : '';
+      const indentMatch = line.codeSnippet.match(/^(\s*)/);
+      const indent = indentMatch ? indentMatch[1] : '';
 
-    if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
-      return `${indent}// ${line.simpleMeaning}`;
-    }
+      if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
+        return `${indent}// ${line.simpleMeaning}`;
+      }
 
-    // Format clean educational annotation
-    return `${indent}// [L${line.lineNumber}] ${line.simpleMeaning}`;
-  });
+      return `${indent}// [L${line.lineNumber}] ${line.simpleMeaning}`;
+    });
+
+    return {
+      translatedCode: guideLines.join('\n'),
+      translatedLineCount: guideLines.length,
+      mode,
+      nativeLanguage: nativeLang,
+    };
+  }
+
+  // 3. Default: Instant Telugu-Script Code Transliteration
+  // Displays the SAME code with important identifiers and readable text written in Telugu script.
+  // Keywords (def, for, if, return, print) and syntax structure remain preserved.
+  const transliterated = transliterateCode(code, nativeLang);
+  const lines = transliterated.split('\n');
 
   return {
-    translatedCode: guideLines.join('\n'),
-    translatedLineCount: guideLines.length,
+    translatedCode: transliterated,
+    translatedLineCount: lines.length,
     mode,
     nativeLanguage: nativeLang,
   };

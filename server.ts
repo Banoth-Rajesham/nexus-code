@@ -628,15 +628,32 @@ interface ExecutionResult {
   engine: string;
 }
 
+interface ExecutionOptions {
+  code?: string;
+  files?: Record<string, string>;
+  activeFileName?: string;
+  language: string;
+  input?: string;
+  timeoutMs?: number;
+}
+
 function executeCodeInProcess(
-  code: string,
-  language: string,
+  optsOrCode: string | ExecutionOptions,
+  language: string = 'python',
   input: string = '',
   timeoutMs: number = 6000
 ): Promise<ExecutionResult> {
+  const opts: ExecutionOptions =
+    typeof optsOrCode === 'string'
+      ? { code: optsOrCode, language, input, timeoutMs }
+      : optsOrCode;
+
   return new Promise((resolve) => {
     const startTime = Date.now();
-    const langLower = (language || '').toLowerCase().trim();
+    const effectiveLang = opts.language || language || 'python';
+    const effectiveInput = opts.input ?? input ?? '';
+    const effectiveTimeout = opts.timeoutMs ?? timeoutMs ?? 6000;
+    const langLower = effectiveLang.toLowerCase().trim();
     const isPython = langLower === 'python' || langLower === 'py';
     const isJs = langLower === 'javascript' || langLower === 'js';
     const isTs = langLower === 'typescript' || langLower === 'ts';
@@ -644,55 +661,95 @@ function executeCodeInProcess(
     if (!isPython && !isJs && !isTs) {
       return resolve({
         success: false,
-        output: `[Environment Notice: The compiler/runtime for '${language}' is not installed in the local environment. Python 3.11 and JavaScript/TypeScript have live, native execution enabled.]`,
+        output: `[Environment Notice: The compiler/runtime for '${effectiveLang}' is not installed in the local environment. Python 3.11 and JavaScript/TypeScript have live, native execution enabled.]`,
         exitCode: 1,
         executionTimeMs: 0,
-        language,
+        language: effectiveLang,
         engine: 'unsupported',
       });
     }
 
-    const ext = isPython ? '.py' : isTs ? '.ts' : '.js';
-    const uniqueId = `bhasha_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const tempFile = path.join(os.tmpdir(), `${uniqueId}${ext}`);
+    const uniqueId = `bhasha_proj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const projectDir = path.join(os.tmpdir(), uniqueId);
 
     try {
-      fs.writeFileSync(tempFile, code, 'utf-8');
-    } catch (writeErr: any) {
+      fs.mkdirSync(projectDir, { recursive: true });
+    } catch (mkdirErr: any) {
       return resolve({
         success: false,
-        output: `Execution Setup Error: Failed to write temporary execution script: ${writeErr?.message}`,
+        output: `Execution Setup Error: Failed to create temporary workspace directory: ${mkdirErr?.message}`,
         exitCode: 1,
         executionTimeMs: Date.now() - startTime,
-        language,
+        language: effectiveLang,
         engine: isPython ? 'python' : 'node',
       });
     }
 
+    let entryFile = '';
+    const fileMap: Record<string, string> = opts.files || {};
+
+    if (opts.files && Object.keys(opts.files).length > 0) {
+      for (const [relPath, content] of Object.entries(opts.files)) {
+        const safeRel = path.normalize(relPath).replace(/^(\.\.(\/|\\|$))+/, '');
+        const targetPath = path.join(projectDir, safeRel);
+        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+        fs.writeFileSync(targetPath, content, 'utf-8');
+      }
+
+      if (opts.activeFileName && opts.files[opts.activeFileName]) {
+        entryFile = path.join(projectDir, opts.activeFileName);
+      } else if (opts.files['main.py']) {
+        entryFile = path.join(projectDir, 'main.py');
+      } else if (opts.files['index.js'] || opts.files['main.js']) {
+        entryFile = path.join(projectDir, opts.files['index.js'] ? 'index.js' : 'main.js');
+      } else if (opts.files['index.ts'] || opts.files['main.ts']) {
+        entryFile = path.join(projectDir, opts.files['index.ts'] ? 'index.ts' : 'main.ts');
+      } else {
+        const firstKey = Object.keys(opts.files)[0];
+        entryFile = path.join(projectDir, firstKey);
+      }
+    } else {
+      const ext = isPython ? '.py' : isTs ? '.ts' : '.js';
+      const defaultName = isPython ? 'main.py' : isTs ? 'index.ts' : 'index.js';
+      entryFile = path.join(projectDir, defaultName);
+      try {
+        fs.writeFileSync(entryFile, opts.code || '', 'utf-8');
+      } catch (writeErr: any) {
+        try { fs.rmSync(projectDir, { recursive: true, force: true }); } catch {}
+        return resolve({
+          success: false,
+          output: `Execution Setup Error: Failed to write code file: ${writeErr?.message}`,
+          exitCode: 1,
+          executionTimeMs: Date.now() - startTime,
+          language: effectiveLang,
+          engine: isPython ? 'python' : 'node',
+        });
+      }
+    }
+
     const command = isPython ? 'python' : 'node';
     const args = isPython
-      ? ['-u', tempFile]
+      ? ['-u', entryFile]
       : isTs
-      ? ['--experimental-strip-types', tempFile]
-      : [tempFile];
+      ? ['--experimental-strip-types', entryFile]
+      : [entryFile];
 
     let proc: any;
     let timedOut = false;
 
     try {
       proc = spawn(command, args, {
+        cwd: projectDir,
         windowsHide: true,
       });
     } catch (spawnErr: any) {
-      try {
-        fs.unlinkSync(tempFile);
-      } catch {}
+      try { fs.rmSync(projectDir, { recursive: true, force: true }); } catch {}
       return resolve({
         success: false,
         output: `Runtime Startup Error: Failed to spawn ${command}: ${spawnErr?.message}`,
         exitCode: 1,
         executionTimeMs: Date.now() - startTime,
-        language,
+        language: effectiveLang,
         engine: command,
       });
     }
@@ -705,12 +762,12 @@ function executeCodeInProcess(
       try {
         proc.kill('SIGKILL');
       } catch {}
-    }, timeoutMs);
+    }, effectiveTimeout);
 
     // Pass standard input if provided
-    if (input && proc.stdin) {
+    if (effectiveInput && proc.stdin) {
       try {
-        proc.stdin.write(input);
+        proc.stdin.write(effectiveInput);
         proc.stdin.end();
       } catch {}
     }
@@ -731,42 +788,68 @@ function executeCodeInProcess(
 
     proc.on('error', (err: any) => {
       clearTimeout(timer);
-      try {
-        fs.unlinkSync(tempFile);
-      } catch {}
+      try { fs.rmSync(projectDir, { recursive: true, force: true }); } catch {}
       resolve({
         success: false,
         output: `Runtime Error (${command}): ${err.message}`,
         exitCode: 1,
         executionTimeMs: Date.now() - startTime,
-        language,
+        language: effectiveLang,
         engine: command,
       });
     });
 
     proc.on('close', (exitCode: number | null) => {
       clearTimeout(timer);
-      try {
-        fs.unlinkSync(tempFile);
-      } catch {}
+      try { fs.rmSync(projectDir, { recursive: true, force: true }); } catch {}
 
       const durationMs = Date.now() - startTime;
 
       if (timedOut) {
         return resolve({
           success: false,
-          output: `Execution Timed Out (${timeoutMs / 1000}s limit exceeded)\nYour code took too long to finish. This usually happens if you have an infinite loop (e.g. while True without break) or heavy recursion.`,
+          output: `Execution Timed Out (${effectiveTimeout / 1000}s limit exceeded)\nYour code took too long to finish. This usually happens if you have an infinite loop (e.g. while True without break) or heavy recursion.`,
           exitCode: 124,
           executionTimeMs: durationMs,
-          language,
+          language: effectiveLang,
           engine: command,
         });
       }
 
-      // Clean temp file paths in tracebacks so user sees clean 'main.py' or 'index.js'
-      const cleanFileName = isPython ? 'main.py' : isTs ? 'index.ts' : 'index.js';
-      const cleanStderr = stderr.split(tempFile).join(cleanFileName);
-      const cleanStdout = stdout.split(tempFile).join(cleanFileName);
+      // Clean temp file paths in tracebacks
+      let cleanStderr = stderr
+        .split(projectDir + '\\').join('')
+        .split(projectDir + '/').join('')
+        .split(projectDir).join('.');
+      let cleanStdout = stdout
+        .split(projectDir + '\\').join('')
+        .split(projectDir + '/').join('')
+        .split(projectDir).join('.');
+
+      // Detect missing external packages and provide helpful advice
+      let missingPackageAdvice = '';
+      if (isPython) {
+        const pkgMatch = cleanStderr.match(/ModuleNotFoundError:\s+No module named\s+['"]([^'"]+)['"]/);
+        if (pkgMatch) {
+          const missingPkg = pkgMatch[1];
+          const isLocal = fileMap[`${missingPkg}.py`] || fileMap[missingPkg];
+          if (!isLocal) {
+            missingPackageAdvice = `\n\n[Package Error: External package '${missingPkg}' is not installed in the execution environment.\nTo install it on your system, run:\n  pip install ${missingPkg}\nNote: Local files in your workspace (e.g. utils.py) can be imported directly without pip.]`;
+          }
+        }
+      } else if (isJs || isTs) {
+        const pkgMatch = cleanStderr.match(/Cannot find module\s+['"]([^'"]+)['"]/);
+        if (pkgMatch) {
+          const missingPkg = pkgMatch[1];
+          if (!missingPkg.startsWith('.') && !missingPkg.startsWith('/')) {
+            missingPackageAdvice = `\n\n[Package Error: External npm package '${missingPkg}' is not installed.\nTo install it, run:\n  npm install ${missingPkg}]`;
+          }
+        }
+      }
+
+      if (missingPackageAdvice) {
+        cleanStderr = (cleanStderr ? `${cleanStderr}\n` : '') + missingPackageAdvice;
+      }
 
       const codeVal = exitCode ?? 0;
       const isSuccess = codeVal === 0 && (!cleanStderr.trim() || cleanStderr.includes('DeprecationWarning'));
@@ -789,7 +872,7 @@ function executeCodeInProcess(
         output: displayOutput,
         exitCode: isSuccess ? 0 : (codeVal || 1),
         executionTimeMs: durationMs,
-        language,
+        language: effectiveLang,
         engine: command,
       });
     });
@@ -799,13 +882,19 @@ function executeCodeInProcess(
 // 5. Safe Sandboxed Code Execution Endpoint
 app.post('/api/v1/execute', optionalAuth, async (req, res) => {
   try {
-    const { code, programmingLanguage = 'python', input = '' } = req.body;
+        const { code, files, activeFileName, programmingLanguage = 'python', input = '' } = req.body;
 
-    if (!code || typeof code !== 'string') {
-      return res.status(400).json({ error: 'No code provided to execute.' });
+    if (!code && (!files || Object.keys(files).length === 0)) {
+      return res.status(400).json({ error: 'No code or files provided to execute.' });
     }
 
-    const result = await executeCodeInProcess(code, programmingLanguage, input);
+    const result = await executeCodeInProcess({
+      code,
+      files,
+      activeFileName,
+      language: programmingLanguage,
+      input,
+    });
 
     return res.json({
       success: result.success,

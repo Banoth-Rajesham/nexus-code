@@ -26,12 +26,12 @@ export function AppContent() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-[#242424]">
+    <div className={`flex flex-col bg-white text-[#242424] ${currentView === 'workspace' ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {/* Universal Top Navigation */}
       <Navbar currentView={currentView} onNavigate={handleNavigate} />
 
       {/* Main Page Views */}
-      <main className="flex-1 flex flex-col">
+      <main className={`flex-1 flex flex-col ${currentView === 'workspace' ? 'overflow-hidden min-h-0' : ''}`}>
         {currentView === 'landing' && <LandingPage onNavigate={handleNavigate} />}
         {currentView === 'workspace' && (
           <WorkspacePage onNavigate={handleNavigate} initialProject={activeProjectData} />

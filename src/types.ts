@@ -88,6 +88,13 @@ export interface Project {
   updatedAt: string;
 }
 
+export interface ProjectFile {
+  id: string;
+  name: string;
+  content: string;
+  isEntry?: boolean;
+}
+
 export type NativeLanguageKey = 'telugu' | 'hindi' | 'tamil' | 'kannada' | 'marathi' | 'bengali' | 'gujarati' | 'english';
 
 export interface NativeLanguageOption {

@@ -17,7 +17,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
   return (
     <>
       {/* Top Outlook-style announcement ribbon */}
-      {!bannerDismissed && (
+      {!bannerDismissed && currentView === 'landing' && (
         <div className="bg-[#091f2c] text-[#f4fafd] text-[13px] py-2 px-4 flex items-center justify-between z-50">
           <div className="max-w-[1360px] mx-auto w-full flex items-center justify-center gap-2 text-center">
             <span>Learn to code and master algorithms in your mother tongue with BhashaCode AI.</span>
