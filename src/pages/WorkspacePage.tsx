@@ -50,6 +50,8 @@ import {
 import { translateCodeToNative, TranslationMode } from '../utils/codeTranslator';
 import { HighlightedCodeBlock, VSCODE_MONO_FONT, CODE_EDITOR_SHARED_STYLE } from '../utils/codeHighlighter';
 import { NATIVE_CODE_WORD, NATIVE_GUIDE_WORD, NATIVE_PSEUDO_WORD, transliterateWord } from '../utils/codeTransliterator';
+import { debugCodeDeterministically, convertCodeDeterministically, askCodeDeterministically } from '../utils/deterministicTools';
+import { analyzeCodeRuleBased } from '../utils/ruleBasedAnalyzer';
 
 interface WorkspacePageProps {
   onNavigate: (view: string) => void;
@@ -76,108 +78,13 @@ const LANG_ICONS: Record<string, string> = {
   rust: '🦀',
 };
 
-const SECTION_TITLES: Record<string, {
-  overview: string;
-  lineByLine: string;
-  executionFlow: string;
-  expectedOutput: string;
-  simpleSummary: string;
-  syntaxIssues: string;
-}> = {
-  telugu: {
-    overview: 'కోడ్ ఏం చేస్తుంది?',
-    lineByLine: 'లైన్ బై లైన్ వివరణ',
-    executionFlow: 'కోడ్ ఎలా నడుస్తుంది?',
-    expectedOutput: 'చివరి ఫలితం',
-    simpleSummary: 'సులభమైన సారాంశం',
-    syntaxIssues: 'సింటాక్స్ పరిశీలన / సలహా',
-  },
-  hindi: {
-    overview: 'कोड क्या करता है?',
-    lineByLine: 'लाइन दर लाइन व्याख्या',
-    executionFlow: 'कोड कैसे चलता है?',
-    expectedOutput: 'अंतिम परिणाम',
-    simpleSummary: 'सरल सारांश',
-    syntaxIssues: 'सिंटैक्स जांच / सुझाव',
-  },
-  tamil: {
-    overview: 'குறியீடு என்ன செய்கிறது?',
-    lineByLine: 'வரிக்கு வரி விளக்கம்',
-    executionFlow: 'குறியீடு எவ்வாறு இயங்குகிறது?',
-    expectedOutput: 'இறுதி முடிவு',
-    simpleSummary: 'எளிய சுருக்கம்',
-    syntaxIssues: 'தொடரியல் சோதனை / ஆலோசனை',
-  },
-  kannada: {
-    overview: 'ಕೋಡ್ ಏನು ಮಾಡುತ್ತದೆ?',
-    lineByLine: 'ಸಾಲಿನಿಂದ ಸಾಲಿಗೆ ವಿವರಣೆ',
-    executionFlow: 'ಕೋಡ್ ಹೇಗೆ ಚಲಿಸುತ್ತದೆ?',
-    expectedOutput: 'ಅಂತಿಮ ಫಲಿತಾಂಶ',
-    simpleSummary: 'ಸರಳ ಸಾರಾಂಶ',
-    syntaxIssues: 'ಸಿಂಟ್ಯಾಕ್ಸ್ ಪರಿಶೀಲನೆ / ಸಲಹೆ',
-  },
-  marathi: {
-    overview: 'कोड काय करतो?',
-    lineByLine: 'ओळ दर ओळ स्पष्टीकरण',
-    executionFlow: 'कोड कसा चालतो?',
-    expectedOutput: 'अंतिम निकाल',
-    simpleSummary: 'साधा सारांश',
-    syntaxIssues: 'सिंटॅक्स तपासणी / सल्ला',
-  },
-  bengali: {
-    overview: 'কোড কি করে?',
-    lineByLine: 'লাইন বাই লাইন ব্যাখ্যা',
-    executionFlow: 'কোড কিভাবে চলে?',
-    expectedOutput: 'চূড়ান্ত ফলাফল',
-    simpleSummary: 'সহজ সারাংশ',
-    syntaxIssues: 'সিনট্যাক্স পরীক্ষা / পরামর্শ',
-  },
-  gujarati: {
-    overview: 'કોડ શું કરે છે?',
-    lineByLine: 'લાઇન દર લાઇન સમજૂતી',
-    executionFlow: 'કોડ કેવી રીતે ચાલે છે?',
-    expectedOutput: 'અંતિમ પરિણામ',
-    simpleSummary: 'સરળ સારાંશ',
-    syntaxIssues: 'સિંટેક્સ ચકાસણી / સલાહ',
-  },
-  english: {
-    overview: 'What Does the Code Do?',
-    lineByLine: 'Line-by-Line Explanation',
-    executionFlow: 'How Does the Code Run?',
-    expectedOutput: 'Expected Output / Final Result',
-    simpleSummary: 'Simple Summary',
-    syntaxIssues: 'Syntax Issues / Suggestions',
-  },
-};
-
+// Default project files: Only main.py for a new project
 const DEFAULT_PROJECT_FILES: ProjectFile[] = [
   {
     id: 'f_main',
     name: 'main.py',
-    content: `from utils import calculate_sum
-from helper import format_result
-
-# Test numbers list
-numbers = [10, 20, 30]
-result = calculate_sum(numbers)
-print(format_result("Calculated sum", result))`,
+    content: `# BhashaCode Python Project\n\ndef calculate_sum(a, b):\n    return a + b\n\nresult = calculate_sum(10, 20)\nprint("Result:", result)\n`,
     isEntry: true,
-  },
-  {
-    id: 'f_utils',
-    name: 'utils.py',
-    content: `def calculate_sum(numbers):
-    # Sum all numbers in the list
-    total = 0
-    for number in numbers:
-        total += number
-    return total`,
-  },
-  {
-    id: 'f_helper',
-    name: 'helper.py',
-    content: `def format_result(label, value):
-    return f"==> {label}: {value}"`,
   },
 ];
 
@@ -192,6 +99,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     initialProject?.nativeLanguage || (user?.defaultLanguage as NativeLanguageKey) || 'telugu'
   );
 
+  // Files state (persisted to localStorage)
   const [files, setFiles] = useState<ProjectFile[]>(() => {
     if (initialProject?.code) {
       return [
@@ -203,17 +111,54 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
         },
       ];
     }
+    try {
+      const saved = localStorage.getItem('bhashacode_files_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
     return DEFAULT_PROJECT_FILES;
   });
 
+  // Open tabs state (persisted to localStorage)
+  const [openTabIds, setOpenTabIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bhashacode_open_tabs_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [files[0]?.id || 'f_main'];
+  });
+
+  // Active file ID
   const [activeFileId, setActiveFileId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('bhashacode_active_file_v2');
+      if (saved && files.some((f) => f.id === saved)) return saved;
+    } catch {}
     return files[0]?.id || 'f_main';
   });
+
+  // Persist files and tabs to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('bhashacode_files_v2', JSON.stringify(files));
+      localStorage.setItem('bhashacode_open_tabs_v2', JSON.stringify(openTabIds));
+      localStorage.setItem('bhashacode_active_file_v2', activeFileId);
+    } catch {}
+  }, [files, openTabIds, activeFileId]);
 
   // Active file helper
   const activeFile = useMemo(() => {
     return files.find((f) => f.id === activeFileId) || files[0] || { id: 'default', name: 'main.py', content: '' };
   }, [files, activeFileId]);
+
+  const entryFile = useMemo(() => {
+    return files.find((f) => f.isEntry) || files[0] || activeFile;
+  }, [files, activeFile]);
 
   const code = activeFile.content;
 
@@ -227,6 +172,27 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const [translationMode, setTranslationMode] = useState<TranslationMode>('guide');
   const [viewLayout, setViewLayout] = useState<'split' | 'english' | 'native'>('split');
   const [mobileView, setMobileView] = useState<'files' | 'english' | 'native' | 'console'>('english');
+
+  // Draggable Split Divider State (20% to 80%)
+  const [splitPercent, setSplitPercent] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('bhashacode_split_percent');
+      if (saved) return Number(saved);
+    } catch {}
+    return 50;
+  });
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+
+  // Draggable Bottom Console Resizer State (120px to 80vh)
+  const [consoleHeight, setConsoleHeight] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('bhashacode_console_height');
+      if (saved) return Number(saved);
+    } catch {}
+    return 240;
+  });
+  const [isDraggingConsole, setIsDraggingConsole] = useState(false);
 
   // Console & AI drawer state
   const [showConsole, setShowConsole] = useState(false);
@@ -274,46 +240,112 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const [stdinInput, setStdinInput] = useState('');
   const [showFileExplorer, setShowFileExplorer] = useState(true);
 
+  // Reactive window width for responsive layout decisions
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Inline file creation / renaming state
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [renameInput, setRenameInput] = useState('');
 
-  // Refs for synchronized scroll & syntax highlighting
+  // Refs for editor & viewer
   const englishEditorRef = useRef<HTMLTextAreaElement>(null);
   const englishPreRef = useRef<HTMLDivElement>(null);
   const nativeViewerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // INSTANT TRANSLATION (Client-side, 0 latency, updates as user types!)
+  // INSTANT DETERMINISTIC TRANSLATION (Client-side, 0 latency, updates as user types)
   const nativeTranslation = useMemo(() => {
     return translateCodeToNative(code, nativeLang, translationMode);
   }, [code, nativeLang, translationMode]);
 
-  // Sync scroll between background highlight, left editor and right viewer
+  // Independent scrolling: left editor syncs with its syntax overlay; right viewer scrolls independently
   const handleEnglishScroll = () => {
-    if (englishEditorRef.current) {
-      if (englishPreRef.current) {
-        englishPreRef.current.scrollTop = englishEditorRef.current.scrollTop;
-        englishPreRef.current.scrollLeft = englishEditorRef.current.scrollLeft;
-      }
-      if (nativeViewerRef.current) {
-        nativeViewerRef.current.scrollTop = englishEditorRef.current.scrollTop;
-      }
+    if (englishEditorRef.current && englishPreRef.current) {
+      englishPreRef.current.scrollTop = englishEditorRef.current.scrollTop;
+      englishPreRef.current.scrollLeft = englishEditorRef.current.scrollLeft;
     }
   };
 
-  const handleNativeScroll = () => {
-    if (nativeViewerRef.current) {
-      if (englishEditorRef.current) {
-        englishEditorRef.current.scrollTop = nativeViewerRef.current.scrollTop;
-      }
-      if (englishPreRef.current) {
-        englishPreRef.current.scrollTop = nativeViewerRef.current.scrollTop;
-      }
-    }
+  // Draggable Split Divider Event Listener
+  const handleSplitMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsDraggingSplit(true);
   };
+
+  useEffect(() => {
+    if (!isDraggingSplit) return;
+
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      if (!splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const newPercent = ((clientX - rect.left) / rect.width) * 100;
+      const clamped = Math.max(20, Math.min(80, newPercent));
+      setSplitPercent(clamped);
+      try {
+        localStorage.setItem('bhashacode_split_percent', String(clamped));
+      } catch {}
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSplit(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchmove', handleMouseMove);
+    window.addEventListener('touchend', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleMouseMove);
+      window.removeEventListener('touchend', handleMouseUp);
+    };
+  }, [isDraggingSplit]);
+
+  // Draggable Bottom Console Resizer Event Listener
+  const handleConsoleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsDraggingConsole(true);
+  };
+
+  useEffect(() => {
+    if (!isDraggingConsole) return;
+
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const newH = window.innerHeight - clientY;
+      const clamped = Math.max(120, Math.min(window.innerHeight * 0.8, newH));
+      setConsoleHeight(clamped);
+      try {
+        localStorage.setItem('bhashacode_console_height', String(clamped));
+      } catch {}
+    };
+
+    const handleUp = () => {
+      setIsDraggingConsole(false);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchend', handleUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
+    };
+  }, [isDraggingConsole]);
 
   // Cross-file symbol references and module relationship analysis
   const moduleImports = useMemo(() => {
@@ -322,25 +354,104 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
       moduleName: string;
       importedSymbols: string[];
       isLocal: boolean;
+      targetFile?: ProjectFile;
+      missingFile: boolean;
+      missingSymbols: string[];
       translatedSymbols: string[];
     }> = [];
+
+    const standardPackages = new Set([
+      'math', 'sys', 'os', 'json', 'random', 'time', 'datetime', 're', 'collections',
+      'itertools', 'functools', 'urllib', 'requests', 'diagrams', 'numpy', 'pandas',
+      'matplotlib', 'scipy', 'typing', 'pathlib', 'sqlite3', 'unittest', 'pytest',
+      'fs', 'path', 'http', 'express', 'react', 'crypto'
+    ]);
 
     files.forEach((file) => {
       const lines = file.content.split('\n');
       lines.forEach((line) => {
         const trimmed = line.trim();
+
+        // 1. Python: from <mod> import <syms>
         const fromMatch = trimmed.match(/^from\s+([a-zA-Z0-9_.]+)\s+import\s+(.+)$/);
         if (fromMatch) {
           const mod = fromMatch[1];
-          const rawSyms = fromMatch[2].split(',').map((s) => s.trim().split(' as ')[0].trim()).filter(Boolean);
-          const isLocal = files.some(
+          const rawSyms = fromMatch[2].split(',').map((s) => s.trim().split(/\s+as\s+/)[0].trim()).filter(Boolean);
+          const target = files.find(
             (f) => f.name === `${mod}.py` || f.name === mod || f.name === `${mod}.js` || f.name === `${mod}.ts`
           );
+          const isStandard = standardPackages.has(mod.split('.')[0]);
+          const isLocal = !!target;
+          const missingFile = !target && !isStandard;
+
+          const missingSymbols: string[] = [];
+          if (target) {
+            rawSyms.forEach((sym) => {
+              if (sym === '*') return;
+              const defPattern = new RegExp(`\\b(def|class)\\s+${sym}\\b|\\b${sym}\\s*=`);
+              if (!defPattern.test(target.content)) {
+                missingSymbols.push(sym);
+              }
+            });
+          }
+
           list.push({
             fromFile: file.name,
             moduleName: mod,
             importedSymbols: rawSyms,
             isLocal,
+            targetFile: target,
+            missingFile,
+            missingSymbols,
+            translatedSymbols: rawSyms.map((s) => transliterateWord(s, nativeLang)),
+          });
+        }
+
+        // 2. Python: import <mod>
+        const importMatch = trimmed.match(/^import\s+([a-zA-Z0-9_.]+)(?:\s+as\s+[a-zA-Z0-9_]+)?$/);
+        if (importMatch && !trimmed.startsWith('from ')) {
+          const mod = importMatch[1];
+          const target = files.find(
+            (f) => f.name === `${mod}.py` || f.name === mod || f.name === `${mod}.js` || f.name === `${mod}.ts`
+          );
+          const isStandard = standardPackages.has(mod.split('.')[0]);
+          const isLocal = !!target;
+          const missingFile = !target && !isStandard;
+
+          list.push({
+            fromFile: file.name,
+            moduleName: mod,
+            importedSymbols: [mod],
+            isLocal,
+            targetFile: target,
+            missingFile,
+            missingSymbols: [],
+            translatedSymbols: [transliterateWord(mod, nativeLang)],
+          });
+        }
+
+        // 3. JS / TS: import ... from './<mod>'
+        const jsImportMatch = trimmed.match(/^import\s+(?:\{([^}]+)\}|([a-zA-Z0-9_$]+))\s+from\s+['"]\.\/([^'"]+)['"]/);
+        if (jsImportMatch) {
+          const rawSyms = jsImportMatch[1]
+            ? jsImportMatch[1].split(',').map((s) => s.trim().split(/\s+as\s+/)[0].trim()).filter(Boolean)
+            : [jsImportMatch[2].trim()];
+          const modRaw = jsImportMatch[3];
+          const modClean = modRaw.replace(/\.(js|ts|jsx|tsx)$/, '');
+          const target = files.find(
+            (f) => f.name === modRaw || f.name === `${modClean}.js` || f.name === `${modClean}.ts` || f.name === modClean
+          );
+          const isLocal = !!target;
+          const missingFile = !target;
+
+          list.push({
+            fromFile: file.name,
+            moduleName: modClean,
+            importedSymbols: rawSyms,
+            isLocal,
+            targetFile: target,
+            missingFile,
+            missingSymbols: [],
             translatedSymbols: rawSyms.map((s) => transliterateWord(s, nativeLang)),
           });
         }
@@ -350,11 +461,39 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     return list;
   }, [files, nativeLang]);
 
+  // Circular imports detection
+  const circularImports = useMemo(() => {
+    const cycles: Array<{ fileA: string; fileB: string }> = [];
+    moduleImports.forEach((imp) => {
+      if (imp.isLocal && imp.targetFile) {
+        const reverseImp = moduleImports.find(
+          (other) =>
+            other.fromFile === imp.targetFile?.name &&
+            other.moduleName.replace(/\.[^/.]+$/, '') === imp.fromFile.replace(/\.[^/.]+$/, '')
+        );
+        if (reverseImp) {
+          const already = cycles.some(
+            (c) =>
+              (c.fileA === imp.fromFile && c.fileB === reverseImp.fromFile) ||
+              (c.fileA === reverseImp.fromFile && c.fileB === imp.fromFile)
+          );
+          if (!already) {
+            cycles.push({ fileA: imp.fromFile, fileB: reverseImp.fromFile });
+          }
+        }
+      }
+    });
+    return cycles;
+  }, [moduleImports]);
+
   // Keyboard shortcut: Ctrl+B / Cmd+B to toggle side menu
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Don't toggle if typing inside an input or textarea
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        const target = e.target as HTMLElement;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+          return;
+        }
         e.preventDefault();
         setShowFileExplorer((v) => !v);
       }
@@ -363,12 +502,35 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
-  // Scroll chat
+  // Scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
   // Multi-File Operations
+  const handleOpenFile = (fileId: string) => {
+    if (!openTabIds.includes(fileId)) {
+      setOpenTabIds((prev) => [...prev, fileId]);
+    }
+    setActiveFileId(fileId);
+    if (mobileView === 'files') setMobileView('english');
+  };
+
+  const handleCloseTab = (fileId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const nextOpen = openTabIds.filter((id) => id !== fileId);
+    if (nextOpen.length === 0) {
+      const fallbackId = files.find((f) => f.id !== fileId)?.id || fileId;
+      setOpenTabIds([fallbackId]);
+      setActiveFileId(fallbackId);
+      return;
+    }
+    setOpenTabIds(nextOpen);
+    if (activeFileId === fileId) {
+      setActiveFileId(nextOpen[nextOpen.length - 1]);
+    }
+  };
+
   const handleCreateFileSubmit = () => {
     const name = newFileName.trim();
     if (!name) {
@@ -383,13 +545,20 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
       return;
     }
 
+    const defaultContent = finalName.endsWith('.py')
+      ? `# ${finalName}\n\ndef ${finalName.replace(/\.[^/.]+$/, '')}_task():\n    return "Ready"\n`
+      : finalName.endsWith('.js') || finalName.endsWith('.ts')
+      ? `// ${finalName}\n\nexport function ${finalName.replace(/\.[^/.]+$/, '')}Task() {\n  return "Ready";\n}\n`
+      : `// ${finalName}\n`;
+
     const newFile: ProjectFile = {
       id: `f_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: finalName,
-      content: `# ${finalName}\n\ndef ${finalName.replace(/\.[^/.]+$/, '')}_example():\n    return "Ready"\n`,
+      content: defaultContent,
     };
 
     setFiles((prev) => [...prev, newFile]);
+    setOpenTabIds((prev) => [...prev, newFile.id]);
     setActiveFileId(newFile.id);
     setIsCreatingFile(false);
     setNewFileName('');
@@ -416,7 +585,8 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     setRenameInput('');
   };
 
-  const handleDeleteFile = (fileId: string) => {
+  const handleDeleteFile = (fileId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (files.length <= 1) {
       setErrorMessage('Cannot delete the only file in your project.');
       return;
@@ -427,12 +597,16 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     const remaining = files.filter((f) => f.id !== fileId);
     setFiles(remaining);
 
+    const nextOpen = openTabIds.filter((id) => id !== fileId);
+    setOpenTabIds(nextOpen.length > 0 ? nextOpen : [remaining[0].id]);
+
     if (activeFileId === fileId) {
-      setActiveFileId(remaining[0].id);
+      setActiveFileId(nextOpen.length > 0 ? nextOpen[0] : remaining[0].id);
     }
   };
 
-  const handleSetEntrypoint = (fileId: string) => {
+  const handleSetEntrypoint = (fileId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setFiles((prev) =>
       prev.map((f) => ({ ...f, isEntry: f.id === fileId }))
     );
@@ -442,118 +616,87 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const handleLoadSample = (sampleType: string) => {
     if (sampleType === 'modular_math') {
       setProgLang('python');
-      setFiles([
+      const sampleFiles: ProjectFile[] = [
         {
           id: 'f_main',
           name: 'main.py',
-          content: `from utils import calculate_sum
-from helper import format_result
-
-# Test numbers list
-numbers = [10, 20, 30]
-result = calculate_sum(numbers)
-print(format_result("Calculated sum", result))`,
+          content: `from utils import calculate_sum\nfrom helper import format_result\n\n# Test numbers list\nnumbers = [10, 20, 30]\nresult = calculate_sum(numbers)\nprint(format_result("Calculated sum", result))`,
           isEntry: true,
         },
         {
           id: 'f_utils',
           name: 'utils.py',
-          content: `def calculate_sum(numbers):
-    # Sum all numbers in the list
-    total = 0
-    for number in numbers:
-        total += number
-    return total`,
+          content: `def calculate_sum(numbers):\n    # Sum all numbers in the list\n    total = 0\n    for number in numbers:\n        total += number\n    return total`,
         },
         {
           id: 'f_helper',
           name: 'helper.py',
-          content: `def format_result(label, value):
-    return f"==> {label}: {value}"`,
+          content: `def format_result(label, value):\n    return f"==> {label}: {value}"`,
         },
-      ]);
+      ];
+      setFiles(sampleFiles);
+      setOpenTabIds(['f_main', 'f_utils', 'f_helper']);
       setActiveFileId('f_main');
       setProjectTitle('modular_math');
     } else if (sampleType === 'count_number') {
       setProgLang('python');
+      const newId = `f_count_${Date.now()}`;
       setFiles([
         {
-          id: 'f_count',
+          id: newId,
           name: 'count_number.py',
-          content: `def count_number(arr, target):
-    # count occurrences in array
-    count = 0
-    for num in arr:
-        if num == target:
-            count += 1
-    return count
-
-numbers = [2, 5, 8, 2, 9, 2, 11]
-result = count_number(numbers, 2)
-print("Target count:", result)`,
+          content: `def count_number(arr, target):\n    # count occurrences in array\n    count = 0\n    for num in arr:\n        if num == target:\n            count += 1\n    return count\n\nnumbers = [2, 5, 8, 2, 9, 2, 11]\nresult = count_number(numbers, 2)\nprint("Target count:", result)`,
           isEntry: true,
         },
       ]);
-      setActiveFileId('f_count');
+      setOpenTabIds([newId]);
+      setActiveFileId(newId);
       setProjectTitle('count_occurrences');
     } else if (sampleType === 'binary_search') {
       setProgLang('python');
       const snippet = SUPPORTED_PROG_LANGUAGES.find((p) => p.key === 'python')?.defaultSnippet || '';
+      const newId = `f_bs_${Date.now()}`;
       setFiles([
         {
-          id: 'f_bs',
+          id: newId,
           name: 'binary_search.py',
           content: snippet,
           isEntry: true,
         },
       ]);
-      setActiveFileId('f_bs');
+      setOpenTabIds([newId]);
+      setActiveFileId(newId);
       setProjectTitle('binary_search');
     } else if (sampleType === 'buggy_loop') {
       setProgLang('python');
+      const newId = `f_bug_${Date.now()}`;
       setFiles([
         {
-          id: 'f_bug',
+          id: newId,
           name: 'average.py',
-          content: `def calculate_average(scores):
-    total = 0
-    # Bug: Off-by-one and division by zero vulnerability
-    for i in range(len(scores) + 1):
-        total += scores[i]
-    return total / len(scores)
-
-grades = [88, 92, 79, 95]
-print("Average:", calculate_average(grades))`,
+          content: `def calculate_average(scores):\n    total = 0\n    # Bug: Off-by-one and division by zero vulnerability\n    for i in range(len(scores) + 1):\n        total += scores[i]\n    return total / len(scores)\n\ngrades = [88, 92, 79, 95]\nprint("Average:", calculate_average(grades))`,
           isEntry: true,
         },
       ]);
-      setActiveFileId('f_bug');
+      setOpenTabIds([newId]);
+      setActiveFileId(newId);
       setProjectTitle('buggy_average');
       setShowConsole(true);
       setConsoleTab('ai');
       setAiSubTab('debug');
     } else if (sampleType === 'js_filter') {
       setProgLang('javascript');
+      const newId = `f_js_${Date.now()}`;
       setFiles([
         {
-          id: 'f_js_main',
+          id: newId,
           name: 'index.js',
-          content: `function filterEvenNumbers(numbers) {
-  const evens = [];
-  for (let i = 0; i < numbers.length; i++) {
-    if (numbers[i] % 2 === 0) {
-      evens.push(numbers[i]);
-    }
-  }
-  return evens;
-}
-
-const nums = [1, 2, 3, 4, 5, 6, 7, 8];
-console.log("Even numbers:", filterEvenNumbers(nums));`,
+          content: `function filterEvenNumbers(numbers) {\n  const evens = [];\n  for (let i = 0; i < numbers.length; i++) {\n    if (numbers[i] % 2 === 0) {\n      evens.push(numbers[i]);\n    }\n  }\n  return evens;\n}\n\nconst nums = [1, 2, 3, 4, 5, 6, 7, 8];\nconsole.log("Even numbers:", filterEvenNumbers(nums));`,
           isEntry: true,
         },
       ]);
-      setActiveFileId('f_js_main');
+      setOpenTabIds([newId]);
+      setActiveFileId(newId);
       setProjectTitle('filter_even');
     }
   };
@@ -565,15 +708,16 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
     const ext = SUPPORTED_PROG_LANGUAGES.find((p) => p.key === key)?.extension || '.py';
     const snippet = SUPPORTED_PROG_LANGUAGES.find((p) => p.key === key)?.defaultSnippet || '';
 
-    setFiles([
-      {
-        id: `f_${Date.now()}`,
-        name: `main${ext}`,
-        content: snippet,
-        isEntry: true,
-      },
-    ]);
-    setActiveFileId(files[0]?.id || 'f_main');
+    const newId = `f_${Date.now()}`;
+    const mainFile: ProjectFile = {
+      id: newId,
+      name: key === 'javascript' ? 'index.js' : key === 'typescript' ? 'index.ts' : `main${ext}`,
+      content: snippet,
+      isEntry: true,
+    };
+    setFiles([mainFile]);
+    setOpenTabIds([newId]);
+    setActiveFileId(newId);
     setTerminalOutput(null);
   };
 
@@ -653,7 +797,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
       return;
     }
 
-    // 4. Smart Backspace: Remove 4 spaces if cursor is preceded by 4 spaces
+    // 4. Smart Backspace: Remove 4 spaces
     if (e.key === 'Backspace' && start === end && start >= 4) {
       const preceding = val.substring(start - 4, start);
       const lineStart = val.lastIndexOf('\n', start - 1) + 1;
@@ -706,8 +850,8 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
 
   // 1. RUN CODE — Real Subprocess Execution with Multi-File support!
   const handleExecute = async () => {
-    if (!code.trim()) {
-      setErrorMessage('Please enter code to run.');
+    if (!code.trim() && files.length === 0) {
+      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి రన్ చేయడానికి కోడ్ రాయండి.' : 'Please enter code to run.');
       return;
     }
     setErrorMessage(null);
@@ -722,14 +866,16 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
       filePayload[f.name] = f.content;
     });
 
+    const targetRunFile = entryFile || activeFile;
+
     try {
       const res = await fetch('/api/v1/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           files: filePayload,
-          code: activeFile.content,
-          activeFileName: activeFile.name,
+          code: targetRunFile.content,
+          activeFileName: targetRunFile.name,
           programmingLanguage: progLang,
           input: stdinInput,
         }),
@@ -756,10 +902,10 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
     }
   };
 
-  // 2. Explain Code
+  // 2. Explain Code (Deterministic Rule-Based)
   const handleExplain = async () => {
     if (!code.trim()) {
-      setErrorMessage('Please enter code first.');
+      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి ముందుగా కోడ్ రాయండి.' : 'Please enter code first.');
       return;
     }
     setErrorMessage(null);
@@ -767,22 +913,41 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
     setShowConsole(true);
     setConsoleTab('ai');
     setAiSubTab('lineByLine');
-    setExplanation(null);
     try {
-      const res = await fetch('/api/v1/explain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ code, programmingLanguage: progLang, nativeLanguage: nativeLang }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || 'Failed to explain.');
-        return;
+      // Deterministic client-side execution + server sync
+      const result = analyzeCodeRuleBased(code, progLang, nativeLang);
+      setExplanation(result);
+
+      if (token) {
+        fetch('/api/v1/explain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ code, programmingLanguage: progLang, nativeLanguage: nativeLang }),
+        }).then(() => refreshUser()).catch(() => {});
       }
-      setExplanation(data.data);
-      if (token) refreshUser();
     } catch (err: any) {
-      setErrorMessage(err.message || 'Network error.');
+      setErrorMessage(err.message || 'Explanation failed.');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  // 2b. Simple Logic Tool
+  const handleSimpleLogic = () => {
+    if (!code.trim()) {
+      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి ముందుగా కోడ్ రాయండి.' : 'Please enter code first.');
+      return;
+    }
+    setErrorMessage(null);
+    setLoadingAction('simpleLogic');
+    setShowConsole(true);
+    setConsoleTab('ai');
+    setAiSubTab('simpleLogic');
+    try {
+      const result = analyzeCodeRuleBased(code, progLang, nativeLang);
+      setExplanation(result);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Logic analysis failed.');
     } finally {
       setLoadingAction(null);
     }
@@ -791,25 +956,17 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
   const handleNativeLangChange = (newLang: NativeLanguageKey) => {
     setNativeLang(newLang);
     if (explanation && code.trim()) {
-      setLoadingAction('explain');
-      fetch('/api/v1/explain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ code, programmingLanguage: progLang, nativeLanguage: newLang }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data?.data) setExplanation(data.data);
-        })
-        .catch(() => {})
-        .finally(() => setLoadingAction(null));
+      try {
+        const result = analyzeCodeRuleBased(code, progLang, newLang);
+        setExplanation(result);
+      } catch {}
     }
   };
 
-  // 3. Debug
+  // 3. Debug & Fix (Deterministic Rule-Based)
   const handleDebug = async () => {
     if (!code.trim()) {
-      setErrorMessage('Please enter code first.');
+      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి ముందుగా కోడ్ రాయండి.' : 'Please enter code first.');
       return;
     }
     setErrorMessage(null);
@@ -818,58 +975,48 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
     setConsoleTab('ai');
     setAiSubTab('debug');
     try {
-      const res = await fetch('/api/v1/debug', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ code, programmingLanguage: progLang, nativeLanguage: nativeLang }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || 'Debug failed.');
-        return;
-      }
-      setDebugResult(data.data);
+      const result = debugCodeDeterministically(
+        code,
+        progLang,
+        nativeLang,
+        terminalOutput?.output || ''
+      );
+      setDebugResult(result);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Network error.');
+      setErrorMessage(err.message || 'Debug failed.');
     } finally {
       setLoadingAction(null);
     }
   };
 
-  // 4. Convert
+  // 4. Convert Code (Deterministic Python <-> JS/TS and Native Pseudocode)
   const handleConvert = async () => {
     if (!code.trim()) {
-      setErrorMessage('Please enter code first.');
+      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి ముందుగా కోడ్ రాయండి.' : 'Please enter code first.');
       return;
     }
     setErrorMessage(null);
     setLoadingAction('convert');
+    setShowConsole(true);
+    setConsoleTab('ai');
+    setAiSubTab('convert');
     try {
-      const res = await fetch('/api/v1/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({
-          code,
-          sourceLanguage: progLang,
-          targetLanguage: convertTargetLang,
-          nativeLanguage: nativeLang,
-          mode: convertMode,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMessage(data.error || 'Conversion failed.');
-        return;
-      }
-      setConversionResult(data.data);
+      const result = convertCodeDeterministically(
+        code,
+        progLang,
+        convertTargetLang,
+        nativeLang,
+        convertMode
+      );
+      setConversionResult(result);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Network error.');
+      setErrorMessage(err.message || 'Conversion failed.');
     } finally {
       setLoadingAction(null);
     }
   };
 
-  // 5. Ask AI
+  // 5. Ask in Bhasha (Deterministic Context-Aware Tutor)
   const handleAskAi = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!questionInput.trim()) return;
@@ -878,21 +1025,10 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
     setChatMessages((prev) => [...prev, { sender: 'user', text: q }]);
     setAskingAi(true);
     try {
-      const res = await fetch('/api/v1/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ code, question: q, programmingLanguage: progLang, nativeLanguage: nativeLang }),
-      });
-      const data = await res.json();
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          sender: 'ai',
-          text: res.ok && data.answer ? data.answer : data.error || 'సమాధానం పొందడంలో సమస్య ఎదురైంది.',
-        },
-      ]);
+      const answer = askCodeDeterministically(code, q, progLang, nativeLang);
+      setChatMessages((prev) => [...prev, { sender: 'ai', text: answer }]);
     } catch (err: any) {
-      setChatMessages((prev) => [...prev, { sender: 'ai', text: 'Network connection error.' }]);
+      setChatMessages((prev) => [...prev, { sender: 'ai', text: 'Error generating response.' }]);
     } finally {
       setAskingAi(false);
     }
@@ -952,22 +1088,6 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
     URL.revokeObjectURL(url);
   };
 
-  const handleSpeakText = (text: string) => {
-    if (!('speechSynthesis' in window)) return;
-    if (speaking) {
-      window.speechSynthesis.cancel();
-      setSpeaking(false);
-      return;
-    }
-    const u = new SpeechSynthesisUtterance(text);
-    const langMap: Record<string, string> = { hindi: 'hi-IN', telugu: 'te-IN', tamil: 'ta-IN', kannada: 'kn-IN' };
-    u.lang = langMap[nativeLang] || 'en-US';
-    u.onend = () => setSpeaking(false);
-    u.onerror = () => setSpeaking(false);
-    setSpeaking(true);
-    window.speechSynthesis.speak(u);
-  };
-
   const lineCount = code.split('\n').length;
   const currentLang = SUPPORTED_PROG_LANGUAGES.find((p) => p.key === progLang);
   const currentNative = SUPPORTED_NATIVE_LANGUAGES.find((l) => l.key === nativeLang);
@@ -975,7 +1095,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
   const langIcon = LANG_ICONS[progLang] || progLang.slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full bg-[#0d1117] text-white overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 h-full bg-[#0d1117] text-white overflow-hidden select-text">
       {/* ─── TOP BAR (Responsive IDE Toolbar) ────────────────────────── */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] shrink-0 gap-2 overflow-x-auto no-scrollbar">
         {/* Left: Language Picker + File Explorer Toggle + Samples */}
@@ -1019,7 +1139,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
           {/* Side Menu Toggle Button */}
           <button
             onClick={() => setShowFileExplorer((v) => !v)}
-            title={showFileExplorer ? "Hide Side Menu (Ctrl+B) to get free editor space" : "Show Side Menu (Ctrl+B)"}
+            title={showFileExplorer ? 'Hide Side Menu (Ctrl+B) to expand editors' : 'Show Side Menu (Ctrl+B)'}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md text-xs font-semibold transition-colors ${showFileExplorer ? 'bg-blue-600/25 border-blue-500/60 text-blue-300' : 'bg-[#21262d] border-[#30363d] text-slate-400 hover:text-white hover:bg-[#30363d]'}`}
           >
             {showFileExplorer ? <PanelLeftClose className="w-3.5 h-3.5 text-blue-400" /> : <PanelLeft className="w-3.5 h-3.5" />}
@@ -1042,18 +1162,18 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
           >
             <option value="" disabled>Load preset sample...</option>
             <option value="modular_math">Modular Math (Multi-File with Imports)</option>
-            <option value="count_number">Count Occurrences (count_number)</option>
+            <option value="count_number">Count Occurrences (Python)</option>
             <option value="binary_search">Binary Search (Python)</option>
             <option value="buggy_loop">Buggy Loop (Debug AI)</option>
             <option value="js_filter">Filter Evens (JavaScript)</option>
           </select>
         </div>
 
-        {/* Center: BIG GREEN RUN BUTTON */}
+        {/* Center: BIG GREEN RUN BUTTON WITH ENTRYPOINT BADGE */}
         <button
           onClick={handleExecute}
           disabled={!!loadingAction}
-          title="Run Code in Native Sandbox (Ctrl+Enter)"
+          title={`Run ${entryFile.name} (Ctrl+Enter)`}
           className="flex items-center gap-2 px-5 py-1.5 bg-[#238636] hover:bg-[#2ea043] disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-md transition-all shadow-md shadow-green-950/40 active:scale-95 shrink-0"
         >
           {loadingAction === 'execute' ? (
@@ -1061,10 +1181,10 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
           ) : (
             <Play className="w-4 h-4 fill-white" />
           )}
-          <span>{loadingAction === 'execute' ? 'Running...' : 'Run'}</span>
+          <span>{loadingAction === 'execute' ? 'Running...' : `Run ${entryFile.name}`}</span>
         </button>
 
-        {/* Right: Target Language + View Mode + Console + Save */}
+        {/* Right: Target Language + 3-Way Dual Split Toggle + Console + Save */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Chosen Native Language Selector (All 8 Languages) */}
           <div className="flex items-center gap-1.5 bg-[#21262d] border border-[#30363d] rounded-md px-2.5 py-1">
@@ -1082,35 +1202,46 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
             </select>
           </div>
 
-          {/* Desktop Dual Split Toggle */}
-          <div className="hidden lg:flex items-center bg-[#21262d] border border-[#30363d] rounded-md p-0.5 text-xs">
+          {/* Dual Split 3-Segment Switcher (Visible & Responsive across screen sizes) */}
+          <div className="flex items-center bg-[#21262d] border border-[#30363d] rounded-md p-0.5 text-xs">
             <button
-              onClick={() => setViewLayout('split')}
-              title="Dual Split View (English ↔ Native)"
+              onClick={() => {
+                setViewLayout('english');
+                setMobileView('english');
+              }}
+              title="Show Source Code Only"
+              className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'english' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <FileCode className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Source</span>
+            </button>
+            <button
+              onClick={() => {
+                setViewLayout('split');
+              }}
+              title="Dual Split View (Source + Selected Native Language)"
               className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'split' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
             >
-              <Columns className="w-3 h-3 text-blue-400" />
+              <Columns className="w-3.5 h-3.5 text-emerald-400" />
               <span>Dual Split</span>
             </button>
             <button
-              onClick={() => setViewLayout('english')}
-              title="English Code Only"
-              className={`px-2 py-1 rounded font-medium transition-colors ${viewLayout === 'english' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+              onClick={() => {
+                setViewLayout('native');
+                setMobileView('native');
+              }}
+              title={`Show ${currentNative?.native || 'Native'} Translation Only`}
+              className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'native' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
             >
-              EN
-            </button>
-            <button
-              onClick={() => setViewLayout('native')}
-              title="Native Code Only"
-              className={`px-2 py-1 rounded font-medium transition-colors ${viewLayout === 'native' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              {currentNative?.native || 'భ'}
+              <Languages className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{currentNative?.native || 'భ'}</span>
             </button>
           </div>
 
-          {/* Console Toggle */}
+          {/* Console Toggle Button */}
           <button
             onClick={() => setShowConsole((v) => !v)}
+            title="Toggle Terminal Console"
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors border ${showConsole ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'}`}
           >
             <Terminal className="w-3.5 h-3.5" />
@@ -1131,8 +1262,8 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
         </div>
       </div>
 
-      {/* ─── MOBILE VIEW SWITCHER (Visible on Mobile/Tablet < 1024px) ── */}
-      <div className="flex lg:hidden items-center bg-[#161b22] border-b border-[#30363d] px-2 py-1 gap-1 text-xs overflow-x-auto shrink-0">
+      {/* ─── MOBILE VIEW SWITCHER (Visible on Mobile < 768px) ── */}
+      <div className="flex md:hidden items-center bg-[#161b22] border-b border-[#30363d] px-2 py-1 gap-1 text-xs overflow-x-auto shrink-0">
         <button
           onClick={() => setMobileView('files')}
           className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'files' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
@@ -1145,17 +1276,17 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
             setMobileView('english');
             setViewLayout('english');
           }}
-          className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'english' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+          className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'english' && viewLayout === 'english' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
         >
           <FileCode className="w-3.5 h-3.5 text-blue-400" />
-          <span>English Code</span>
+          <span>Source Code</span>
         </button>
         <button
           onClick={() => {
             setMobileView('native');
             setViewLayout('native');
           }}
-          className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'native' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+          className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'native' && viewLayout === 'native' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
         >
           <Languages className="w-3.5 h-3.5 text-emerald-400" />
           <span>{currentNative?.native || 'భ'} {NATIVE_CODE_WORD[nativeLang] || 'కోడ్'}</span>
@@ -1186,11 +1317,17 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
       )}
 
       {/* ─── MAIN IDE BODY ───────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+      <div className={`flex flex-1 min-h-0 overflow-hidden relative ${isDraggingSplit ? 'select-none pointer-events-none' : ''}`}>
         {/* ══ 1. FILE EXPLORER & BHASHA TOOLS SIDEBAR ══ */}
         {(showFileExplorer || mobileView === 'files') && (
           <div
-            className={`${mobileView === 'files' ? 'w-full flex' : 'hidden md:flex'} flex-col w-64 lg:w-72 shrink-0 bg-[#0d1117] border-r border-[#30363d] overflow-y-auto`}
+            className={`${
+              mobileView === 'files'
+                ? 'flex w-full'
+                : windowWidth >= 768
+                  ? 'flex w-64 lg:w-72'
+                  : 'hidden'
+            } flex-col shrink-0 bg-[#0d1117] border-r border-[#30363d] overflow-y-auto`}
           >
             {/* Section A: File Management */}
             <div className="p-3 border-b border-[#30363d]">
@@ -1255,10 +1392,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                   <div
                     key={file.id}
                     className={`group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-mono transition-colors cursor-pointer ${file.id === activeFile.id ? 'bg-[#21262d] text-white border-l-2 border-blue-500 font-bold' : 'text-slate-400 hover:text-slate-200 hover:bg-[#161b22]'}`}
-                    onClick={() => {
-                      setActiveFileId(file.id);
-                      if (mobileView === 'files') setMobileView('english');
-                    }}
+                    onClick={() => handleOpenFile(file.id)}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <FileCode className="w-3.5 h-3.5 text-blue-400 shrink-0" />
@@ -1289,7 +1423,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                     <div className="hidden group-hover:flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {!file.isEntry && (
                         <button
-                          onClick={() => handleSetEntrypoint(file.id)}
+                          onClick={(e) => handleSetEntrypoint(file.id, e)}
                           title="Set as main entrypoint"
                           className="p-1 text-slate-400 hover:text-amber-400 transition-colors"
                         >
@@ -1297,7 +1431,8 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                         </button>
                       )}
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setEditingFileId(file.id);
                           setRenameInput(file.name);
                         }}
@@ -1308,7 +1443,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                       </button>
                       {files.length > 1 && (
                         <button
-                          onClick={() => handleDeleteFile(file.id)}
+                          onClick={(e) => handleDeleteFile(file.id, e)}
                           title="Delete file"
                           className="p-1 text-slate-400 hover:text-rose-400 transition-colors"
                         >
@@ -1321,26 +1456,73 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
               </div>
             </div>
 
-            {/* Section B: Cross-File Module Relationships */}
-            {moduleImports.length > 0 && (
-              <div className="p-3 border-b border-[#30363d] bg-[#161b22]/40">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+            {/* Section B: Real Multi-File Module Imports */}
+            <div className="p-3 border-b border-[#30363d] bg-[#161b22]/40">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1">
                   <ArrowRight className="w-3 h-3 text-emerald-400" /> Module Imports
+                </span>
+                <span className="text-[9px] font-mono text-slate-500">{moduleImports.length} detected</span>
+              </div>
+
+              {/* Circular import alerts */}
+              {circularImports.length > 0 && (
+                <div className="mb-2 p-1.5 bg-rose-950/60 border border-rose-500/40 rounded text-[10px] text-rose-300 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 shrink-0 text-rose-400" />
+                  <span>
+                    Circular import: {circularImports[0].fileA} ↔ {circularImports[0].fileB}
+                  </span>
                 </div>
+              )}
+
+              {moduleImports.length > 0 ? (
                 <div className="space-y-1.5">
                   {moduleImports.map((rel, idx) => (
-                    <div key={idx} className="bg-[#0d1117] border border-[#30363d] p-2 rounded text-[11px] font-mono">
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        if (rel.targetFile) {
+                          handleOpenFile(rel.targetFile.id);
+                        }
+                      }}
+                      className={`bg-[#0d1117] border p-2 rounded text-[11px] font-mono transition-colors ${rel.isLocal ? 'border-[#30363d] hover:border-blue-500/60 cursor-pointer hover:bg-[#161b22]' : 'border-[#30363d]'}`}
+                      title={rel.isLocal ? `Click to open ${rel.moduleName}` : `Import from ${rel.moduleName}`}
+                    >
                       <div className="text-slate-400 flex items-center justify-between">
-                        <span>{rel.fromFile} → {rel.moduleName}</span>
+                        <span className="font-semibold text-slate-200">
+                          {rel.fromFile} → {rel.moduleName}
+                        </span>
                         {rel.isLocal ? (
-                          <span className="text-[9px] text-emerald-400 bg-emerald-950/60 px-1 rounded">Local</span>
+                          <span className="text-[9px] text-emerald-400 bg-emerald-950/60 px-1 rounded flex items-center gap-0.5">
+                            <Check className="w-2.5 h-2.5" /> Local
+                          </span>
+                        ) : rel.missingFile ? (
+                          <span className="text-[9px] text-rose-400 bg-rose-950/60 px-1 rounded flex items-center gap-0.5">
+                            Missing File
+                          </span>
                         ) : (
                           <span className="text-[9px] text-amber-400 bg-amber-950/60 px-1 rounded">Package</span>
                         )}
                       </div>
-                      <div className="mt-1 text-emerald-300 font-sans text-xs">
+
+                      {/* Missing file explanation */}
+                      {rel.missingFile && (
+                        <div className="text-[10px] text-rose-400 mt-1 font-sans">
+                          ⚠️ '{rel.moduleName}.py' not found in workspace.
+                        </div>
+                      )}
+
+                      {/* Missing symbols in local file */}
+                      {rel.missingSymbols.length > 0 && (
+                        <div className="text-[10px] text-amber-400 mt-1 font-sans">
+                          ⚠️ Missing in {rel.targetFile?.name}: {rel.missingSymbols.join(', ')}
+                        </div>
+                      )}
+
+                      {/* Translated symbol preview */}
+                      <div className="mt-1 text-emerald-300 font-sans text-xs flex flex-wrap gap-1">
                         {rel.importedSymbols.map((sym, sIdx) => (
-                          <span key={sIdx} className="inline-block mr-2">
+                          <span key={sIdx} className="inline-block bg-[#161b22] px-1 rounded text-[11px]">
                             {sym} <span className="text-slate-500">→</span> <span className="font-bold">{rel.translatedSymbols[sIdx]}</span>
                           </span>
                         ))}
@@ -1348,8 +1530,12 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="text-[10px] text-slate-500 font-sans py-1">
+                  No local or external imports in current files. Type e.g. <code className="text-blue-400">from utils import add</code> to link files.
+                </div>
+              )}
+            </div>
 
             {/* Section C: Bhasha Tools */}
             <div className="p-3 border-b border-[#30363d]">
@@ -1367,12 +1553,8 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                   {
                     icon: <Brain className="w-4 h-4 text-amber-400" />,
                     label: 'Simple Logic',
-                    action: () => {
-                      setShowConsole(true);
-                      setConsoleTab('ai');
-                      setAiSubTab('simpleLogic');
-                    },
-                    loading: null,
+                    action: handleSimpleLogic,
+                    loading: 'simpleLogic',
                   },
                   {
                     icon: <Bug className="w-4 h-4 text-rose-400" />,
@@ -1383,12 +1565,8 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                   {
                     icon: <Repeat className="w-4 h-4 text-indigo-400" />,
                     label: 'Convert Code',
-                    action: () => {
-                      setShowConsole(true);
-                      setConsoleTab('ai');
-                      setAiSubTab('convert');
-                    },
-                    loading: null,
+                    action: handleConvert,
+                    loading: 'convert',
                   },
                   {
                     icon: <MessageSquare className="w-4 h-4 text-purple-400" />,
@@ -1426,15 +1604,15 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                 <Zap className="w-3.5 h-3.5 shrink-0" /> Live Transliterator Active
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5 leading-snug">
-                Identifiers transliterated to {currentNative?.native} ({currentNative?.english})
+                Deterministic {currentNative?.native} ({currentNative?.english})
               </div>
             </div>
           </div>
         )}
 
         {/* ══ 2. CENTRAL EDITORS & TABS AREA ══ */}
-        {(mobileView !== 'files' || window.innerWidth >= 1024) && (
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {(mobileView !== 'files' || windowWidth >= 768) && (
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
             {/* Editor File Tabs Bar (VS Code Style) */}
             <div className="flex items-center bg-[#161b22] border-b border-[#30363d] px-2 overflow-x-auto no-scrollbar shrink-0">
               {!showFileExplorer && (
@@ -1448,28 +1626,32 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                 </button>
               )}
               <div className="flex items-center gap-1 py-1">
-                {files.map((file) => (
-                  <div
-                    key={file.id}
-                    onClick={() => setActiveFileId(file.id)}
-                    className={`group flex items-center gap-2 px-3 py-1.5 text-xs font-mono rounded-t-md border-t-2 cursor-pointer transition-colors ${file.id === activeFile.id ? 'bg-[#1e1e1e] border-blue-500 text-white font-bold' : 'bg-[#161b22] border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#21262d]'}`}
-                  >
-                    <FileCode className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                    <span>{file.name}</span>
-                    {files.length > 1 && (
+                {openTabIds.map((tabId) => {
+                  const file = files.find((f) => f.id === tabId);
+                  if (!file) return null;
+                  return (
+                    <div
+                      key={file.id}
+                      onClick={() => setActiveFileId(file.id)}
+                      className={`group flex items-center gap-2 px-3 py-1.5 text-xs font-mono rounded-t-md border-t-2 cursor-pointer transition-colors ${file.id === activeFile.id ? 'bg-[#1e1e1e] border-blue-500 text-white font-bold' : 'bg-[#161b22] border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#21262d]'}`}
+                    >
+                      <FileCode className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span>{file.name}</span>
+                      {file.isEntry && (
+                        <span className="text-[8px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1 rounded font-sans uppercase">
+                          Entry
+                        </span>
+                      )}
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteFile(file.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
-                        title="Close file"
+                        onClick={(e) => handleCloseTab(file.id, e)}
+                        className="opacity-60 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
+                        title="Close tab"
                       >
                         <X className="w-3 h-3" />
                       </button>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
                 <button
                   onClick={() => setIsCreatingFile(true)}
                   title="Add new file"
@@ -1481,233 +1663,256 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
             </div>
 
             {/* Split Panes Container */}
-            <div className="flex-1 flex min-h-0 overflow-hidden">
-              {/* ────── LEFT PANE: ENGLISH CODE EDITOR ────── */}
-              {(viewLayout === 'split' || viewLayout === 'english') && mobileView !== 'native' && (
-                <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#1e1e1e]">
-                  {/* Left Pane Header */}
-                  <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="font-semibold text-slate-200">
-                        {activeFile.name} (Source)
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-mono">Lines: {lineCount}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setSyntaxOverlay(!syntaxOverlay)}
-                        title={syntaxOverlay ? 'Switch to Direct Text Mode' : 'Switch to Syntax Highlighting'}
-                        className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${syntaxOverlay ? 'bg-blue-950/60 text-blue-300 border-blue-500/30 hover:bg-blue-900/60' : 'bg-[#21262d] text-slate-400 border-[#30363d] hover:text-white'}`}
-                      >
-                        {syntaxOverlay ? '🎨 VS Code Colors' : '📝 Direct Text'}
-                      </button>
-                      <button
-                        onClick={handleCopyEnglish}
-                        title="Copy Source Code"
-                        className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
-                      >
-                        {copiedEnglish ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                      <button
-                        onClick={() => handleDownload(code, activeFile.name)}
-                        title="Download File"
-                        className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+            <div ref={splitContainerRef} className="flex-1 flex min-h-0 overflow-hidden relative">
+              {/* ────── LEFT PANE: SOURCE CODE EDITOR ────── */}
+              <div
+                style={{
+                  width: viewLayout === 'split' ? `${splitPercent}%` : '100%',
+                  display: viewLayout === 'native' ? 'none' : 'flex',
+                }}
+                className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#1e1e1e]"
+              >
+                {/* Left Pane Header */}
+                <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span className="font-semibold text-slate-200">
+                      {activeFile.name} {activeFile.isEntry ? '(Main Entry)' : ''}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">Lines: {lineCount}</span>
                   </div>
 
-                  {/* Overlapping Synchronized Editor */}
-                  <div className="flex-1 flex overflow-hidden relative bg-[#1e1e1e]">
-                    {/* Line numbers column */}
-                    <div
-                      className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-3 pl-2 shrink-0 border-r border-[#30363d]/60 overflow-hidden"
-                      style={{
-                        minWidth: '44px',
-                        fontFamily: VSCODE_MONO_FONT,
-                        fontSize: '13px',
-                        lineHeight: '24px',
-                        paddingTop: '12px',
-                        paddingBottom: '12px',
-                      }}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setSyntaxOverlay(!syntaxOverlay)}
+                      title={syntaxOverlay ? 'Switch to Direct Text Mode' : 'Switch to Syntax Highlighting'}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${syntaxOverlay ? 'bg-blue-950/60 text-blue-300 border-blue-500/30 hover:bg-blue-900/60' : 'bg-[#21262d] text-slate-400 border-[#30363d] hover:text-white'}`}
                     >
-                      {Array.from({ length: Math.max(lineCount, 25) }).map((_, i) => (
-                        <div
-                          key={i}
-                          onClick={() => setHighlightedLine(i + 1)}
-                          style={{ height: '24px', lineHeight: '24px' }}
-                          className={`cursor-pointer hover:text-slate-200 ${highlightedLine === i + 1 ? 'text-[#58a6ff] font-bold' : ''}`}
-                        >
-                          {i + 1}
-                        </div>
-                      ))}
-                    </div>
+                      {syntaxOverlay ? '🎨 VS Code Colors' : '📝 Direct Text'}
+                    </button>
+                    <button
+                      onClick={handleCopyEnglish}
+                      title="Copy Source Code"
+                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                    >
+                      {copiedEnglish ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => handleDownload(code, activeFile.name)}
+                      title="Download File"
+                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
 
-                    {/* Editor Layers */}
-                    <div className="flex-1 relative overflow-hidden bg-[#1e1e1e]">
-                      {syntaxOverlay && (
-                        <div
-                          ref={englishPreRef}
-                          aria-hidden="true"
-                          style={{
-                            ...CODE_EDITOR_SHARED_STYLE,
-                            position: 'absolute',
-                            inset: 0,
-                            pointerEvents: 'none',
-                            userSelect: 'none',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <HighlightedCodeBlock code={code} highlightedLine={highlightedLine} />
-                        </div>
-                      )}
+                {/* Overlapping Synchronized Editor */}
+                <div className="flex-1 flex min-h-0 overflow-hidden relative bg-[#1e1e1e]">
+                  {/* Line numbers column */}
+                  <div
+                    className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-3 pl-2 shrink-0 border-r border-[#30363d]/60 overflow-hidden"
+                    style={{
+                      minWidth: '44px',
+                      fontFamily: VSCODE_MONO_FONT,
+                      fontSize: '13px',
+                      lineHeight: '24px',
+                      paddingTop: '12px',
+                      paddingBottom: '12px',
+                    }}
+                  >
+                    {Array.from({ length: Math.max(lineCount, 25) }).map((_, i) => (
+                      <div
+                        key={i}
+                        onClick={() => setHighlightedLine(i + 1)}
+                        style={{ height: '24px', lineHeight: '24px' }}
+                        className={`cursor-pointer hover:text-slate-200 ${highlightedLine === i + 1 ? 'text-[#58a6ff] font-bold' : ''}`}
+                      >
+                        {i + 1}
+                      </div>
+                    ))}
+                  </div>
 
-                      <textarea
-                        ref={englishEditorRef}
-                        value={code}
-                        onChange={(e) => handleCodeChange(e.target.value)}
-                        onScroll={handleEnglishScroll}
-                        onKeyDown={handleEditorKeyDown}
-                        placeholder="// Type your code here..."
-                        spellCheck={false}
-                        autoCorrect="off"
-                        autoCapitalize="off"
+                  {/* Editor Layers with Independent Scrolling */}
+                  <div className="flex-1 relative min-h-0 overflow-hidden bg-[#1e1e1e]">
+                    {syntaxOverlay && (
+                      <div
+                        ref={englishPreRef}
+                        aria-hidden="true"
                         style={{
                           ...CODE_EDITOR_SHARED_STYLE,
                           position: 'absolute',
                           inset: 0,
-                          background: 'transparent',
-                          color: syntaxOverlay ? 'transparent' : '#e6edf3',
-                          caretColor: '#58a6ff',
-                          outline: 'none',
-                          resize: 'none',
-                          overflow: 'auto',
-                          zIndex: 10,
+                          pointerEvents: 'none',
+                          userSelect: 'none',
+                          overflow: 'hidden',
                         }}
-                        className="selection:bg-[#264f78]/60 selection:text-transparent"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Central Divider in Split View */}
-              {viewLayout === 'split' && mobileView !== 'native' && mobileView !== 'english' && (
-                <div className="w-[5px] bg-[#1b222d] hover:bg-blue-600/70 border-x border-[#30363d] flex flex-col items-center justify-center cursor-col-resize transition-colors shrink-0 group relative z-10">
-                  <div className="w-1.5 h-8 rounded-full bg-slate-600 group-hover:bg-blue-400 transition-colors" />
-                </div>
-              )}
-
-              {/* ────── RIGHT PANE: NATIVE LANGUAGE CODE ────── */}
-              {(viewLayout === 'split' || viewLayout === 'native') && mobileView !== 'english' && (
-                <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0d1117] border-l border-[#30363d]">
-                  {/* Right Header */}
-                  <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span className="font-semibold text-emerald-400">
-                        {currentNative?.native || 'తెలుగు'} {NATIVE_CODE_WORD[nativeLang] || 'కోడ్'} ({currentNative?.english})
-                      </span>
-                      <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono">
-                        Deterministic
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="flex bg-[#21262d] border border-[#30363d] rounded text-[10px] font-medium overflow-hidden">
-                        <button
-                          onClick={() => setTranslationMode('guide')}
-                          className={`px-2 py-0.5 transition-colors ${translationMode === 'guide' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
-                        >
-                          {currentNative?.native} {NATIVE_CODE_WORD[nativeLang] || 'కోడ్'}
-                        </button>
-                        <button
-                          onClick={() => setTranslationMode('pseudocode')}
-                          className={`px-2 py-0.5 transition-colors ${translationMode === 'pseudocode' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
-                        >
-                          {NATIVE_PSEUDO_WORD[nativeLang] || 'సూడోకోడ్'}
-                        </button>
+                      >
+                        <HighlightedCodeBlock code={code} highlightedLine={highlightedLine} />
                       </div>
+                    )}
 
-                      <button
-                        onClick={handleCopyNative}
-                        title="Copy Native Code"
-                        className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
-                      >
-                        {copiedNative ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleDownload(nativeTranslation.translatedCode, `${activeFile.name}_${nativeLang}.txt`)
-                        }
-                        title="Download Native Code"
-                        className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Right Code Display */}
-                  <div className="flex-1 flex overflow-hidden relative bg-[#1e1e1e]">
-                    <div
-                      className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-3 pl-2 shrink-0 border-r border-[#30363d]/60 overflow-hidden"
-                      style={{
-                        minWidth: '44px',
-                        fontFamily: VSCODE_MONO_FONT,
-                        fontSize: '13px',
-                        lineHeight: '24px',
-                        paddingTop: '12px',
-                        paddingBottom: '12px',
-                      }}
-                    >
-                      {Array.from({ length: Math.max(nativeTranslation.translatedCode.split('\n').length, 25) }).map(
-                        (_, i) => (
-                          <div
-                            key={i}
-                            style={{ height: '24px', lineHeight: '24px' }}
-                            className="cursor-default"
-                          >
-                            {i + 1}
-                          </div>
-                        )
-                      )}
-                    </div>
-
-                    <div
-                      ref={nativeViewerRef}
-                      onScroll={handleNativeScroll}
+                    <textarea
+                      ref={englishEditorRef}
+                      value={code}
+                      onChange={(e) => handleCodeChange(e.target.value)}
+                      onScroll={handleEnglishScroll}
+                      onKeyDown={handleEditorKeyDown}
+                      placeholder="// Type or paste your code here..."
+                      spellCheck={false}
+                      autoCorrect="off"
+                      autoCapitalize="off"
                       style={{
                         ...CODE_EDITOR_SHARED_STYLE,
                         position: 'absolute',
                         inset: 0,
-                        left: '44px',
+                        background: 'transparent',
+                        color: syntaxOverlay ? 'transparent' : '#e6edf3',
+                        caretColor: '#58a6ff',
+                        outline: 'none',
+                        resize: 'none',
                         overflow: 'auto',
+                        zIndex: 10,
                       }}
-                    >
-                      <HighlightedCodeBlock
-                        code={nativeTranslation.translatedCode}
-                        highlightedLine={highlightedLine}
-                      />
-                    </div>
+                      className="selection:bg-[#264f78]/60 selection:text-transparent"
+                    />
                   </div>
                 </div>
+              </div>
+
+              {/* Central Draggable Split Divider in Dual Split View */}
+              {viewLayout === 'split' && (
+                <div
+                  onMouseDown={handleSplitMouseDown}
+                  onTouchStart={handleSplitMouseDown}
+                  className="w-[6px] hover:w-[8px] bg-[#161b22] hover:bg-blue-500/80 border-x border-[#30363d] flex flex-col items-center justify-center cursor-col-resize transition-all shrink-0 group relative z-20 select-none"
+                  title="Drag to resize split panels"
+                >
+                  <div className="w-1 h-8 rounded-full bg-slate-600 group-hover:bg-blue-300 transition-colors" />
+                </div>
               )}
+
+              {/* ────── RIGHT PANE: NATIVE LANGUAGE TRANSLATION ────── */}
+              <div
+                style={{
+                  width: viewLayout === 'split' ? `${100 - splitPercent}%` : '100%',
+                  display: viewLayout === 'english' ? 'none' : 'flex',
+                }}
+                className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#0d1117] border-l border-[#30363d]"
+              >
+                {/* Right Header */}
+                <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="font-semibold text-emerald-400">
+                      {currentNative?.native || 'తెలుగు'} {NATIVE_CODE_WORD[nativeLang] || 'కోడ్'} ({currentNative?.english})
+                    </span>
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono">
+                      Deterministic
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex bg-[#21262d] border border-[#30363d] rounded text-[10px] font-medium overflow-hidden">
+                      <button
+                        onClick={() => setTranslationMode('guide')}
+                        className={`px-2 py-0.5 transition-colors ${translationMode === 'guide' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        {currentNative?.native} {NATIVE_CODE_WORD[nativeLang] || 'కోడ్'}
+                      </button>
+                      <button
+                        onClick={() => setTranslationMode('pseudocode')}
+                        className={`px-2 py-0.5 transition-colors ${translationMode === 'pseudocode' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        {NATIVE_PSEUDO_WORD[nativeLang] || 'సూడోకోడ్'}
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={handleCopyNative}
+                      title="Copy Native Code"
+                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                    >
+                      {copiedNative ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleDownload(nativeTranslation.translatedCode, `${activeFile.name}_${nativeLang}.txt`)
+                      }
+                      title="Download Native Code"
+                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right Code Display with Independent Scrolling */}
+                <div className="flex-1 flex min-h-0 overflow-hidden relative bg-[#1e1e1e]">
+                  <div
+                    className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-3 pl-2 shrink-0 border-r border-[#30363d]/60 overflow-hidden"
+                    style={{
+                      minWidth: '44px',
+                      fontFamily: VSCODE_MONO_FONT,
+                      fontSize: '13px',
+                      lineHeight: '24px',
+                      paddingTop: '12px',
+                      paddingBottom: '12px',
+                    }}
+                  >
+                    {Array.from({ length: Math.max(nativeTranslation.translatedCode.split('\n').length, 25) }).map(
+                      (_, i) => (
+                        <div
+                          key={i}
+                          style={{ height: '24px', lineHeight: '24px' }}
+                          className="cursor-default"
+                        >
+                          {i + 1}
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  <div
+                    ref={nativeViewerRef}
+                    style={{
+                      ...CODE_EDITOR_SHARED_STYLE,
+                      position: 'absolute',
+                      inset: 0,
+                      left: '44px',
+                      overflow: 'auto',
+                    }}
+                  >
+                    <HighlightedCodeBlock
+                      code={nativeTranslation.translatedCode}
+                      highlightedLine={highlightedLine}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* ─── BOTTOM CONSOLE & AI INSIGHTS DRAWER ─────────────────────── */}
+      {/* ─── BOTTOM CONSOLE & AI INSIGHTS DRAWER (RESIZABLE) ─────────────────────── */}
       {showConsole && (
         <div
-          className={`border-t border-[#30363d] bg-[#161b22] shrink-0 flex flex-col transition-all duration-200 ${consoleMaximized ? 'h-[75vh]' : 'h-60 sm:h-72'}`}
+          style={{ height: consoleMaximized ? '85vh' : `${consoleHeight}px` }}
+          className="border-t border-[#30363d] bg-[#161b22] shrink-0 flex flex-col relative z-30 transition-all duration-75"
         >
+          {/* Draggable Top Resize Handle */}
+          <div
+            onMouseDown={handleConsoleResizeStart}
+            onTouchStart={handleConsoleResizeStart}
+            className="h-1.5 w-full bg-[#30363d] hover:bg-blue-500/80 cursor-row-resize flex items-center justify-center transition-colors group select-none"
+            title="Drag up or down to resize console"
+          >
+            <div className="w-12 h-0.5 rounded-full bg-slate-500 group-hover:bg-white" />
+          </div>
+
           {/* Console Header */}
-          <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] text-xs">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setConsoleTab('terminal')}
@@ -1737,7 +1942,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                 className={`flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-colors ${consoleTab === 'ai' ? 'bg-[#30363d] text-white' : 'text-slate-400 hover:text-slate-200'}`}
               >
                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                <span>AI Insights</span>
+                <span>Bhasha Insights</span>
               </button>
             </div>
 
@@ -1825,7 +2030,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
             {consoleTab === 'ai' && (
               <div className="font-sans">
                 {/* Sub-tabs */}
-                <div className="flex gap-2 border-b border-[#21262d] pb-2 mb-3 text-xs">
+                <div className="flex gap-2 border-b border-[#21262d] pb-2 mb-3 text-xs overflow-x-auto">
                   {[
                     { key: 'lineByLine', label: 'Line-by-Line' },
                     { key: 'simpleLogic', label: 'Simple Logic' },
@@ -1836,7 +2041,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                     <button
                       key={sub.key}
                       onClick={() => setAiSubTab(sub.key as any)}
-                      className={`px-2.5 py-1 rounded text-xs transition-colors ${aiSubTab === sub.key ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                      className={`px-2.5 py-1 rounded text-xs transition-colors shrink-0 ${aiSubTab === sub.key ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
                     >
                       {sub.label}
                     </button>
@@ -1855,17 +2060,18 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                         <div className="space-y-2">
                           {explanation.lineByLine.map((line, idx) => (
                             <div key={idx} className="p-2 bg-[#161b22] border border-[#30363d] rounded text-xs">
-                              <div className="font-mono text-blue-300 font-bold mb-1">
-                                Line {line.lineNumber}: {line.codeSnippet}
+                              <div className="font-mono text-blue-300 font-bold mb-1 flex items-center justify-between">
+                                <span>Line {line.lineNumber}: {line.codeSnippet}</span>
+                                <span className="text-[10px] text-slate-500 uppercase">{line.category}</span>
                               </div>
-                              <div className="text-slate-300">{line.explanation}</div>
+                              <div className="text-slate-300">{line.explanation || line.simpleMeaning}</div>
                             </div>
                           ))}
                         </div>
                       </div>
                     ) : (
                       <div className="text-center py-6 text-slate-400">
-                        Click "Explain Code" in the sidebar to generate line-by-line explanation in {currentNative?.native}.
+                        Click "Explain Code" in the sidebar to generate a line-by-line explanation in {currentNative?.native}.
                       </div>
                     )}
                   </div>
@@ -1875,13 +2081,30 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                 {aiSubTab === 'simpleLogic' && (
                   <div>
                     {explanation?.simpleLogicSummary ? (
-                      <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
-                        <div className="font-bold text-amber-400 text-xs mb-1">Logic Summary:</div>
-                        <p className="text-sm text-slate-200">{explanation.simpleLogicSummary}</p>
+                      <div className="space-y-3">
+                        <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
+                          <div className="font-bold text-amber-400 text-xs mb-1">Logic Summary:</div>
+                          <p className="text-sm text-slate-200">{explanation.simpleLogicSummary}</p>
+                        </div>
+                        {explanation.executionFlow && explanation.executionFlow.length > 0 && (
+                          <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
+                            <div className="font-bold text-blue-400 text-xs mb-2">Execution Flow:</div>
+                            <div className="space-y-1.5">
+                              {explanation.executionFlow.map((step, i) => (
+                                <div key={i} className="text-xs text-slate-300 flex items-start gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-blue-600/30 text-blue-300 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                                    {i + 1}
+                                  </span>
+                                  <span>{step}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-6 text-slate-400">
-                        Click "Simple Logic" in the sidebar to generate a plain-language summary.
+                        Click "Simple Logic" in the sidebar to generate an intuitive plain-language summary.
                       </div>
                     )}
                   </div>
@@ -1896,18 +2119,38 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                           <div className="font-bold text-xs mb-1">
                             {debugResult.hasErrors ? '⚠️ Issues Detected:' : '✅ Code Looks Good:'}
                           </div>
-                          <p className="text-sm">{debugResult.summary}</p>
+                          <p className="text-sm text-slate-200">{debugResult.summary}</p>
                         </div>
+
+                        {debugResult.lineDiffs && debugResult.lineDiffs.length > 0 && (
+                          <div className="space-y-1.5">
+                            {debugResult.lineDiffs.map((diff, i) => (
+                              <div key={i} className="p-2 bg-[#161b22] border border-[#30363d] rounded text-xs">
+                                <div className="text-rose-400 font-bold mb-0.5">Line {diff.lineNumber}: {diff.issue}</div>
+                                <div className="text-emerald-300 font-mono text-[11px]">Fix: {diff.correction}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         {debugResult.correctedCode && (
                           <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
-                            <div className="font-bold text-emerald-400 text-xs mb-1">Suggested Fix:</div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="font-bold text-emerald-400 text-xs">Suggested Working Fix:</span>
+                              <button
+                                onClick={() => handleCodeChange(debugResult.correctedCode)}
+                                className="text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 rounded font-bold transition-colors"
+                              >
+                                Apply Fix to Editor
+                              </button>
+                            </div>
                             <pre className="font-mono text-xs text-emerald-300 whitespace-pre-wrap">{debugResult.correctedCode}</pre>
                           </div>
                         )}
                       </div>
                     ) : (
                       <div className="text-center py-6 text-slate-400">
-                        Click "Debug & Fix" in the sidebar to analyze code for potential bugs.
+                        Click "Debug & Fix" in the sidebar to inspect code for syntax or boundary bugs.
                       </div>
                     )}
                   </div>
@@ -1916,17 +2159,23 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                 {/* Sub-tab 4: Convert */}
                 {aiSubTab === 'convert' && (
                   <div>
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex flex-wrap items-center gap-3 mb-3">
                       <select
                         value={convertTargetLang}
                         onChange={(e) => setConvertTargetLang(e.target.value)}
-                        className="bg-[#161b22] border border-[#30363d] rounded px-2.5 py-1 text-xs text-white"
+                        className="bg-[#161b22] border border-[#30363d] rounded px-2.5 py-1 text-xs text-white outline-none cursor-pointer"
                       >
                         <option value="javascript">JavaScript</option>
                         <option value="python">Python</option>
                         <option value="typescript">TypeScript</option>
-                        <option value="java">Java</option>
-                        <option value="cpp">C++</option>
+                      </select>
+                      <select
+                        value={convertMode}
+                        onChange={(e) => setConvertMode(e.target.value as any)}
+                        className="bg-[#161b22] border border-[#30363d] rounded px-2.5 py-1 text-xs text-white outline-none cursor-pointer"
+                      >
+                        <option value="programming_language">Convert to Target Language</option>
+                        <option value="native_pseudocode">Convert to Native Pseudocode</option>
                       </select>
                       <button
                         onClick={handleConvert}
@@ -1938,6 +2187,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                     </div>
                     {conversionResult && (
                       <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
+                        <div className="text-xs text-slate-300 mb-2">{conversionResult.explanation}</div>
                         <pre className="font-mono text-xs text-indigo-300 whitespace-pre-wrap">{conversionResult.convertedCode}</pre>
                       </div>
                     )}
@@ -1951,7 +2201,7 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                       {chatMessages.map((msg, i) => (
                         <div
                           key={i}
-                          className={`p-2.5 rounded-lg text-xs ${msg.sender === 'user' ? 'bg-blue-600/30 border border-blue-500/40 ml-8 text-white' : 'bg-[#161b22] border border-[#30363d] mr-8 text-slate-200'}`}
+                          className={`p-2.5 rounded-lg text-xs leading-relaxed whitespace-pre-wrap ${msg.sender === 'user' ? 'bg-blue-600/30 border border-blue-500/40 ml-8 text-white' : 'bg-[#161b22] border border-[#30363d] mr-8 text-slate-200'}`}
                         >
                           {msg.text}
                         </div>
@@ -1963,13 +2213,13 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
                         type="text"
                         value={questionInput}
                         onChange={(e) => setQuestionInput(e.target.value)}
-                        placeholder="Ask anything about your code..."
-                        className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-3 py-1 text-xs text-white outline-none focus:border-blue-500"
+                        placeholder="Ask anything about this code (e.g. time complexity, line 2)..."
+                        className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-3 py-1 text-xs text-white outline-none focus:border-blue-500 font-sans"
                       />
                       <button
                         type="submit"
                         disabled={askingAi}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold"
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold transition-colors"
                       >
                         Send
                       </button>

@@ -24,6 +24,7 @@ export interface LineExplanation {
   smallExample?: string;
   keyConcepts?: string[];
   variableNotes?: string;
+  category?: string;
 }
 
 export interface VariableFunction {

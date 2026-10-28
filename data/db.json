@@ -23,6 +23,18 @@
       "dailyUsageCount": 10,
       "lastUsageDate": "2026-10-26",
       "createdAt": "2026-10-26T15:57:36.236Z"
+    },
+    {
+      "id": "usr_a8695260a4e3d515",
+      "name": "moses",
+      "email": "r@gmail.com",
+      "passwordHash": "f48ace1b73e210a4e95b4c153496296bcf9b079df212b8f8f208c8836a3ec307840d0f08e256db290c8c44a0adf6ad7333c8ee9753a62ae4f59b33d43246d972",
+      "salt": "ff4d924da7d4f360715c7b9c2b76a644",
+      "defaultLanguage": "telugu",
+      "plan": "free",
+      "dailyUsageCount": 1,
+      "lastUsageDate": "2026-10-28",
+      "createdAt": "2026-10-28T17:20:54.629Z"
     }
   ],
   "sessions": [
@@ -35,6 +47,11 @@
       "token": "7aa55c0c587c40c498a4cb2a839385079466f8f3e844eb3335bd8664256cf67f",
       "userId": "usr_edc848403d1b9009",
       "expiresAt": 1793635056236
+    },
+    {
+      "token": "fe963bc86444c0fd83089b53586ec38996823cdb2605c0bbdaa692ee13832fff",
+      "userId": "usr_a8695260a4e3d515",
+      "expiresAt": 1793812854629
     }
   ],
   "projects": [
@@ -59,5 +76,13 @@
       "updatedAt": "2026-10-24T06:51:03.528Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "id": "fb_1793208093378",
+      "name": "DFV",
+      "email": "DF@GMAIL.COM",
+      "message": "SDFSF",
+      "date": "2026-10-28T17:21:33.378Z"
+    }
+  ]
 }

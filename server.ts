@@ -8,6 +8,7 @@ import { spawn } from 'child_process';
 import os from 'os';
 import { analyzeAnyCodeDynamically } from './src/utils/universalCodeAnalyzer';
 import { analyzeCodeRuleBased } from './src/utils/ruleBasedAnalyzer';
+import { debugCodeDeterministically, convertCodeDeterministically, askCodeDeterministically } from './src/utils/deterministicTools';
 
 dotenv.config();
 
@@ -610,7 +611,7 @@ Use code snippets where appropriate. If they ask in their native language or Eng
       }
     }
 
-    const fallbackAnswer = generateSmartAskFallback(question, nativeLanguage);
+    const fallbackAnswer = generateSmartAskFallback(question, nativeLanguage, code, programmingLanguage);
     return res.json({ success: true, answer: fallbackAnswer, fallbackUsed: true });
   } catch (error: any) {
     console.error('Ask AI error:', error);
@@ -1019,53 +1020,15 @@ function generateSmartExplanationFallback(code: string, progLang: string, native
 }
 
 function generateSmartDebugFallback(code: string, progLang: string, nativeLang: string, errorLog: string) {
-  return {
-    hasErrors: true,
-    summary: 'కోడ్‌లో సింటాక్స్ లేదా ఇండెక్స్ పరిమితి లోపం ఉంది.',
-    likelyCauses: [
-      'బ్రాకెట్లు లేదా కోలన్ (:) మిస్ అవ్వడం లేదా ఇండెంటేషన్ సమస్య.',
-      'ఆఫ్-బై-వన్ (Off-by-one) ఇండెక్స్ ఎర్రర్ సంభవించే అవకాశం.',
-    ],
-    originalCode: code,
-    correctedCode: code.replace(/==(?!=)/g, '==').replace(/;/g, ';'),
-    explanationOfFix: 'పరిశీలించిన లోపాలను సరిదిద్ది, ఎడ్జ్-కేసుల వద్ద ఎర్రర్ రాకుండా సరిచేశాము.',
-    lineDiffs: [
-      {
-        lineNumber: 1,
-        issue: 'బాధాకరమైన ఎక్స్‌ప్రెషన్ లేదా బౌండరీ శోధన',
-        correction: 'సరైన కండిషన్ మరియు బౌండరీ చెక్ జోడించబడింది',
-      },
-    ],
-    preventativeTips: 'ఎల్లప్పుడూ బౌండరీ వాల్యూస్ (ఉదాహరణకు ఖాళీ లిస్ట్‌లు, సింగిల్ ఎలిమెంట్స్) కోసం టెస్ట్ చేయండి.',
-  };
+  return debugCodeDeterministically(code, progLang, nativeLang as any, errorLog);
 }
 
 function generateSmartConvertFallback(code: string, srcLang: string, targetLang: string, nativeLang: string, mode: string) {
-  if (mode === 'native_pseudocode') {
-    return {
-      convertedCode: `// తెలుగు సులభ సూడోకోడ్ (Pseudocode)\n1. ఇన్పుట్ డేటాను స్వీకరించుము\n2. ప్రతి ఎలిమెంట్ కోసం లూప్ అమలు చేయుము\n3. షరతు నిజమైతే ఫలితంలో చేర్చుము\n4. అంతిమ ఫలితాన్ని ప్రదర్శించుము`,
-      explanation: 'ఈ సూడోకోడ్ ప్రోగ్రామ్ యొక్క మౌలిక తర్కాన్ని మీ మాతృభాషలో స్పష్టంగా వివరిస్తుంది.',
-      warnings: ['సూడోకోడ్ నేరుగా రన్ కాదు, కానీ ప్రోగ్రామింగ్ లాజిక్ అర్థం చేసుకోవడానికి చాలా అనువైనది.'],
-      keyDifferences: [{ sourceFeature: 'Syntax', targetFeature: 'Pseudocode', note: 'లాజిక్ ఫ్లో' }],
-    };
-  }
-
-  return {
-    convertedCode: `// Converted from ${srcLang} to ${targetLang}\n${code}`,
-    explanation: `${srcLang} నుండి ${targetLang} లోకి ప్రామాణిక సింటాక్స్ కన్వర్షన్ చేయబడింది.`,
-    warnings: ['రెండు భాషల మెమరీ మేనేజ్‌మెంట్ మరియు లైబ్రరీ మద్దతులో స్వల్ప తేడాలు ఉండవచ్చు.'],
-    keyDifferences: [{ sourceFeature: 'Type definition', targetFeature: 'Target standard', note: 'సింటాక్స్ మార్పు' }],
-  };
+  return convertCodeDeterministically(code, srcLang, targetLang, nativeLang as any, mode);
 }
 
-function generateSmartAskFallback(question: string, nativeLang: string): string {
-  if (nativeLang.toLowerCase() === 'telugu') {
-    return `మీ ప్రశ్నకు సమాధానం: "${question}".\n\nఈ కోడ్ విభాగంలో లాజిక్ చాలా స్పష్టంగా ఉంది. లూప్ ప్రతి ఎటరేషన్‌లో ఇచ్చిన కండిషన్‌ను ధృవీకరించి, డేటా సరిపోలినప్పుడు కావలసిన చర్యను అమలు చేస్తుంది. మీరు నిర్దిష్ట లైన్ గురించి అడిగితే మరింత సులభంగా విడమరిచి చెప్పగలను!`;
-  }
-  if (nativeLang.toLowerCase() === 'hindi') {
-    return `आपके प्रश्न का उत्तर: "${question}".\n\nइस कोड में लूप और कंडीशन्स का उपयोग करके इनपुट को प्रोसेस किया जाता है। यदि आप किसी खास लाइन या वेरिएबल के बारे में और गहराई से समझना चाहते हैं, तो कृपया पूछें!`;
-  }
-  return `Regarding your question: "${question}".\n\nThis code segment operates by initializing its state variables, running a controlled iterative loop, and terminating once the base condition is met. Feel free to ask about any specific line!`;
+function generateSmartAskFallback(question: string, nativeLang: string, code: string = '', progLang: string = 'python'): string {
+  return askCodeDeterministically(code, question, progLang, nativeLang as any);
 }
 
 // Vite middleware for dev or Static files for production
