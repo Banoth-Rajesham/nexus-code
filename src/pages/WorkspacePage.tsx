@@ -35,6 +35,8 @@ import {
   Monitor,
   Smartphone,
   ChevronRight,
+  PanelLeft,
+  PanelLeftClose,
 } from 'lucide-react';
 import {
   SUPPORTED_NATIVE_LANGUAGES,
@@ -347,6 +349,19 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
     return list;
   }, [files, nativeLang]);
+
+  // Keyboard shortcut: Ctrl+B / Cmd+B to toggle side menu
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Don't toggle if typing inside an input or textarea
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setShowFileExplorer((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   // Scroll chat
   useEffect(() => {
@@ -1001,14 +1016,14 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
             )}
           </div>
 
-          {/* Toggle File Explorer button */}
+          {/* Side Menu Toggle Button */}
           <button
             onClick={() => setShowFileExplorer((v) => !v)}
-            title="Toggle File Explorer & Project Files"
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md text-xs font-medium transition-colors ${showFileExplorer ? 'bg-blue-600/20 border-blue-500/50 text-blue-300' : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'}`}
+            title={showFileExplorer ? "Hide Side Menu (Ctrl+B) to get free editor space" : "Show Side Menu (Ctrl+B)"}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md text-xs font-semibold transition-colors ${showFileExplorer ? 'bg-blue-600/25 border-blue-500/60 text-blue-300' : 'bg-[#21262d] border-[#30363d] text-slate-400 hover:text-white hover:bg-[#30363d]'}`}
           >
-            <Folder className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Files</span>
+            {showFileExplorer ? <PanelLeftClose className="w-3.5 h-3.5 text-blue-400" /> : <PanelLeft className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{showFileExplorer ? 'Hide Menu' : 'Side Menu'}</span>
             <span className="text-[10px] bg-[#30363d] px-1.5 py-0.2 rounded-full font-mono text-slate-300">
               {files.length}
             </span>
@@ -1180,16 +1195,25 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
             {/* Section A: File Management */}
             <div className="p-3 border-b border-[#30363d]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                   <Folder className="w-3.5 h-3.5 text-blue-400" /> Project Files
                 </span>
-                <button
-                  onClick={() => setIsCreatingFile(true)}
-                  className="flex items-center gap-1 text-[11px] bg-blue-600 hover:bg-blue-500 text-white font-semibold px-2 py-0.5 rounded transition-colors"
-                  title="Add new file"
-                >
-                  <Plus className="w-3 h-3" /> New File
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setIsCreatingFile(true)}
+                    className="flex items-center gap-1 text-[11px] bg-blue-600 hover:bg-blue-500 text-white font-semibold px-2 py-0.5 rounded transition-colors"
+                    title="Add new file"
+                  >
+                    <Plus className="w-3 h-3" /> New
+                  </button>
+                  <button
+                    onClick={() => setShowFileExplorer(false)}
+                    className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                    title="Hide Side Menu (Ctrl+B) to expand editors"
+                  >
+                    <PanelLeftClose className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               {/* Inline New File Form */}
@@ -1413,6 +1437,16 @@ console.log("Even numbers:", filterEvenNumbers(nums));`,
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {/* Editor File Tabs Bar (VS Code Style) */}
             <div className="flex items-center bg-[#161b22] border-b border-[#30363d] px-2 overflow-x-auto no-scrollbar shrink-0">
+              {!showFileExplorer && (
+                <button
+                  onClick={() => setShowFileExplorer(true)}
+                  title="Show Side Menu (Ctrl+B)"
+                  className="hidden md:flex items-center gap-1.5 px-2 py-1 mr-2 text-xs text-blue-400 hover:text-blue-300 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] rounded transition-colors shrink-0"
+                >
+                  <PanelLeft className="w-3.5 h-3.5" />
+                  <span className="text-[11px] font-semibold">Side Menu</span>
+                </button>
+              )}
               <div className="flex items-center gap-1 py-1">
                 {files.map((file) => (
                   <div
