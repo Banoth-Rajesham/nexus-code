@@ -49,6 +49,318 @@ export interface IndicScriptSpec {
   consonants: Record<string, string>;
 }
 
+// Universal letter-by-letter phonetic spelling for technical acronyms
+export const ACRONYM_LETTERS: Record<NativeLanguageKey, Record<string, string>> = {
+  telugu: {
+    A: 'ఏ', B: 'బీ', C: 'సీ', D: 'డీ', E: 'ఈ', F: 'ఎఫ్', G: 'జీ',
+    H: 'హెచ్', I: 'ఐ', J: 'జే', K: 'కే', L: 'ఎల్', M: 'ఎమ్', N: 'ఎన్',
+    O: 'ఓ', P: 'పీ', Q: 'క్యూ', R: 'ఆర్', S: 'ఎస్', T: 'టీ', U: 'యూ',
+    V: 'వీ', W: 'డబ్ల్యూ', X: 'ఎక్స్', Y: 'వై', Z: 'జీ'
+  },
+  hindi: {
+    A: 'ए', B: 'बी', C: 'सी', D: 'डी', E: 'ई', F: 'एफ', G: 'जी',
+    H: 'एच', I: 'आई', J: 'जे', K: 'के', L: 'एल', M: 'एम', N: 'एन',
+    O: 'ओ', P: 'पी', Q: 'क्यू', R: 'आर', S: 'एस', T: 'टी', U: 'यू',
+    V: 'वी', W: 'डब्ल्यू', X: 'एक्स', Y: 'वाई', Z: 'ज़ी'
+  },
+  tamil: {
+    A: 'ஏ', B: 'பீ', C: 'ஸீ', D: 'டீ', E: 'ஈ', F: 'எஃப்', G: 'ஜீ',
+    H: 'எச்', I: 'ஐ', J: 'ஜே', K: 'கே', L: 'எல்', M: 'எம்', N: 'என்',
+    O: 'ஓ', P: 'பீ', Q: 'கியூ', R: 'ஆர்', S: 'எஸ்', T: 'டீ', U: 'யூ',
+    V: 'வீ', W: 'டபிள்யூ', X: 'எக்ஸ்', Y: 'வை', Z: 'ஜீ'
+  },
+  kannada: {
+    A: 'ಎ', B: 'ಬೀ', C: 'ಸೀ', D: 'ಡೀ', E: 'ಈ', F: 'ಎಫ್', G: 'ಜೀ',
+    H: 'ಹೆಚ್', I: 'ಐ', J: 'ಜೇ', K: 'ಕೇ', L: 'ಎಲ್', M: 'ಎಮ್', N: 'ಎನ್',
+    O: 'ಓ', P: 'ಪೀ', Q: 'ಕ್ಯೂ', R: 'ಆರ್', S: 'ಎಸ್', T: 'ಟೀ', U: 'ಯೂ',
+    V: 'ವೀ', W: 'ಡಬ್ಲ್ಯೂ', X: 'ಎಕ್ಸ್', Y: 'ವೈ', Z: 'ಜೀ'
+  },
+  marathi: {
+    A: 'ए', B: 'बी', C: 'सी', D: 'डी', E: 'ई', F: 'एफ', G: 'जी',
+    H: 'एच', I: 'आय', J: 'जे', K: 'के', L: 'एल', M: 'एम', N: 'एन',
+    O: 'ओ', P: 'पी', Q: 'क्यू', R: 'आर', S: 'एस', T: 'टी', U: 'यू',
+    V: 'व्ही', W: 'डब्ल्यू', X: 'एक्स', Y: 'वाय', Z: 'झेड'
+  },
+  bengali: {
+    A: 'এ', B: 'বি', C: 'সী', D: 'ডি', E: 'ই', F: 'এফ', G: 'জী',
+    H: 'এইচ', I: 'আই', J: 'জে', K: 'কে', L: 'এল', M: 'এম', N: 'এন',
+    O: 'ও', P: 'পী', Q: 'কিউ', R: 'আর', S: 'এস', T: 'টি', U: 'ইউ',
+    V: 'ভি', W: 'ডব্লিউ', X: 'এক্স', Y: 'ওয়াই', Z: 'জি'
+  },
+  gujarati: {
+    A: 'એ', B: 'બી', C: 'સી', D: 'ડી', E: 'ઈ', F: 'એફ', G: 'જી',
+    H: 'એચ', I: 'આઇ', J: 'જે', K: 'કે', L: 'એલ', M: 'એમ', N: 'એન',
+    O: 'ઓ', P: 'પી', Q: 'ક્યૂ', R: 'આર', S: 'એસ', T: 'ટી', U: 'યુ',
+    V: 'વી', W: 'ડબલ્યુ', X: 'એક્સ', Y: 'વાય', Z: 'ઝી'
+  },
+  english: {} as Record<string, string>
+};
+
+// High-frequency technical acronyms across all supported Indic languages
+export const COMMON_ACRONYMS: Record<NativeLanguageKey, Record<string, string>> = {
+  telugu: {
+    ai: 'ఏఐ',
+    api: 'ఏపీఐ',
+    url: 'యుఆర్ఎల్',
+    urls: 'యుఆర్ఎల్స్',
+    sql: 'ఎస్క్యూఎల్',
+    http: 'హెచ్‌టీటీపీ',
+    https: 'హెచ్‌టీటీపీఎస్',
+    id: 'ఐడీ',
+    ids: 'ఐడీస్',
+    db: 'డీబీ',
+    dbs: 'డీబీస్',
+    ui: 'యూఐ',
+    ux: 'యూఎక్స్',
+    json: 'జేసన్',
+    xml: 'ఎక్స్‌ఎమ్‌ఎల్',
+    html: 'హెచ్‌టీఎంఎల్',
+    css: 'సీఎస్ఎస్',
+    cpu: 'సీపీయూ',
+    ram: 'రామ్',
+    io: 'ఐఓ',
+    ip: 'ఐపీ',
+    os: 'ఓఎస్',
+    sdk: 'ఎస్డీకే',
+    cli: 'సీఎల్ఐ',
+    rest: 'రెస్ట్',
+    dom: 'డామ్',
+    csv: 'సీఎస్వీ',
+    pdf: 'పీడీఎఫ్',
+    jwt: 'జేడబ్ల్యూటీ',
+    uuid: 'యూయూఐడీ',
+    app: 'యాప్',
+    apps: 'యాప్స్',
+    auth: 'ఆథ్',
+    sync: 'సింక్',
+    async: 'అసింక్',
+  },
+  hindi: {
+    ai: 'एआई',
+    api: 'एपीआई',
+    url: 'यूआरएल',
+    urls: 'यूआरएल्स',
+    sql: 'एसक्यूएल',
+    http: 'एचटीटीपी',
+    https: 'एचटीटीपीएस',
+    id: 'आईडी',
+    ids: 'आईडीज़',
+    db: 'डीबी',
+    dbs: 'डीबीज़',
+    ui: 'यूआई',
+    ux: 'यूएक्स',
+    json: 'जेसन',
+    xml: 'एक्सएमएल',
+    html: 'एचटीएमएल',
+    css: 'सीएसएस',
+    cpu: 'सीपीयू',
+    ram: 'रैम',
+    io: 'आईओ',
+    ip: 'आईपी',
+    os: 'ओएस',
+    sdk: 'एसडीके',
+    cli: 'सीएलआई',
+    rest: 'रेस्ट',
+    dom: 'डॉम',
+    csv: 'सीएसवी',
+    pdf: 'पीडीएफ',
+    jwt: 'जेडब्ल्यूटी',
+    uuid: 'यूयूआईडी',
+    app: 'ऐप',
+    apps: 'ऐप्स',
+    auth: 'ऑथ',
+    sync: 'सिंक',
+    async: 'असिंक',
+  },
+  tamil: {
+    ai: 'ஏஐ',
+    api: 'ஏபிஐ',
+    url: 'யுஆர்எல்',
+    urls: 'யுஆர்எல்ஸ்',
+    sql: 'எஸ்கியூஎல்',
+    http: 'எச்டிடிபி',
+    https: 'எச்டிடிபிஎஸ்',
+    id: 'ஐடி',
+    ids: 'ஐடிஸ்',
+    db: 'டிபி',
+    dbs: 'டிபிஸ்',
+    ui: 'யூஐ',
+    ux: 'யூஎக்ஸ்',
+    json: 'ஜேசன்',
+    xml: 'எக்ஸ்எம்எல்',
+    html: 'எச்டிஎம்எல்',
+    css: 'சிஎஸ்எஸ்',
+    cpu: 'சிபியூ',
+    ram: 'ரேம்',
+    io: 'ஐஓ',
+    ip: 'ஐபி',
+    os: 'ஓஎஸ்',
+    sdk: 'எஸ்டிகே',
+    cli: 'சிஎல்ஐ',
+    rest: 'ரெஸ்ட்',
+    dom: 'டாம்',
+    csv: 'சிஎஸ்வி',
+    pdf: 'பிடிஎஃப்',
+    jwt: 'ஜேடபிள்யூடி',
+    uuid: 'யூயூஐடி',
+    app: 'ஆப்',
+    apps: 'ஆப்ஸ்',
+    auth: 'ஆத்',
+    sync: 'சிங்க்',
+    async: 'அசிங்க்',
+  },
+  kannada: {
+    ai: 'ಎಐ',
+    api: 'ಎಪಿಐ',
+    url: 'ಯುಆರ್ಎಲ್',
+    urls: 'ಯುಆರ್ಎಲ್ಸ್',
+    sql: 'ಎಸ್ಕ್ಯೂಎಲ್',
+    http: 'ಹೆಚ್ಟಿಟಿಪಿ',
+    https: 'ಹೆಚ್ಟಿಟಿಪಿಎಸ್',
+    id: 'ಐಡಿ',
+    ids: 'ಐಡಿಸ್',
+    db: 'ಡಿಬಿ',
+    dbs: 'ಡಿಬಿಸ್',
+    ui: 'ಯೂಐ',
+    ux: 'ಯೂಎಕ್ಸ್',
+    json: 'ಜೇಸನ್',
+    xml: 'ಎಕ್ಸ್‌ಎಂಎಲ್',
+    html: 'ಹೆಚ್ಟಿಎಂಎಲ್',
+    css: 'ಸಿಎಸ್ಎಸ್',
+    cpu: 'ಸಿಪಿಯು',
+    ram: 'ರಾಮ್',
+    io: 'ಐಓ',
+    ip: 'ಐಪಿ',
+    os: 'ಓಎಸ್',
+    sdk: 'ಎಸ್‌ಡಿಕೆ',
+    cli: 'ಸಿಎಲ್ಐ',
+    rest: 'ರೆಸ್ಟ್',
+    dom: 'ಡಾಮ್',
+    csv: 'ಸಿಎಸ್ವಿ',
+    pdf: 'ಪಿಡಿಎಫ್',
+    jwt: 'ಜೇಡಬ್ಲ್ಯೂಟಿ',
+    uuid: 'ಯೂಯೂಐಡಿ',
+    app: 'ಆ್ಯಪ್',
+    apps: 'ಆ್ಯಪ್ಸ್',
+    auth: 'ಆಥ್',
+    sync: 'ಸಿಂಕ್',
+    async: 'ಅಸಿಂಕ್',
+  },
+  marathi: {
+    ai: 'एआय',
+    api: 'एपीआय',
+    url: 'यूआरएल',
+    urls: 'यूआरएल्स',
+    sql: 'एसक्यूएल',
+    http: 'एचटीटीपी',
+    https: 'एचटीटीपीएस',
+    id: 'आयडी',
+    ids: 'आयडीज़',
+    db: 'डीबी',
+    dbs: 'डीबीज़',
+    ui: 'यूआय',
+    ux: 'यूएक्स',
+    json: 'जेसन',
+    xml: 'एक्सएमएल',
+    html: 'एचटीएमएल',
+    css: 'सीएसएस',
+    cpu: 'सीपीयू',
+    ram: 'रॅम',
+    io: 'आयओ',
+    ip: 'आयपी',
+    os: 'ओएस',
+    sdk: 'एसडीके',
+    cli: 'सीएलआय',
+    rest: 'रेस्ट',
+    dom: 'डॉम',
+    csv: 'सीएसव्ही',
+    pdf: 'पीडीएफ',
+    jwt: 'जेडब्ल्यूटी',
+    uuid: 'यूयूआयडी',
+    app: 'अ‍ॅप',
+    apps: 'अ‍ॅप्स',
+    auth: 'ऑथ',
+    sync: 'सिंक',
+    async: 'असिंक',
+  },
+  bengali: {
+    ai: 'এআই',
+    api: 'এপিআই',
+    url: 'ইউআরএল',
+    urls: 'ইউআরএলস',
+    sql: 'এসকিউএল',
+    http: 'এইচটিটিপি',
+    https: 'এইচটিটিপিএস',
+    id: 'আইডি',
+    ids: 'আইডিস',
+    db: 'ডিবি',
+    dbs: 'ডিবিন',
+    ui: 'ইউআই',
+    ux: 'ইউএক্স',
+    json: 'জেসন',
+    xml: 'এক্সএমএল',
+    html: 'এইচটিএমএল',
+    css: 'সিএসএস',
+    cpu: 'সিপিইউ',
+    ram: 'র‍্যাম',
+    io: 'আইও',
+    ip: 'আইপি',
+    os: 'ওএস',
+    sdk: 'এসডিকে',
+    cli: 'সিএলআই',
+    rest: 'রেস্ট',
+    dom: 'ডম',
+    csv: 'সিএসভি',
+    pdf: 'পিডিএফ',
+    jwt: 'জেডব্লিউটি',
+    uuid: 'ইউইউআইডি',
+    app: 'অ্যাপ',
+    apps: 'অ্যাপস',
+    auth: 'অথ',
+    sync: 'সিঙ্ক',
+    async: 'অ্যাসিঙ্ক',
+  },
+  gujarati: {
+    ai: 'એઆઇ',
+    api: 'એપીઆઇ',
+    url: 'યુઆરએલ',
+    urls: 'યુઆરએલ્સ',
+    sql: 'એસક્યૂએલ',
+    http: 'એચટીટીપી',
+    https: 'એચટીટીપીએસ',
+    id: 'આઇડી',
+    ids: 'આઇડીઝ',
+    db: 'ડીબી',
+    dbs: 'ડીબીઝ',
+    ui: 'યુઆઇ',
+    ux: 'યુએક્સ',
+    json: 'જેસન',
+    xml: 'એક્સએમએલ',
+    html: 'એચટીએમએલ',
+    css: 'સીએસએસ',
+    cpu: 'સીપીયુ',
+    ram: 'રેમ',
+    io: 'આઇઓ',
+    ip: 'આઇપી',
+    os: 'ઓએસ',
+    sdk: 'એસડીકે',
+    cli: 'સીએલઆઇ',
+    rest: 'રેસ્ટ',
+    dom: 'ડૉમ',
+    csv: 'સીએસવી',
+    pdf: 'પીડીએફ',
+    jwt: 'જેડબલ્યુટી',
+    uuid: 'યૂયૂઆઇડી',
+    app: 'એપ',
+    apps: 'એપ્સ',
+    auth: 'ઓથ',
+    sync: 'સિંક',
+    async: 'અસિંક',
+  },
+  english: {} as Record<string, string>
+};
+
+
 export const INDIC_SCRIPTS: Record<string, IndicScriptSpec> = {
   telugu: {
     virama: '\u0C4D', // ్
@@ -65,7 +377,7 @@ export const INDIC_SCRIPTS: Record<string, IndicScriptSpec> = {
     consonants: {
       sch: 'స్క్', str: 'స్ట్ర', spr: 'స్ప్ర', spl: 'స్ప్ల', scr: 'స్క్ర',
       thr: 'థ్ర', shr: 'శ్ర', chr: 'క్ర', ph: 'ఫ', th: 'థ', sh: 'ష్', ch: 'చ్',
-      gh: 'ఘ', kh: 'ఖ', jh: 'ఝ', dh: 'ధ', bh: 'భ', ng: 'ంగ్', nk: 'ంక్', ck: 'క్',
+      gh: 'ఘ', kh: 'ఖ', jh: 'ఝ', dh: 'ధ', bh: 'భ', ng: 'ంగ్', nk: 'ంక్', nt: 'ంట్', nd: 'ండ్', mp: 'ంప్', ns: 'న్స్', nch: 'ంచ్', ck: 'క్', wr: 'ర్', kn: 'న్',
       qu: 'క్వ', wh: 'వ్', st: 'స్ట', sp: 'స్ప', sk: 'స్క', sc: 'స్క', sm: 'స్మ',
       sn: 'స్న', sl: 'స్ల', sw: 'స్వ', pl: 'ప్ల', pr: 'ప్ర', bl: 'బ్ల', br: 'బ్ర',
       tr: 'ట్ర', dr: 'డ్ర', cl: 'క్ల', cr: 'క్ర', gl: 'గ్ల', gr: 'గ్ర', fl: 'ఫ్ల',
@@ -89,7 +401,7 @@ export const INDIC_SCRIPTS: Record<string, IndicScriptSpec> = {
     consonants: {
       sch: 'स्क', str: 'स्ट्र', spr: 'स्प्र', spl: 'स्प्ल', scr: 'स्क्र',
       thr: 'थ्र', shr: 'श्र', chr: 'क्र', ph: 'फ', th: 'थ', sh: 'श', ch: 'च',
-      gh: 'घ', kh: 'ख', jh: 'झ', dh: 'ध', bh: 'भ', ng: 'ंग', nk: 'ंक', ck: 'क',
+      gh: 'घ', kh: 'ख', jh: 'झ', dh: 'ध', bh: 'भ', ng: 'ंग', nk: 'ंक', nt: 'ंट', nd: 'ंड', mp: 'ंप', ns: 'ंस', nch: 'ंच', ck: 'क', wr: 'र', kn: 'न',
       qu: 'क्व', wh: 'व', st: 'स्ट', sp: 'स्प', sk: 'स्क', sc: 'स्क', sm: 'स्म',
       sn: 'स्न', sl: 'स्ल', sw: 'स्व', pl: 'प्ल', pr: 'प्र', bl: 'ब्ल', br: 'ब्र',
       tr: 'ट्र', dr: 'ड्र', cl: 'क्ल', cr: 'क्र', gl: 'ग्ल', gr: 'ग्र', fl: 'फ्ल',
@@ -113,7 +425,7 @@ export const INDIC_SCRIPTS: Record<string, IndicScriptSpec> = {
     consonants: {
       sch: 'ஸ்க்', str: 'ஸ்ட்ர', spr: 'ஸ்ப்ர', spl: 'ஸ்ப்ல', scr: 'ஸ்க்ர',
       thr: 'த்ர', shr: 'ஸ்ர', chr: 'க்ர', ph: 'ப்', th: 'த்', sh: 'ஷ்', ch: 'ச்',
-      gh: 'க்', kh: 'க்', jh: 'ஜ்', dh: 'ட்', bh: 'ப்', ng: 'ங்', nk: 'ங்க்', ck: 'க்',
+      gh: 'க்', kh: 'க்', jh: 'ஜ்', dh: 'ட்', bh: 'ப்', ng: 'ங்', nk: 'ங்க்', nt: 'ண்ட்', nd: 'ண்ட்', mp: 'ம்ப', ns: 'ன்ஸ்', nch: 'ஞ்ச்', ck: 'க்', wr: 'ர', kn: 'ந',
       qu: 'க்வ', wh: 'வ்', st: 'ஸ்ட', sp: 'ஸ்ப', sk: 'ஸ்க', sc: 'ஸ்க', sm: 'ஸ்ம',
       sn: 'ஸ்ந', sl: 'ஸ்ல', sw: 'ஸ்வ', pl: 'ப்ல', pr: 'ப்ர', bl: 'ப்ல', br: 'ப்ர',
       tr: 'ட்ர', dr: 'ட்ர', cl: 'க்ல', cr: 'க்ர', gl: 'க்ல', gr: 'க்ர', fl: 'ப்ல',
@@ -137,7 +449,7 @@ export const INDIC_SCRIPTS: Record<string, IndicScriptSpec> = {
     consonants: {
       sch: 'ಸ್ಕ್', str: 'ಸ್ಟ್ರ', spr: 'ಸ್ಪ್ರ', spl: 'ಸ್ಪ್ಲ', scr: 'ಸ್ಕ್ರ',
       thr: 'ಥ್ರ', shr: 'ಶ್ರ', chr: 'ಕ್ರ', ph: 'ಫ', th: 'ಥ', sh: 'ಶ್', ch: 'ಚ್',
-      gh: 'ಘ', kh: 'ಖ', jh: 'ಝ', dh: 'ಧ', bh: 'ಭ', ng: 'ಂಗ್', nk: 'ಂಕ್', ck: 'ಕ್',
+      gh: 'ಘ', kh: 'ಖ', jh: 'ಝ', dh: 'ಧ', bh: 'ಭ', ng: 'ಂಗ್', nk: 'ಂಕ್', nt: 'ಂಟ್', nd: 'ಂಡ್', mp: 'ಂಪ್', ns: 'ನ್ಸ್', nch: 'ಂಚ್', ck: 'ಕ್', wr: 'ರ', kn: 'ನ',
       qu: 'ಕ್ವ', wh: 'ವ್', st: 'ಸ್ಟ', sp: 'ಸ್ಪ', sk: 'ಸ್ಕ', sc: 'ಸ್ಕ', sm: 'ಸ್ಮ',
       sn: 'ಸ್ನ', sl: 'ಸ್ಲ', sw: 'ಸ್ವ', pl: 'ಪ್ಲ', pr: 'ಪ್ರ', bl: 'ಬ್ಲ', br: 'ಬ್ರ',
       tr: 'ಟ್ರ', dr: 'ಡ್ರ', cl: 'ಕ್ಲ', cr: 'ಕ್ರ', gl: 'ಗ್ಲ', gr: 'ಗ್ರ', fl: 'ಫ್ಲ',
@@ -161,7 +473,7 @@ export const INDIC_SCRIPTS: Record<string, IndicScriptSpec> = {
     consonants: {
       sch: 'स्क', str: 'स्ट्र', spr: 'स्प्र', spl: 'स्प्ल', scr: 'स्क्र',
       thr: 'थ्र', shr: 'श्र', chr: 'क्र', ph: 'फ', th: 'थ', sh: 'श', ch: 'च',
-      gh: 'घ', kh: 'ख', jh: 'झ', dh: 'ध', bh: 'भ', ng: 'ंग', nk: 'ंक', ck: 'क',
+      gh: 'घ', kh: 'ख', jh: 'झ', dh: 'ध', bh: 'भ', ng: 'ंग', nk: 'ंक', nt: 'ंट', nd: 'ंड', mp: 'ंप', ns: 'ंस', nch: 'ंच', ck: 'क', wr: 'र', kn: 'न',
       qu: 'क्व', wh: 'व', st: 'स्ट', sp: 'स्प', sk: 'स्क', sc: 'स्क', sm: 'स्म',
       sn: 'स्न', sl: 'स्ल', sw: 'स्व', pl: 'प्ल', pr: 'प्र', bl: 'ब्ल', br: 'ब्र',
       tr: 'ट्र', dr: 'ड्र', cl: 'क्ल', cr: 'क्र', gl: 'ग्ल', gr: 'ग्र', fl: 'फ्ल',
@@ -185,7 +497,7 @@ export const INDIC_SCRIPTS: Record<string, IndicScriptSpec> = {
     consonants: {
       sch: 'স্ক', str: 'স্ট্র', spr: 'স্প্র', spl: 'স্প্ল', scr: 'স্ক্র',
       thr: 'থ্র', shr: 'শ্র', chr: 'ক্র', ph: 'ফ', th: 'থ', sh: 'শ', ch: 'চ',
-      gh: 'ঘ', kh: 'খ', jh: 'ঝ', dh: 'ধ', bh: 'ভ', ng: 'ং', nk: 'ংক', ck: 'ক',
+      gh: 'ঘ', kh: 'খ', jh: 'ঝ', dh: 'ধ', bh: 'ভ', ng: 'ং', nk: 'ংক', nt: 'ন্ট', nd: 'ন্ড', mp: 'ম্প', ns: 'ন্স', nch: 'ঞ্চ', ck: 'ক', wr: 'র', kn: 'ন',
       qu: 'ক্ব', wh: 'ভ', st: 'স্ট', sp: 'স্প', sk: 'স্ক', sc: 'স্ক', sm: 'স্ম',
       sn: 'স্ন', sl: 'স্ল', sw: 'স্ব', pl: 'প্ল', pr: 'প্র', bl: 'ব্ল', br: 'ব্র',
       tr: 'ট্র', dr: 'ড্র', cl: 'ক্ল', cr: 'ক্র', gl: 'গ্ল', gr: 'গ্র', fl: 'ফ্ল',
@@ -209,7 +521,7 @@ export const INDIC_SCRIPTS: Record<string, IndicScriptSpec> = {
     consonants: {
       sch: 'સ્ક', str: 'સ્ટ્ર', spr: 'સ્પ્ર', spl: 'સ્પ્લ', scr: 'સ્ક્ર',
       thr: 'થ્ર', shr: 'શ્ર', chr: 'ક્ર', ph: 'ફ', th: 'થ', sh: 'શ', ch: 'ચ',
-      gh: 'ઘ', kh: 'ખ', jh: 'ઝ', dh: 'ધ', bh: 'ભ', ng: 'ંગ', nk: 'ંક', ck: 'ક',
+      gh: 'ઘ', kh: 'ખ', jh: 'ઝ', dh: 'ધ', bh: 'ભ', ng: 'ંગ', nk: 'ંક', nt: 'ન્ટ', nd: 'ન્ડ', mp: 'મ્પ', ns: 'ન્સ', nch: 'ન્ચ', ck: 'ક', wr: 'ર', kn: 'ન',
       qu: 'ક્વ', wh: 'વ', st: 'સ્ટ', sp: 'સ્પ', sk: 'સ્ક', sc: 'સ્ક', sm: 'સ્મ',
       sn: 'સ્ન', sl: 'સ્લ', sw: 'સ્વ', pl: 'પ્લ', pr: 'પ્ર', bl: 'બ્લ', br: 'બ્ર',
       tr: 'ટ્ર', dr: 'ડ્ર', cl: 'ક્લ', cr: 'ક્ર', gl: 'ગ્લ', gr: 'ગ્ર', fl: 'ફ્લ',
@@ -231,7 +543,119 @@ export function phoneticTransliterate(word: string, lang: NativeLanguageKey): st
   const spec = INDIC_SCRIPTS[lang];
   if (!spec) return word;
 
-  const w = word.toLowerCase();
+  const lower = word.toLowerCase();
+
+  // 1. Common acronyms (e.g. ai, api, url, sql, http, etc.)
+  if (COMMON_ACRONYMS[lang] && COMMON_ACRONYMS[lang][lower]) {
+    return COMMON_ACRONYMS[lang][lower];
+  }
+
+  // 2. All-caps acronym letter-by-letter (e.g. RPC, DNS, FTP, CPU, SDK, CLI)
+  if (/^[A-Z]{2,5}$/.test(word) && ACRONYM_LETTERS[lang]) {
+    const letters = word.split('').map((char) => ACRONYM_LETTERS[lang][char] || char);
+    return letters.join('');
+  }
+
+  // 3. Ambiguity safeguard: If word length >= 3 and has no vowels/consonant syllables,
+  // preserve original identifier untouched rather than producing corrupted output
+  if (word.length >= 3 && !/[aeiouy]/i.test(word) && !spec.consonants[lower]) {
+    return word;
+  }
+
+  // 4. Common English Suffix Heuristics
+  // -tion / -sion (e.g. action, condition, section)
+  if ((lower.endsWith('tion') || lower.endsWith('sion')) && lower.length > 4) {
+    const root = lower.slice(0, -4);
+    const rootTrans = root ? phoneticTransliterate(root, lang) : '';
+    const shSuffix: Record<NativeLanguageKey, string> = {
+      telugu: 'షన్',
+      hindi: 'शन',
+      tamil: 'ஷன்',
+      kannada: 'ಶನ್',
+      marathi: 'शन',
+      bengali: 'শন',
+      gujarati: 'શન',
+      english: 'tion',
+    };
+    return `${rootTrans}${shSuffix[lang] || 'షన్'}`;
+  }
+
+  // -ture (e.g. feature, picture, structure)
+  if (lower.endsWith('ture') && lower.length > 4) {
+    const root = lower.slice(0, -4);
+    const rootTrans = phoneticTransliterate(root, lang);
+    const tureSuffix: Record<NativeLanguageKey, string> = {
+      telugu: 'చర్',
+      hindi: 'चर',
+      tamil: 'ச்சர்',
+      kannada: 'ಚರ್',
+      marathi: 'चर',
+      bengali: 'চার',
+      gujarati: 'ચર',
+      english: 'ture',
+    };
+    return `${rootTrans}${tureSuffix[lang] || 'చర్'}`;
+  }
+
+  // -ment (e.g. element, payment, comment)
+  if (lower.endsWith('ment') && lower.length > 4) {
+    const root = lower.slice(0, -4);
+    const rootTrans = phoneticTransliterate(root, lang);
+    const mentSuffix: Record<NativeLanguageKey, string> = {
+      telugu: 'మెంట్',
+      hindi: 'मेंट',
+      tamil: 'மென்ட்',
+      kannada: 'ಮೆಂಟ್',
+      marathi: 'मेंट',
+      bengali: 'মেন্ট',
+      gujarati: 'મેન્ટ',
+      english: 'ment',
+    };
+    return `${rootTrans}${mentSuffix[lang] || 'మెంట్'}`;
+  }
+
+  // -ing (e.g. loading, filtering, sorting)
+  if (lower.endsWith('ing') && lower.length > 4) {
+    const root = lower.slice(0, -3);
+    const rootTrans = phoneticTransliterate(root, lang);
+    const ingSuffix: Record<NativeLanguageKey, string> = {
+      telugu: 'ఇంగ్',
+      hindi: 'इंग',
+      tamil: 'இங்',
+      kannada: 'ಇಂಗ್',
+      marathi: 'इंग',
+      bengali: 'ইং',
+      gujarati: 'ઇંગ',
+      english: 'ing',
+    };
+    return `${rootTrans}${ingSuffix[lang] || 'ఇంగ్'}`;
+  }
+
+  // 5. Silent 'e' / Magic 'e' pattern (e.g. name, rate, price, code, save, base, mode, file)
+  const magicEMatch = lower.match(/^([a-z]*?)([aeiou])([bcdfghjklmnpqrstvwxyz])e$/);
+  if (magicEMatch && lower.length >= 4) {
+    const prefixCons = magicEMatch[1];
+    const vowel = magicEMatch[2];
+    const finalCons = magicEMatch[3];
+
+    let preOut = prefixCons ? phoneticTransliterate(prefixCons, lang) : '';
+    if (preOut.endsWith(spec.virama)) {
+      preOut = preOut.slice(0, -spec.virama.length);
+    }
+
+    const vowelMatra: Record<string, string> = {
+      a: spec.matras['ay'] || spec.matras['e'] || '',
+      i: spec.matras['ai'] || '',
+      o: spec.matras['oa'] || spec.matras['o'] || '',
+      u: spec.matras['uu'] || spec.matras['u'] || '',
+      e: spec.matras['ee'] || '',
+    };
+    const cChar = spec.consonants[finalCons] || finalCons;
+    const trailingVirama = (lang === 'telugu' || lang === 'tamil' || lang === 'kannada') ? spec.virama : '';
+    return `${preOut}${vowelMatra[vowel] || ''}${cChar}${trailingVirama}`;
+  }
+
+  const w = lower;
   let out = '';
   let i = 0;
   let lastWasConsonant = false;
@@ -1035,12 +1459,39 @@ export const PRESERVED_KEYWORDS = new Set([
   'reversed', 'isinstance', 'issubclass',
 
   // Literals
-  'True', 'False', 'None', 'true', 'false', 'null', 'undefined'
+  'True', 'False', 'None', 'true', 'false', 'null', 'undefined',
+
+  // Standard libraries & built-in modules
+  'math', 'sys', 'os', 'json', 'time', 'datetime', 'random', 're', 'collections',
+  'itertools', 'functools', 'urllib', 'requests', 'http', 'asyncio', 'sqlite3',
+  'pathlib', 'logging', 'subprocess', 'threading', 'multiprocessing', 'shutil',
+  'tempfile', 'copy', 'heapq', 'bisect', 'hashlib', 'uuid', 'base64', 'unittest', 'pytest',
+  'typing', 'List', 'Dict', 'Set', 'Tuple', 'Optional', 'Union', 'Any', 'Callable',
+  'numpy', 'np', 'pandas', 'pd', 'matplotlib', 'plt', 'scipy', 'sklearn', 'torch', 'tensorflow',
+  'fs', 'path', 'express', 'react', 'useState', 'useEffect', 'useMemo', 'useRef', 'useCallback'
+]);
+
+// Common built-in object methods (Never transliterate standard object method names)
+export const BUILTIN_OBJECT_METHODS = new Set([
+  'append', 'pop', 'push', 'shift', 'unshift', 'extend', 'insert', 'remove', 'clear',
+  'index', 'count', 'sort', 'reverse', 'keys', 'values', 'items', 'get', 'update',
+  'split', 'join', 'strip', 'lstrip', 'rstrip', 'replace', 'find', 'startswith', 'endswith',
+  'lower', 'upper', 'format', 'encode', 'decode', 'read', 'write', 'close', 'flush', 'seek',
+  'slice', 'splice', 'reduce', 'forEach', 'includes', 'indexOf', 'lastIndexOf', 'substring',
+  'toUpperCase', 'toLowerCase', 'charAt', 'charCodeAt', 'trim', 'trimStart', 'trimEnd',
+  'sqrt', 'pow', 'ceil', 'floor', 'round', 'sin', 'cos', 'tan', 'exp',
+  'length', 'size', 'toString', 'valueOf', 'json', 'status', 'send',
+  '__init__', '__str__', '__repr__', '__len__', '__main__', '__name__', '__doc__',
 ]);
 
 // ─── 6. Single Word Transliteration Function ──────────────────────────────────
 export function transliterateWord(word: string, lang: NativeLanguageKey): string {
   if (lang === 'english' || !word) return word;
+
+  // Single letters preserved in English (loop indices: i, j, k, x, y, etc.)
+  if (word.length === 1 && /[a-zA-Z]/.test(word)) {
+    return word;
+  }
 
   const lower = word.toLowerCase();
   const dict = NATIVE_DICTIONARIES[lang] || TELUGU_DICTIONARY;
@@ -1050,7 +1501,18 @@ export function transliterateWord(word: string, lang: NativeLanguageKey): string
     return dict[lower];
   }
 
-  // 2. Snake_case compound (e.g. count_number, weather_condition, cout_work)
+  // 2. Acronym match (case-insensitive for common acronyms like ai, api, url, sql, etc.)
+  if (COMMON_ACRONYMS[lang] && COMMON_ACRONYMS[lang][lower]) {
+    return COMMON_ACRONYMS[lang][lower];
+  }
+
+  // 3. All-caps acronym letter-by-letter (e.g. JWT, RPC, DNS, CPU, SDK, CLI)
+  if (/^[A-Z]{2,5}$/.test(word) && ACRONYM_LETTERS[lang]) {
+    const letters = word.split('').map((char) => ACRONYM_LETTERS[lang][char] || char);
+    return letters.join('');
+  }
+
+  // 4. Snake_case compound (e.g. count_number, weather_condition, user_id, api_key)
   if (word.includes('_')) {
     const parts = word.split('_');
     const translatedParts = parts.map((part) => {
@@ -1060,20 +1522,23 @@ export function transliterateWord(word: string, lang: NativeLanguageKey): string
     return translatedParts.join('_');
   }
 
-  // 3. Trailing digits (e.g. num1, item2)
-  const numMatch = word.match(/^([a-zA-Z]+)(\d+)$/);
+  // 5. Trailing digits (e.g. num1, item2, var10)
+  const numMatch = word.match(/^([a-zA-Z_]+)(\d+)$/);
   if (numMatch) {
     const base = transliterateWord(numMatch[1], lang);
     return `${base}${numMatch[2]}`;
   }
 
-  // 4. CamelCase or PascalCase compound (e.g. filterEvenNumbers, calculateSalary, BinarySearch)
-  const camelParts = word.replace(/([a-z0-9])([A-Z])/g, '$1_$2').split('_');
+  // 6. CamelCase or PascalCase compound (including acronyms e.g. getAPIResponse, userID, filterEvenNumbers)
+  const camelParts = word
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .split('_');
   if (camelParts.length > 1) {
     return camelParts.map((p) => transliterateWord(p, lang)).join('_');
   }
 
-  // 5. Fallback: Deterministic universal phonetic transliteration
+  // 7. Fallback: Deterministic universal phonetic transliteration
   return phoneticTransliterate(word, lang);
 }
 
@@ -1275,11 +1740,37 @@ export function transliterateCodeLine(line: string, lang: NativeLanguageKey): st
       }
       const token = trimmed.slice(start, i);
 
+      // Check Python dunders (__init__, __str__, etc.)
+      if (token.startsWith('__') && token.endsWith('__')) {
+        out += token;
+        continue;
+      }
+
+      // Check member access: preceded by '.' (e.g. obj.append, console.log)
+      let prevNonWs = start - 1;
+      while (prevNonWs >= 0 && /\s/.test(trimmed[prevNonWs])) prevNonWs--;
+      const isMemberAccess = prevNonWs >= 0 && trimmed[prevNonWs] === '.';
+
+      if (isMemberAccess && (BUILTIN_OBJECT_METHODS.has(token) || PRESERVED_KEYWORDS.has(token))) {
+        out += token;
+        continue;
+      }
+
+      // Check if followed by dot (e.g. math.sqrt, console.log)
+      let nextNonWs = i;
+      while (nextNonWs < trimmed.length && /\s/.test(trimmed[nextNonWs])) nextNonWs++;
+      const isFollowedByDot = nextNonWs < trimmed.length && trimmed[nextNonWs] === '.';
+
+      if (isFollowedByDot && PRESERVED_KEYWORDS.has(token)) {
+        out += token;
+        continue;
+      }
+
       // Preserve programming keywords intact in English
       if (PRESERVED_KEYWORDS.has(token)) {
         out += token;
       } else {
-        // Transliterate identifier to target native script
+        // Transliterate user-defined identifier to target native script
         out += transliterateWord(token, lang);
       }
       continue;
@@ -1315,6 +1806,42 @@ export function transliterateCode(code: string, lang: NativeLanguageKey = 'telug
   if (lang === 'english' || !code) return code;
 
   const lines = code.split('\n');
-  const transliteratedLines = lines.map((line) => transliterateCodeLine(line, lang));
+  let inBlockComment = false;
+  let inDocstring: string | null = null;
+
+  const transliteratedLines = lines.map((line) => {
+    // If inside a multiline docstring
+    if (inDocstring) {
+      const endIdx = line.indexOf(inDocstring);
+      if (endIdx !== -1) {
+        inDocstring = null;
+      }
+      return line;
+    }
+
+    // Check if line starts a multiline docstring
+    const trimmed = line.trim();
+    if ((trimmed.startsWith('"""') && !trimmed.slice(3).includes('"""')) ||
+        (trimmed.startsWith("'''") && !trimmed.slice(3).includes("'''"))) {
+      inDocstring = trimmed.startsWith('"""') ? '"""' : "'''";
+      return line;
+    }
+
+    // If inside a multiline block comment /* ... */
+    if (inBlockComment) {
+      if (line.includes('*/')) {
+        inBlockComment = false;
+      }
+      return line;
+    }
+
+    if (trimmed.startsWith('/*') && !trimmed.includes('*/')) {
+      inBlockComment = true;
+      return line;
+    }
+
+    return transliterateCodeLine(line, lang);
+  });
+
   return transliteratedLines.join('\n');
 }
