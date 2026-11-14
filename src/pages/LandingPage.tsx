@@ -539,24 +539,20 @@ const learningPath = [
 // ─── FAQs Data ─────────────────────────────────────────────────────────────────
 const faqs = [
   {
-    q: 'How do I get started with BhashaCode?',
-    a: 'Getting started is completely free and takes seconds. You can try the live interactive playground right on this page without an account, or open the full Workspace to type your own code, choose your mother tongue, and get instant line-by-line pedagogical explanations.',
+    q: 'How do I get started with NexusCode?',
+    a: 'Getting started is completely free and takes seconds. You can try the live interactive playground right on this page without an account, or open the full Workspace to type your own code and get instant line-by-line visual blueprint explanations.',
   },
   {
     q: 'Is there a free version?',
-    a: 'Yes, BhashaCode is genuinely free. The free plan gives you 20 AI code explanations every day across all 8 supported native languages, access to the interactive browser sandbox, and the ability to save up to 15 projects in your personal library.',
+    a: 'Yes, NexusCode is genuinely free. The free plan gives you 20 AI visual code blueprints every day, access to the interactive browser sandbox, and the ability to save up to 15 projects in your personal library.',
   },
   {
     q: 'Which programming languages are supported?',
-    a: 'The workspace supports Python, JavaScript, TypeScript, Java, C++, Go, and Rust. The AI explanation engine is specially tuned for Python algorithms and computer science curricula while fully handling syntax from all 7 languages.',
+    a: 'The workspace supports Python, JavaScript, TypeScript, Java, C++, Go, and Rust. The visual blueprint engine is specially tuned for Python algorithms and modern agent architectures while fully handling syntax from all major languages.',
   },
   {
-    q: 'Which explanation languages are supported?',
-    a: 'BhashaCode supports Telugu (తెలుగు), Hindi (हिन्दी), Tamil (தமிழ்), Kannada (ಕನ್ನಡ), Marathi (मराठी), Bengali (বাংলা), Gujarati (ગુજરાતી), and English. All 8 languages are available on every plan without restriction.',
-  },
-  {
-    q: 'How does line-by-line code breakdown work?',
-    a: 'Our AI reads each non-empty line of your code and explains its exact execution logic in your chosen mother tongue. Technical names like "loop", "variable", or "array" are kept in English in parentheses alongside native terms so you build professional industry vocabulary.',
+    q: 'How does line-by-line visual blueprint work?',
+    a: 'Our engine parses each non-empty line of your code and draws interactive right-pointing connector arrows directly to visual cards with icons and plain-English explanations. You can see system toolkits, AI agent connections, MCP tools, and control flow side-by-side.',
   },
   {
     q: 'Can I run code in my browser?',
@@ -564,7 +560,7 @@ const faqs = [
   },
   {
     q: 'Does the AI assistant explain errors?',
-    a: 'Yes. The AI Debugger tab analyzes syntax errors, runtime exceptions, and logic bugs. It explains why the error occurred in your mother tongue and presents a side-by-side corrected code diff with preventive coding tips.',
+    a: 'Yes. The AI Debugger analyzes syntax errors, runtime exceptions, and logic bugs, explaining why the error occurred and presenting a side-by-side corrected code diff with preventive coding tips.',
   },
   {
     q: 'Is my submitted code stored?',
@@ -572,11 +568,11 @@ const faqs = [
   },
   {
     q: 'Is an account required?',
-    a: 'An account is not required to explore the interactive playground on this homepage. Creating a free account is recommended to save projects, track your daily quota of 20 explanations, and maintain your personal learning history.',
+    a: 'An account is not required to explore the interactive playground on this homepage. Creating a free account is recommended to save projects, track your daily quota of 20 blueprints, and maintain your personal learning history.',
   },
   {
     q: 'How do I upgrade or cancel my subscription?',
-    a: 'You can review plans on the Plans & Pricing page. Upgrades to Pro (₹399/month for 200 daily explanations and priority reasoning) can be managed directly in your account settings. Subscriptions can be canceled at any time with no penalty.',
+    a: 'You can review plans on the Plans & Pricing page. Upgrades to Pro (₹399/month for 200 daily blueprints and priority reasoning) can be managed directly in your account settings. Subscriptions can be canceled at any time with no penalty.',
   },
 ];
 
@@ -585,7 +581,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const { user, openAuthModal } = useAuth();
 
   // Language state (persisted across all sections)
-  const [selectedLang, setSelectedLang] = useState<NativeLanguageKey>('telugu');
+  const [selectedLang, setSelectedLang] = useState<NativeLanguageKey>('english');
 
   // Playground state
   const [playgroundSnippet, setPlaygroundSnippet] = useState<'loop' | 'condition' | 'function'>('loop');
@@ -736,16 +732,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             {/* Left Column: Value Proposition & CTAs */}
             <div className="lg:col-span-6 flex flex-col items-start text-left pb-12 sm:pb-16 lg:pb-20">
               <div className="text-[12px] font-semibold uppercase tracking-widest text-[#0067B8] mb-4">
-                CODE LEARNING IN YOUR LANGUAGE
+                VISUAL CODE BLUEPRINT & ARCHITECTURE
               </div>
               <h1
                 className="text-3xl sm:text-4xl lg:text-[46px] xl:text-[52px] font-bold text-[#0e1726] tracking-tight leading-[1.14] mb-5"
                 style={{ textWrap: 'balance' } as React.CSSProperties}
               >
-                Understand Every Line.<br />Learn Coding in Your Language.
+                Understand Every Line.<br />Visual Code Blueprints & Architecture.
               </h1>
               <p className="text-sm sm:text-base lg:text-[17px] text-[#3a4c56] leading-relaxed mb-7 max-w-[520px]">
-                Learn Python step by step with simple explanations in Telugu, Hindi, Tamil, and Kannada. Write code, run examples, and understand how your program works.
+                Master algorithms and software systems step-by-step with interactive line-by-line connector arrows, semantic toolkit mapping, and visual architecture diagrams.
               </p>
 
               {/* Primary & Secondary CTAs */}
@@ -782,7 +778,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
 
               {/* Supporting proof points */}
               <div className="flex flex-wrap items-center gap-3 text-[12px] text-[#5a6972]">
-                {['Python examples', 'Native-language explanations', 'Interactive practice'].map((t, i) => (
+                {['Interactive Line Arrows', 'Visual Architecture Blueprints', 'Live Execution Sandbox'].map((t, i) => (
                   <React.Fragment key={t}>
                     {i > 0 && <span className="text-[#ccc]">·</span>}
                     <span className="flex items-center gap-1.5 font-medium text-[#242424]">
@@ -799,7 +795,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               <div className="w-full max-w-[780px] lg:max-w-none flex justify-center items-center">
                 <img
                   src="/assets/aistudio/Telugu Coding Learning Workspace.png"
-                  alt="BhashaCode workspace demonstrating line-by-line Telugu code explanations"
+                  alt="NexusCode workspace demonstrating line-by-line visual code blueprints"
                   className="w-full max-w-[840px] lg:max-w-none lg:w-[130%] xl:w-[135%] h-auto block object-contain select-none transition-transform hover:scale-[1.01] duration-300"
                   loading="eager"
                   draggable={false}
@@ -865,66 +861,88 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* ─── SECTION 2: LANGUAGE SELECTION ──────────────────────────────────── */}
+      {/* ─── SECTION 2: VISUAL BLUEPRINT ARCHITECTURE ──────────────────────── */}
       <section id="languages" className="py-16 bg-white border-b border-[#E1DFDD]">
         <div className="max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-10">
             <span className="text-[12px] font-semibold uppercase tracking-widest text-[#0067B8] mb-2 block">
-              Native-Language Experience
+              VISUAL BLUEPRINT ARCHITECTURE
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold text-[#0e1726] tracking-tight mb-3">
-              Learn in the Language You Understand Best
+              From Raw Code to Clear Mental Models
             </h2>
             <p className="text-sm text-[#616161]">
-              Choose your native language. BhashaCode will update all code breakdowns, explanations, and AI mentor responses into your chosen mother tongue.
+              Every line of code connects with right-pointing connector arrows directly to visual semantic cards. Understand toolkits, AI connections, and execution flow at a glance.
             </p>
           </div>
 
-          {/* Language Cards Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
-            {SUPPORTED_NATIVE_LANGUAGES.filter((l) =>
-              ['telugu', 'hindi', 'tamil', 'kannada'].includes(l.key)
-            ).map((lang) => {
-              const isSelected = selectedLang === lang.key;
-              return (
-                <button
-                  key={lang.key}
-                  id={`lang-${lang.key}`}
-                  onClick={() => setSelectedLang(lang.key)}
-                  className={`group p-5 rounded-xl border-2 transition-all text-center cursor-pointer relative ${
-                    isSelected
-                      ? 'border-[#0067B8] bg-[#F4FAFF] shadow-sm ring-1 ring-[#0067B8]'
-                      : 'border-[#E1DFDD] bg-white hover:border-[#0067B8] hover:bg-[#F9FBFE]'
-                  }`}
-                  aria-pressed={isSelected}
-                  aria-label={`Select ${lang.english} language`}
-                >
-                  {isSelected && (
-                    <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#0067B8]" />
-                  )}
-                  <div
-                    className={`text-3xl font-bold mb-2 group-hover:scale-110 transition-transform ${
-                      isSelected ? 'text-[#0067B8]' : 'text-[#242424]'
-                    }`}
-                  >
-                    {lang.native.charAt(0)}
+          {/* Architecture Pillars Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+            {[
+              {
+                icon: '💻',
+                title: 'Essential Toolkits',
+                badge: 'System & OS',
+                code: 'import os\nimport sys\nfrom pathlib import Path',
+                desc: 'Accesses environment variables, interpreter paths, and filesystem servers.',
+                color: 'border-sky-500/40 bg-sky-500/5 text-sky-400',
+              },
+              {
+                icon: '🤖',
+                title: 'Google AI & Models',
+                badge: 'Autonomous Agents',
+                code: 'from google.adk.agents import Agent\nfrom models import LiteLlm',
+                desc: 'Constructs agent reasoning engines connected to Ollama and cloud LLMs.',
+                color: 'border-emerald-500/40 bg-emerald-500/5 text-emerald-400',
+              },
+              {
+                icon: '🧰',
+                title: 'Model Context Protocol',
+                badge: 'MCP Toolset',
+                code: 'tools = [crm_mcp]\nmcp = McpToolset(...)',
+                desc: 'Integrates secure inter-process stdio pipes and external capabilities.',
+                color: 'border-amber-500/40 bg-amber-500/5 text-amber-400',
+              },
+              {
+                icon: '🎯',
+                title: 'Core Functions & Rules',
+                badge: 'Execution Logic',
+                code: 'def agent_react(values):\n    return { "status": 200 }',
+                desc: 'Orchestrates parameter handling, guardrails, and structured return payloads.',
+                color: 'border-purple-500/40 bg-purple-500/5 text-purple-400',
+              },
+            ].map((pillar, idx) => (
+              <div
+                key={idx}
+                className="p-5 rounded-xl border border-[#E1DFDD] bg-white hover:border-[#0067B8] hover:shadow-md transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-2xl">{pillar.icon}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border border-slate-300 text-slate-600 bg-slate-50">
+                      {pillar.badge}
+                    </span>
                   </div>
-                  <div className="text-base font-bold text-[#0e1726] mb-0.5">
-                    {lang.native}
-                  </div>
-                  <div className="text-xs text-[#616161]">
-                    {lang.english}
-                  </div>
-                  <div className="text-[11px] text-[#0067B8] mt-2 font-medium">
-                    {lang.greeting} {isSelected ? '✓ Selected' : '→'}
-                  </div>
-                </button>
-              );
-            })}
+                  <h3 className="text-base font-bold text-[#0e1726] mb-2">
+                    {pillar.title}
+                  </h3>
+                  <pre className="font-mono text-[11px] bg-[#161b22] text-slate-200 p-2.5 rounded-md border border-[#30363d] overflow-x-auto mb-3 whitespace-pre">
+                    {pillar.code}
+                  </pre>
+                  <p className="text-xs text-[#616161] leading-relaxed">
+                    {pillar.desc}
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-[#f0f0f0] flex items-center gap-1 text-[11px] font-semibold text-[#0067B8]">
+                  <span>Visual Blueprint Active</span>
+                  <span>──&gt;</span>
+                </div>
+              </div>
+            ))}
           </div>
 
           <p className="text-center text-xs text-[#8e989e] mt-6">
-            Also supports Marathi, Bengali, Gujarati, and English · Language selection updates code explanations and AI mentor responses
+            Aligned line-by-line in the workspace · Real-time synchronized scrolling with zero input latency
           </p>
         </div>
       </section>
@@ -1811,50 +1829,46 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-[#0e1726] text-xs mb-3">Languages</h4>
+              <h4 className="font-semibold text-[#0e1726] text-xs mb-3">Visual Blueprints</h4>
               <ul className="space-y-2">
                 <li>
                   <button
-                    onClick={() => {
-                      setSelectedLang('telugu');
-                      document.getElementById('languages')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
+                    onClick={() =>
+                      document.getElementById('languages')?.scrollIntoView({ behavior: 'smooth' })
+                    }
                     className="hover:underline hover:text-[#0e1726] cursor-pointer"
                   >
-                    Telugu (తెలుగు)
+                    Essential Toolkits
                   </button>
                 </li>
                 <li>
                   <button
-                    onClick={() => {
-                      setSelectedLang('hindi');
-                      document.getElementById('languages')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
+                    onClick={() =>
+                      document.getElementById('languages')?.scrollIntoView({ behavior: 'smooth' })
+                    }
                     className="hover:underline hover:text-[#0e1726] cursor-pointer"
                   >
-                    Hindi (हिन्दी)
+                    AI Agent Connections
                   </button>
                 </li>
                 <li>
                   <button
-                    onClick={() => {
-                      setSelectedLang('tamil');
-                      document.getElementById('languages')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
+                    onClick={() =>
+                      document.getElementById('languages')?.scrollIntoView({ behavior: 'smooth' })
+                    }
                     className="hover:underline hover:text-[#0e1726] cursor-pointer"
                   >
-                    Tamil (தமிழ்)
+                    MCP Protocol Setup
                   </button>
                 </li>
                 <li>
                   <button
-                    onClick={() => {
-                      setSelectedLang('kannada');
-                      document.getElementById('languages')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
+                    onClick={() =>
+                      document.getElementById('languages')?.scrollIntoView({ behavior: 'smooth' })
+                    }
                     className="hover:underline hover:text-[#0e1726] cursor-pointer"
                   >
-                    Kannada (ಕನ್ನಡ)
+                    Execution Logic & Flow
                   </button>
                 </li>
               </ul>

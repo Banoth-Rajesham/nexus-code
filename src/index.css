@@ -19,8 +19,8 @@
     --ds-app-color-base-special-bg-opt1-left: linear-gradient(90deg, #ede8f6 0%, #f4fafd 50%, #dceef8 100%);
     --ds-app-color-base-default-fg-heading: #0e1726;
     --ds-app-color-base-default-fg-body: #3a4c56;
-    --ds-font-family-text: "Inter", "Noto Sans Telugu", "Noto Sans Devanagari", "Noto Sans Tamil", "Noto Sans Kannada", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-    --ds-font-family-display: "Inter", "Noto Sans Telugu", "Noto Sans Devanagari", "Noto Sans Tamil", "Noto Sans Kannada", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    --ds-font-family-text: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    --ds-font-family-display: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
     
     /* Legacy aliases for backward compatibility */
     --color-page-bg: #FFFFFF;

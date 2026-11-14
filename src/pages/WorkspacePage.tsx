@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useLayoutEffect, useDeferredValue } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   Sparkles,
@@ -37,6 +37,9 @@ import {
   ChevronRight,
   PanelLeft,
   PanelLeftClose,
+  LayoutDashboard,
+  Layers,
+  Compass,
 } from 'lucide-react';
 import {
   SUPPORTED_NATIVE_LANGUAGES,
@@ -52,6 +55,7 @@ import { HighlightedCodeBlock, VSCODE_MONO_FONT, CODE_EDITOR_SHARED_STYLE } from
 import { NATIVE_CODE_WORD, NATIVE_GUIDE_WORD, NATIVE_PSEUDO_WORD, transliterateWord } from '../utils/codeTransliterator';
 import { debugCodeDeterministically, convertCodeDeterministically, askCodeDeterministically } from '../utils/deterministicTools';
 import { analyzeCodeRuleBased } from '../utils/ruleBasedAnalyzer';
+import { parseVisualBlueprint, VisualBlueprintLine } from '../utils/visualBlueprint';
 
 interface WorkspacePageProps {
   onNavigate: (view: string) => void;
@@ -83,7 +87,7 @@ const DEFAULT_PROJECT_FILES: ProjectFile[] = [
   {
     id: 'f_main',
     name: 'main.py',
-    content: `# BhashaCode Python Project\n\ndef calculate_sum(a, b):\n    return a + b\n\nresult = calculate_sum(10, 20)\nprint("Result:", result)\n`,
+    content: `# NexusCode Python Project\n\ndef calculate_sum(a, b):\n    return a + b\n\nresult = calculate_sum(10, 20)\nprint("Result:", result)\n`,
     isEntry: true,
   },
 ];
@@ -96,7 +100,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const [projectTitle, setProjectTitle] = useState(initialProject?.title || 'my_project');
   const [progLang, setProgLang] = useState(initialProject?.programmingLanguage || 'python');
   const [nativeLang, setNativeLang] = useState<NativeLanguageKey>(
-    initialProject?.nativeLanguage || (user?.defaultLanguage as NativeLanguageKey) || 'telugu'
+    initialProject?.nativeLanguage || (user?.defaultLanguage as NativeLanguageKey) || 'english'
   );
 
   // Files state (persisted to localStorage)
@@ -238,7 +242,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const [speaking, setSpeaking] = useState(false);
   const [langDropOpen, setLangDropOpen] = useState(false);
   const [stdinInput, setStdinInput] = useState('');
-  const [showFileExplorer, setShowFileExplorer] = useState(true);
+  const [showFileExplorer, setShowFileExplorer] = useState(false);
 
   // Reactive window width for responsive layout decisions
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
@@ -257,20 +261,112 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   // Refs for editor & viewer
   const englishEditorRef = useRef<HTMLTextAreaElement>(null);
   const englishPreRef = useRef<HTMLDivElement>(null);
+  const lineNumbersRef = useRef<HTMLDivElement>(null);
+  const arrowsRailRef = useRef<HTMLDivElement>(null);
   const nativeViewerRef = useRef<HTMLDivElement>(null);
+  const nativeLineNumbersRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // INSTANT DETERMINISTIC TRANSLATION (Client-side, 0 latency, updates as user types)
-  const nativeTranslation = useMemo(() => {
-    return translateCodeToNative(code, nativeLang, translationMode);
-  }, [code, nativeLang, translationMode]);
+  // Synchronous cursor & selection restoration (prevents jumping cursor)
+  const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
-  // Independent scrolling: left editor syncs with its syntax overlay; right viewer scrolls independently
-  const handleEnglishScroll = () => {
-    if (englishEditorRef.current && englishPreRef.current) {
-      englishPreRef.current.scrollTop = englishEditorRef.current.scrollTop;
-      englishPreRef.current.scrollLeft = englishEditorRef.current.scrollLeft;
+  // Active cursor line for VS Code active line highlight
+  const [activeCursorLine, setActiveCursorLine] = useState<number>(1);
+
+  // Restore cursor synchronously before paint
+  useLayoutEffect(() => {
+    if (pendingSelectionRef.current && englishEditorRef.current) {
+      const { start, end } = pendingSelectionRef.current;
+      englishEditorRef.current.setSelectionRange(start, end);
+      pendingSelectionRef.current = null;
     }
+  }, [code]);
+
+  // High-performance deferred code for background translation (zero input lag)
+  const deferredCode = useDeferredValue(code);
+
+  // Visual Blueprint View Mode ('aligned' | 'blocks' | 'code')
+  const [blueprintMode, setBlueprintMode] = useState<'aligned' | 'blocks' | 'code'>('aligned');
+
+  // Parse semantic visual blueprint from code (Excalidraw / Architectural style)
+  const visualBlueprint = useMemo(() => {
+    return parseVisualBlueprint(deferredCode, progLang);
+  }, [deferredCode, progLang]);
+
+  // Jump cursor to target line and highlight it
+  const jumpToLine = (targetLineNum: number) => {
+    const lines = code.split('\n');
+    let charCount = 0;
+    for (let i = 0; i < targetLineNum - 1 && i < lines.length; i++) {
+      charCount += lines[i].length + 1;
+    }
+    const lineLen = lines[targetLineNum - 1]?.length || 0;
+    setActiveCursorLine(targetLineNum);
+    if (englishEditorRef.current) {
+      englishEditorRef.current.focus();
+      englishEditorRef.current.setSelectionRange(charCount, charCount + lineLen);
+    }
+  };
+
+  // INSTANT DETERMINISTIC TRANSLATION (Client-side, updates in background as user types)
+  const nativeTranslation = useMemo(() => {
+    return translateCodeToNative(deferredCode, nativeLang, translationMode);
+  }, [deferredCode, nativeLang, translationMode]);
+
+  // Synchronized scrolling for left editor, overlay, line numbers, arrows, and blueprint
+  const handleEnglishScroll = () => {
+    if (englishEditorRef.current) {
+      const { scrollTop, scrollLeft } = englishEditorRef.current;
+      if (englishPreRef.current) {
+        englishPreRef.current.scrollTop = scrollTop;
+        englishPreRef.current.scrollLeft = scrollLeft;
+      }
+      if (lineNumbersRef.current) {
+        lineNumbersRef.current.scrollTop = scrollTop;
+      }
+      if (arrowsRailRef.current) {
+        arrowsRailRef.current.scrollTop = scrollTop;
+      }
+      if (blueprintMode === 'aligned') {
+        if (nativeViewerRef.current) {
+          nativeViewerRef.current.scrollTop = scrollTop;
+        }
+        if (nativeLineNumbersRef.current) {
+          nativeLineNumbersRef.current.scrollTop = scrollTop;
+        }
+      }
+    }
+  };
+
+  // Synchronized scrolling for right native viewer and line numbers
+  const handleNativeScroll = () => {
+    if (nativeViewerRef.current) {
+      const { scrollTop } = nativeViewerRef.current;
+      if (nativeLineNumbersRef.current) {
+        nativeLineNumbersRef.current.scrollTop = scrollTop;
+      }
+      if (blueprintMode === 'aligned' && englishEditorRef.current) {
+        englishEditorRef.current.scrollTop = scrollTop;
+        if (englishPreRef.current) englishPreRef.current.scrollTop = scrollTop;
+        if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = scrollTop;
+        if (arrowsRailRef.current) arrowsRailRef.current.scrollTop = scrollTop;
+      }
+    }
+  };
+
+  // Track cursor position to highlight current active line in VS Code style
+  const handleEditorSelect = () => {
+    if (englishEditorRef.current) {
+      const pos = englishEditorRef.current.selectionStart;
+      const currentLine = code.substring(0, pos).split('\n').length;
+      setActiveCursorLine(currentLine);
+    }
+  };
+
+  // Helper to atomically update code and cursor position synchronously
+  const updateCodeAndSelection = (newCode: string, newStart: number, newEnd: number = newStart) => {
+    pendingSelectionRef.current = { start: newStart, end: newEnd };
+    handleCodeChange(newCode);
   };
 
   // Draggable Split Divider Event Listener
@@ -728,53 +824,74 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     const end = ta.selectionEnd;
     const val = ta.value;
 
-    // 1. Ctrl+Enter: Run Code immediately!
+    // 1. Ctrl+Enter / Cmd+Enter: Run Code immediately
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       handleExecute();
       return;
     }
 
-    // 2. Tab / Shift+Tab: Indent / Unindent
+    // 2. Skip-over closing characters — MUST BE CHECKED BEFORE AUTO-CLOSING!
+    const closingChars = [')', ']', '}', '"', "'", '`'];
+    if (closingChars.includes(e.key) && start === end && val[start] === e.key) {
+      e.preventDefault();
+      ta.selectionStart = ta.selectionEnd = start + 1;
+      const currentLine = val.substring(0, start + 1).split('\n').length;
+      setActiveCursorLine(currentLine);
+      return;
+    }
+
+    // 3. Tab / Shift+Tab: Smart VS Code Indentation
     if (e.key === 'Tab') {
       e.preventDefault();
       if (e.shiftKey) {
+        // Unindent selected lines or current line
         const lineStart = val.lastIndexOf('\n', start - 1) + 1;
         const lineEnd = val.indexOf('\n', end);
         const actualLineEnd = lineEnd === -1 ? val.length : lineEnd;
         const selectedBlock = val.substring(lineStart, actualLineEnd);
+        let removedChars = 0;
         const unindented = selectedBlock
           .split('\n')
-          .map((line) => (line.startsWith('    ') ? line.substring(4) : line.replace(/^\s{1,3}/, '')))
+          .map((line) => {
+            if (line.startsWith('    ')) {
+              removedChars += 4;
+              return line.substring(4);
+            }
+            const match = line.match(/^\s{1,3}/);
+            if (match) {
+              removedChars += match[0].length;
+              return line.substring(match[0].length);
+            }
+            return line;
+          })
           .join('\n');
         const newVal = val.substring(0, lineStart) + unindented + val.substring(actualLineEnd);
-        handleCodeChange(newVal);
+        const newStart = Math.max(lineStart, start - (selectedBlock.startsWith(' ') ? 4 : 0));
+        const newEnd = Math.max(newStart, end - removedChars);
+        updateCodeAndSelection(newVal, newStart, newEnd);
       } else {
         if (start !== end) {
+          // Multiline indent
           const lineStart = val.lastIndexOf('\n', start - 1) + 1;
           const lineEnd = val.indexOf('\n', end);
           const actualLineEnd = lineEnd === -1 ? val.length : lineEnd;
           const selectedBlock = val.substring(lineStart, actualLineEnd);
-          const indented = selectedBlock
-            .split('\n')
-            .map((line) => '    ' + line)
-            .join('\n');
+          const lines = selectedBlock.split('\n');
+          const indented = lines.map((line) => '    ' + line).join('\n');
+          const addedChars = lines.length * 4;
           const newVal = val.substring(0, lineStart) + indented + val.substring(actualLineEnd);
-          handleCodeChange(newVal);
+          updateCodeAndSelection(newVal, start + 4, end + addedChars);
         } else {
+          // Single cursor: insert 4 spaces
           const newVal = val.substring(0, start) + '    ' + val.substring(end);
-          handleCodeChange(newVal);
-          setTimeout(() => {
-            if (englishEditorRef.current) {
-              englishEditorRef.current.selectionStart = englishEditorRef.current.selectionEnd = start + 4;
-            }
-          }, 0);
+          updateCodeAndSelection(newVal, start + 4);
         }
       }
       return;
     }
 
-    // 3. Enter: Smart auto-indent after colon (:) or open brace ({)
+    // 4. Enter: Smart auto-indent after colon (:) or open brace ({) + bracket expansion
     if (e.key === 'Enter') {
       e.preventDefault();
       const currentLineStart = val.lastIndexOf('\n', start - 1) + 1;
@@ -783,67 +900,102 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
       let indent = matchIndent ? matchIndent[1] : '';
 
       const trimmedBefore = currentLine.trimEnd();
-      if (trimmedBefore.endsWith(':') || trimmedBefore.endsWith('{') || trimmedBefore.endsWith('(') || trimmedBefore.endsWith('[')) {
+      if (
+        trimmedBefore.endsWith(':') ||
+        trimmedBefore.endsWith('{') ||
+        trimmedBefore.endsWith('(') ||
+        trimmedBefore.endsWith('[')
+      ) {
         indent += '    ';
       }
 
+      // Check if cursor is between matching pairs: {|} or (|) or [|]
+      const charBefore = val[start - 1];
+      const charAfter = val[start];
+      const isBetweenBrackets =
+        (charBefore === '{' && charAfter === '}') ||
+        (charBefore === '(' && charAfter === ')') ||
+        (charBefore === '[' && charAfter === ']');
+
+      if (isBetweenBrackets) {
+        const baseIndent = matchIndent ? matchIndent[1] : '';
+        const newVal = val.substring(0, start) + '\n' + indent + '\n' + baseIndent + val.substring(end);
+        updateCodeAndSelection(newVal, start + 1 + indent.length);
+        return;
+      }
+
       const newVal = val.substring(0, start) + '\n' + indent + val.substring(end);
-      handleCodeChange(newVal);
-      setTimeout(() => {
-        if (englishEditorRef.current) {
-          englishEditorRef.current.selectionStart = englishEditorRef.current.selectionEnd = start + 1 + indent.length;
-        }
-      }, 0);
+      updateCodeAndSelection(newVal, start + 1 + indent.length);
       return;
     }
 
-    // 4. Smart Backspace: Remove 4 spaces
-    if (e.key === 'Backspace' && start === end && start >= 4) {
-      const preceding = val.substring(start - 4, start);
-      const lineStart = val.lastIndexOf('\n', start - 1) + 1;
-      const lineToCursor = val.substring(lineStart, start);
-      if (preceding === '    ' && lineToCursor.trim() === '') {
+    // 5. Smart Backspace: Remove 4 spaces or delete matching empty pair () [] {} "" '' ``
+    if (e.key === 'Backspace' && start === end && start > 0) {
+      // Empty bracket/quote pair deletion
+      const charBefore = val[start - 1];
+      const charAfter = val[start];
+      if (
+        (charBefore === '(' && charAfter === ')') ||
+        (charBefore === '[' && charAfter === ']') ||
+        (charBefore === '{' && charAfter === '}') ||
+        (charBefore === '"' && charAfter === '"') ||
+        (charBefore === "'" && charAfter === "'") ||
+        (charBefore === '`' && charAfter === '`')
+      ) {
         e.preventDefault();
-        const newVal = val.substring(0, start - 4) + val.substring(end);
-        handleCodeChange(newVal);
-        setTimeout(() => {
-          if (englishEditorRef.current) {
-            englishEditorRef.current.selectionStart = englishEditorRef.current.selectionEnd = start - 4;
-          }
-        }, 0);
+        const newVal = val.substring(0, start - 1) + val.substring(end + 1);
+        updateCodeAndSelection(newVal, start - 1);
         return;
+      }
+
+      // 4-space indentation deletion
+      if (start >= 4) {
+        const preceding = val.substring(start - 4, start);
+        const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+        const lineToCursor = val.substring(lineStart, start);
+        if (preceding === '    ' && lineToCursor.trim() === '') {
+          e.preventDefault();
+          const newVal = val.substring(0, start - 4) + val.substring(end);
+          updateCodeAndSelection(newVal, start - 4);
+          return;
+        }
       }
     }
 
-    // 5. Auto-closing pairs
-    const pairs: Record<string, string> = {
+    // 6. Auto-closing opening brackets: ( [ {
+    const openBrackets: Record<string, string> = {
       '(': ')',
       '[': ']',
       '{': '}',
-      '"': '"',
-      "'": "'",
-      '`': '`',
     };
-
-    if (pairs[e.key]) {
+    if (openBrackets[e.key]) {
       e.preventDefault();
-      const closeChar = pairs[e.key];
+      const closeChar = openBrackets[e.key];
       const selectedText = val.substring(start, end);
       const newVal = val.substring(0, start) + e.key + selectedText + closeChar + val.substring(end);
-      handleCodeChange(newVal);
-      setTimeout(() => {
-        if (englishEditorRef.current) {
-          englishEditorRef.current.selectionStart = start + 1;
-          englishEditorRef.current.selectionEnd = end + 1;
-        }
-      }, 0);
+      updateCodeAndSelection(newVal, start + 1, end + 1);
       return;
     }
 
-    // 6. Skip-over closing characters
-    if (['}', ')', ']', '"', "'", '`'].includes(e.key) && start === end && val[start] === e.key) {
+    // 7. Auto-closing quotes: " ' `
+    if (['"', "'", '`'].includes(e.key)) {
+      // If text is selected, wrap in quotes
+      if (start !== end) {
+        e.preventDefault();
+        const selectedText = val.substring(start, end);
+        const newVal = val.substring(0, start) + e.key + selectedText + e.key + val.substring(end);
+        updateCodeAndSelection(newVal, start + 1, end + 1);
+        return;
+      }
+      // If cursor is right before an alphanumeric char, do not auto-close (treat as normal key)
+      const nextChar = val[start];
+      if (nextChar && /[\w\d]/i.test(nextChar)) {
+        return; // default browser behavior
+      }
+      // Otherwise auto-close pair
       e.preventDefault();
-      ta.selectionStart = ta.selectionEnd = start + 1;
+      const newVal = val.substring(0, start) + e.key + e.key + val.substring(end);
+      updateCodeAndSelection(newVal, start + 1, start + 1);
       return;
     }
   };
@@ -851,7 +1003,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   // 1. RUN CODE — Real Subprocess Execution with Multi-File support!
   const handleExecute = async () => {
     if (!code.trim() && files.length === 0) {
-      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి రన్ చేయడానికి కోడ్ రాయండి.' : 'Please enter code to run.');
+      setErrorMessage('Please enter code to run.');
       return;
     }
     setErrorMessage(null);
@@ -905,7 +1057,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   // 2. Explain Code (Deterministic Rule-Based)
   const handleExplain = async () => {
     if (!code.trim()) {
-      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి ముందుగా కోడ్ రాయండి.' : 'Please enter code first.');
+      setErrorMessage('Please enter code first.');
       return;
     }
     setErrorMessage(null);
@@ -935,7 +1087,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   // 2b. Simple Logic Tool
   const handleSimpleLogic = () => {
     if (!code.trim()) {
-      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి ముందుగా కోడ్ రాయండి.' : 'Please enter code first.');
+      setErrorMessage('Please enter code first.');
       return;
     }
     setErrorMessage(null);
@@ -966,7 +1118,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   // 3. Debug & Fix (Deterministic Rule-Based)
   const handleDebug = async () => {
     if (!code.trim()) {
-      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి ముందుగా కోడ్ రాయండి.' : 'Please enter code first.');
+      setErrorMessage('Please enter code first.');
       return;
     }
     setErrorMessage(null);
@@ -992,7 +1144,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   // 4. Convert Code (Deterministic Python <-> JS/TS and Native Pseudocode)
   const handleConvert = async () => {
     if (!code.trim()) {
-      setErrorMessage(nativeLang === 'telugu' ? 'దయచేసి ముందుగా కోడ్ రాయండి.' : 'Please enter code first.');
+      setErrorMessage('Please enter code first.');
       return;
     }
     setErrorMessage(null);
@@ -1184,24 +1336,8 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           <span>{loadingAction === 'execute' ? 'Running...' : `Run ${entryFile.name}`}</span>
         </button>
 
-        {/* Right: Target Language + 3-Way Dual Split Toggle + Console + Save */}
+        {/* Right: 3-Way Dual Split Toggle + Console + Save */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Chosen Native Language Selector (All 8 Languages) */}
-          <div className="flex items-center gap-1.5 bg-[#21262d] border border-[#30363d] rounded-md px-2.5 py-1">
-            <Languages className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <select
-              value={nativeLang}
-              onChange={(e) => handleNativeLangChange(e.target.value as NativeLanguageKey)}
-              className="bg-transparent text-xs font-semibold text-slate-200 outline-none cursor-pointer"
-            >
-              {SUPPORTED_NATIVE_LANGUAGES.map((l) => (
-                <option key={l.key} value={l.key} className="bg-[#161b22]">
-                  {l.native} ({l.english})
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Dual Split 3-Segment Switcher (Visible & Responsive across screen sizes) */}
           <div className="flex items-center bg-[#21262d] border border-[#30363d] rounded-md p-0.5 text-xs">
             <button
@@ -1219,7 +1355,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
               onClick={() => {
                 setViewLayout('split');
               }}
-              title="Dual Split View (Source + Selected Native Language)"
+              title="Dual Split View (Source + Visual Blueprint)"
               className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'split' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
             >
               <Columns className="w-3.5 h-3.5 text-emerald-400" />
@@ -1230,11 +1366,11 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 setViewLayout('native');
                 setMobileView('native');
               }}
-              title={`Show ${currentNative?.native || 'Native'} Translation Only`}
+              title="Show Visual Blueprint Only"
               className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'native' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
             >
-              <Languages className="w-3.5 h-3.5 text-indigo-400" />
-              <span>{currentNative?.native || 'భ'}</span>
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Blueprint</span>
             </button>
           </div>
 
@@ -1288,8 +1424,8 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           }}
           className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'native' && viewLayout === 'native' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
         >
-          <Languages className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{currentNative?.native || 'భ'} {NATIVE_CODE_WORD[nativeLang] || 'కోడ్'}</span>
+          <LayoutDashboard className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Visual Blueprint</span>
         </button>
         <button
           onClick={() => {
@@ -1540,7 +1676,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
             {/* Section C: Bhasha Tools */}
             <div className="p-3 border-b border-[#30363d]">
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-2">
-                Bhasha Tools
+                Visual Analysis Tools
               </span>
               <div className="space-y-1">
                 {[
@@ -1570,7 +1706,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                   },
                   {
                     icon: <MessageSquare className="w-4 h-4 text-purple-400" />,
-                    label: 'Ask in Bhasha',
+                    label: 'Ask AI Assistant',
                     action: () => {
                       setShowConsole(true);
                       setConsoleTab('ai');
@@ -1601,10 +1737,10 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
             {/* Sidebar Footer */}
             <div className="mt-auto p-3 border-t border-[#30363d] bg-[#161b22]/30">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400">
-                <Zap className="w-3.5 h-3.5 shrink-0" /> Live Transliterator Active
+                <Zap className="w-3.5 h-3.5 shrink-0" /> Visual Blueprint Active
               </div>
               <div className="text-[10px] text-slate-400 mt-0.5 leading-snug">
-                Deterministic {currentNative?.native} ({currentNative?.english})
+                Real-Time Code Map & Annotations
               </div>
             </div>
           </div>
@@ -1711,22 +1847,31 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 <div className="flex-1 flex min-h-0 overflow-hidden relative bg-[#1e1e1e]">
                   {/* Line numbers column */}
                   <div
-                    className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-3 pl-2 shrink-0 border-r border-[#30363d]/60 overflow-hidden"
+                    ref={lineNumbersRef}
+                    className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
                     style={{
-                      minWidth: '44px',
+                      minWidth: '50px',
                       fontFamily: VSCODE_MONO_FONT,
-                      fontSize: '13px',
-                      lineHeight: '24px',
-                      paddingTop: '12px',
-                      paddingBottom: '12px',
+                      fontSize: '14px',
+                      lineHeight: '26px',
+                      paddingTop: '14px',
+                      paddingBottom: '14px',
+                      boxSizing: 'border-box',
                     }}
                   >
                     {Array.from({ length: Math.max(lineCount, 25) }).map((_, i) => (
                       <div
                         key={i}
-                        onClick={() => setHighlightedLine(i + 1)}
-                        style={{ height: '24px', lineHeight: '24px' }}
-                        className={`cursor-pointer hover:text-slate-200 ${highlightedLine === i + 1 ? 'text-[#58a6ff] font-bold' : ''}`}
+                        onClick={() => {
+                          setHighlightedLine(i + 1);
+                          setActiveCursorLine(i + 1);
+                        }}
+                        style={{ height: '26px', lineHeight: '26px' }}
+                        className={`cursor-pointer hover:text-slate-200 transition-colors ${
+                          (highlightedLine === i + 1 || activeCursorLine === i + 1)
+                            ? 'text-[#ffffff] font-bold'
+                            : ''
+                        }`}
                       >
                         {i + 1}
                       </div>
@@ -1748,34 +1893,105 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                           overflow: 'hidden',
                         }}
                       >
-                        <HighlightedCodeBlock code={code} highlightedLine={highlightedLine} />
+                        <HighlightedCodeBlock
+                          code={code}
+                          highlightedLine={highlightedLine || activeCursorLine}
+                        />
                       </div>
                     )}
 
                     <textarea
                       ref={englishEditorRef}
                       value={code}
-                      onChange={(e) => handleCodeChange(e.target.value)}
+                      onChange={(e) => {
+                        handleCodeChange(e.target.value);
+                        handleEditorSelect();
+                      }}
                       onScroll={handleEnglishScroll}
                       onKeyDown={handleEditorKeyDown}
+                      onSelect={handleEditorSelect}
+                      onClick={handleEditorSelect}
+                      onKeyUp={handleEditorSelect}
                       placeholder="// Type or paste your code here..."
                       spellCheck={false}
                       autoCorrect="off"
                       autoCapitalize="off"
+                      autoComplete="off"
+                      data-gramm="false"
+                      data-gramm_editor="false"
+                      data-enable-grammarly="false"
                       style={{
                         ...CODE_EDITOR_SHARED_STYLE,
                         position: 'absolute',
                         inset: 0,
                         background: 'transparent',
+                        /* Always keep text visible — only make it transparent when overlay is ON */
                         color: syntaxOverlay ? 'transparent' : '#e6edf3',
-                        caretColor: '#58a6ff',
+                        /* VS Code white caret — always visible regardless of text color */
+                        caretColor: '#aeafad',
                         outline: 'none',
                         resize: 'none',
                         overflow: 'auto',
+                        overscrollBehavior: 'none',
                         zIndex: 10,
+                        /* Prevent browser from adding its own cursor/selection artifacts */
+                        cursor: 'text',
+                        /* Smooth rendering — no subpixel shifts when scrolling */
+                        willChange: 'scroll-position',
                       }}
                       className="selection:bg-[#264f78]/60 selection:text-transparent"
                     />
+                  </div>
+
+                  {/* ─── VISUAL ARROW CONNECTOR RAIL (Exact matching lines) ─── */}
+                  <div
+                    ref={arrowsRailRef}
+                    className="select-none bg-[#1e1e1e] border-l border-[#30363d]/50 shrink-0 overflow-hidden flex flex-col items-center z-10"
+                    style={{
+                      width: '44px',
+                      paddingTop: '14px',
+                      paddingBottom: '14px',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {code.split('\n').map((lineText, i) => {
+                      const hasContent = lineText.trim().length > 0;
+                      const isCurrent = (highlightedLine === i + 1 || activeCursorLine === i + 1);
+                      return (
+                        <div
+                          key={i}
+                          style={{ height: '26px', lineHeight: '26px' }}
+                          className="flex items-center justify-center w-full"
+                        >
+                          {hasContent ? (
+                            <button
+                              type="button"
+                              onClick={() => jumpToLine(i + 1)}
+                              className={`flex items-center justify-center cursor-pointer transition-all ${
+                                isCurrent
+                                  ? 'text-[#38bdf8] scale-110 drop-shadow-[0_0_8px_rgba(56,189,248,0.85)]'
+                                  : 'text-slate-500 hover:text-slate-200'
+                              }`}
+                              title={`Line ${i + 1} -> Click to inspect explanation`}
+                            >
+                              <svg
+                                width="26"
+                                height="14"
+                                viewBox="0 0 26 14"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <line x1="2" y1="7" x2="22" y2="7" />
+                                <polyline points="15 2 22 7 15 12" />
+                              </svg>
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1792,7 +2008,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 </div>
               )}
 
-              {/* ────── RIGHT PANE: NATIVE LANGUAGE TRANSLATION ────── */}
+              {/* ────── RIGHT PANE: VISUAL CODE BLUEPRINT & ANNOTATIONS ────── */}
               <div
                 style={{
                   width: viewLayout === 'split' ? `${100 - splitPercent}%` : '100%',
@@ -1803,43 +2019,53 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 {/* Right Header */}
                 <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="font-semibold text-emerald-400">
-                      {currentNative?.native || 'తెలుగు'} {NATIVE_CODE_WORD[nativeLang] || 'కోడ్'} ({currentNative?.english})
+                      Visual Blueprint & Line Explanations
                     </span>
                     <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono">
-                      Deterministic
+                      {visualBlueprint.totalNonEmpty} Lines Mapped
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/* View Switcher: Aligned Line Blueprint | Architecture Blocks | Pseudocode */}
                     <div className="flex bg-[#21262d] border border-[#30363d] rounded text-[10px] font-medium overflow-hidden">
                       <button
-                        onClick={() => setTranslationMode('guide')}
-                        className={`px-2 py-0.5 transition-colors ${translationMode === 'guide' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        onClick={() => setBlueprintMode('aligned')}
+                        className={`px-2 py-0.5 transition-colors ${blueprintMode === 'aligned' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        title="Line-by-line arrows aligned with editor"
                       >
-                        {currentNative?.native} {NATIVE_CODE_WORD[nativeLang] || 'కోడ్'}
+                        Line Blueprint
                       </button>
                       <button
-                        onClick={() => setTranslationMode('pseudocode')}
-                        className={`px-2 py-0.5 transition-colors ${translationMode === 'pseudocode' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        onClick={() => setBlueprintMode('blocks')}
+                        className={`px-2 py-0.5 transition-colors ${blueprintMode === 'blocks' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        title="Grouped architectural blocks like Excalidraw"
                       >
-                        {NATIVE_PSEUDO_WORD[nativeLang] || 'సూడోకోడ్'}
+                        Architecture Blocks
+                      </button>
+                      <button
+                        onClick={() => setBlueprintMode('code')}
+                        className={`px-2 py-0.5 transition-colors ${blueprintMode === 'code' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        title="Pure pseudocode representation"
+                      >
+                        Pseudocode
                       </button>
                     </div>
 
                     <button
                       onClick={handleCopyNative}
-                      title="Copy Native Code"
+                      title="Copy Blueprint"
                       className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
                     >
                       {copiedNative ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                     <button
                       onClick={() =>
-                        handleDownload(nativeTranslation.translatedCode, `${activeFile.name}_${nativeLang}.txt`)
+                        handleDownload(nativeTranslation.translatedCode, `${activeFile.name}_blueprint.txt`)
                       }
-                      title="Download Native Code"
+                      title="Download Blueprint"
                       className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -1847,47 +2073,211 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                   </div>
                 </div>
 
-                {/* Right Code Display with Independent Scrolling */}
+                {/* Right Body Display with Independent Scrolling & Synchronized Alignment */}
                 <div className="flex-1 flex min-h-0 overflow-hidden relative bg-[#1e1e1e]">
-                  <div
-                    className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-3 pl-2 shrink-0 border-r border-[#30363d]/60 overflow-hidden"
-                    style={{
-                      minWidth: '44px',
-                      fontFamily: VSCODE_MONO_FONT,
-                      fontSize: '13px',
-                      lineHeight: '24px',
-                      paddingTop: '12px',
-                      paddingBottom: '12px',
-                    }}
-                  >
-                    {Array.from({ length: Math.max(nativeTranslation.translatedCode.split('\n').length, 25) }).map(
-                      (_, i) => (
-                        <div
-                          key={i}
-                          style={{ height: '24px', lineHeight: '24px' }}
-                          className="cursor-default"
-                        >
-                          {i + 1}
-                        </div>
-                      )
-                    )}
-                  </div>
+                  {blueprintMode === 'aligned' ? (
+                    <>
+                      {/* Line Numbers aligned with Left Editor */}
+                      <div
+                        ref={nativeLineNumbersRef}
+                        className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
+                        style={{
+                          minWidth: '50px',
+                          fontFamily: VSCODE_MONO_FONT,
+                          fontSize: '14px',
+                          lineHeight: '26px',
+                          paddingTop: '14px',
+                          paddingBottom: '14px',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        {Array.from({ length: Math.max(visualBlueprint.lines.length, 25) }).map(
+                          (_, i) => (
+                            <div
+                              key={i}
+                              style={{ height: '26px', lineHeight: '26px' }}
+                              className={`cursor-default ${
+                                (highlightedLine === i + 1 || activeCursorLine === i + 1)
+                                  ? 'text-[#ffffff] font-bold'
+                                  : ''
+                              }`}
+                            >
+                              {i + 1}
+                            </div>
+                          )
+                        )}
+                      </div>
 
-                  <div
-                    ref={nativeViewerRef}
-                    style={{
-                      ...CODE_EDITOR_SHARED_STYLE,
-                      position: 'absolute',
-                      inset: 0,
-                      left: '44px',
-                      overflow: 'auto',
-                    }}
-                  >
-                    <HighlightedCodeBlock
-                      code={nativeTranslation.translatedCode}
-                      highlightedLine={highlightedLine}
-                    />
-                  </div>
+                      {/* Line-by-Line Visual Explanations with exact 26px height alignment */}
+                      <div
+                        ref={nativeViewerRef}
+                        onScroll={handleNativeScroll}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          left: '50px',
+                          overflow: 'auto',
+                          paddingTop: '14px',
+                          paddingBottom: '14px',
+                          boxSizing: 'border-box',
+                          fontFamily: VSCODE_MONO_FONT,
+                        }}
+                        className="no-scrollbar"
+                      >
+                        {visualBlueprint.lines.map((bLine, i) => {
+                          const isCurrent = (highlightedLine === bLine.lineNumber || activeCursorLine === bLine.lineNumber);
+                          if (bLine.isEmpty) {
+                            return (
+                              <div
+                                key={i}
+                                style={{ height: '26px', lineHeight: '26px' }}
+                                className="w-full select-none"
+                              />
+                            );
+                          }
+                          return (
+                            <div
+                              key={i}
+                              onClick={() => jumpToLine(bLine.lineNumber)}
+                              style={{ height: '26px', lineHeight: '26px' }}
+                              className={`group flex items-center gap-2.5 px-3 w-full cursor-pointer transition-all rounded-[3px] border ${
+                                isCurrent
+                                  ? 'bg-[#1e293b] border-blue-500/60 shadow-xs'
+                                  : 'border-transparent hover:bg-[#252b36]'
+                              }`}
+                            >
+                              <span
+                                className={`text-[13px] shrink-0 transition-transform group-hover:scale-125 ${
+                                  isCurrent ? 'scale-110 drop-shadow-[0_0_6px_rgba(56,189,248,0.7)]' : ''
+                                }`}
+                              >
+                                {bLine.icon}
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.2 rounded text-[10px] font-semibold uppercase tracking-wider shrink-0 border ${bLine.colorScheme.badgeBg} ${bLine.colorScheme.badgeText} ${bLine.colorScheme.border}`}
+                              >
+                                {bLine.badge}
+                              </span>
+                              <span className="text-slate-500 text-xs shrink-0 select-none">──&gt;</span>
+                              <span
+                                className={`text-[13px] font-medium truncate ${
+                                  isCurrent ? 'text-white font-semibold' : 'text-slate-200 group-hover:text-white'
+                                }`}
+                              >
+                                {bLine.title}
+                              </span>
+                              <span className="text-slate-400 text-[11.5px] truncate hidden md:inline group-hover:text-slate-300">
+                                — {bLine.detail}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : blueprintMode === 'blocks' ? (
+                    /* ─── ARCHITECTURE BLOCKS VIEW (Grouped semantic cards like Excalidraw) ─── */
+                    <div className="flex-1 p-4 overflow-y-auto space-y-6">
+                      {visualBlueprint.groups.map((group, gIdx) => (
+                        <div
+                          key={gIdx}
+                          className="bg-[#161b22] rounded-lg border border-[#30363d] p-4 shadow-sm"
+                        >
+                          {/* Group Header */}
+                          <div className="flex items-center gap-2.5 border-b border-[#30363d]/80 pb-2.5 mb-3">
+                            <span className="text-lg">{group.icon}</span>
+                            <h3 className="text-sm font-bold text-white tracking-tight">
+                              {group.groupTitle}
+                            </h3>
+                            <span className="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono ml-auto">
+                              {group.lines.length} components
+                            </span>
+                          </div>
+
+                          {/* Group Items */}
+                          <div className="space-y-2">
+                            {group.lines.map((item, itIdx) => (
+                              <div
+                                key={itIdx}
+                                onClick={() => jumpToLine(item.lineNumber)}
+                                className={`p-2.5 rounded-md border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                                  activeCursorLine === item.lineNumber
+                                    ? 'bg-[#1e293b] border-blue-500 shadow-xs'
+                                    : 'bg-[#0d1117]/60 border-[#30363d]/60 hover:border-slate-500'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-xs font-mono text-slate-500 shrink-0">
+                                    L{item.lineNumber}
+                                  </span>
+                                  <code className="text-xs font-mono text-emerald-300 bg-[#1e1e1e] px-2 py-1 rounded border border-[#30363d] truncate max-w-[200px]">
+                                    {item.rawText}
+                                  </code>
+                                  <span className="text-slate-400 font-bold shrink-0">──&gt;</span>
+                                  <span className="text-sm">{item.icon}</span>
+                                  <span className="text-xs font-semibold text-slate-200">
+                                    {item.title}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-slate-400 truncate max-w-[340px]">
+                                  {item.detail}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    /* ─── PSEUDOCODE / CODE VIEW ─── */
+                    <>
+                      <div
+                        ref={nativeLineNumbersRef}
+                        className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
+                        style={{
+                          minWidth: '50px',
+                          fontFamily: VSCODE_MONO_FONT,
+                          fontSize: '14px',
+                          lineHeight: '26px',
+                          paddingTop: '14px',
+                          paddingBottom: '14px',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        {Array.from({ length: Math.max(nativeTranslation.translatedCode.split('\n').length, 25) }).map(
+                          (_, i) => (
+                            <div
+                              key={i}
+                              style={{ height: '26px', lineHeight: '26px' }}
+                              className={`cursor-default ${
+                                (highlightedLine === i + 1 || activeCursorLine === i + 1)
+                                  ? 'text-[#ffffff] font-bold'
+                                  : ''
+                              }`}
+                            >
+                              {i + 1}
+                            </div>
+                          )
+                        )}
+                      </div>
+
+                      <div
+                        ref={nativeViewerRef}
+                        onScroll={handleNativeScroll}
+                        style={{
+                          ...CODE_EDITOR_SHARED_STYLE,
+                          position: 'absolute',
+                          inset: 0,
+                          left: '50px',
+                          overflow: 'auto',
+                        }}
+                      >
+                        <HighlightedCodeBlock
+                          code={nativeTranslation.translatedCode}
+                          highlightedLine={highlightedLine || activeCursorLine}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1942,7 +2332,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 className={`flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-colors ${consoleTab === 'ai' ? 'bg-[#30363d] text-white' : 'text-slate-400 hover:text-slate-200'}`}
               >
                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                <span>Bhasha Insights</span>
+                <span>AI Insights</span>
               </button>
             </div>
 
@@ -2194,7 +2584,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                   </div>
                 )}
 
-                {/* Sub-tab 5: Ask in Bhasha */}
+                {/* Sub-tab 5: Ask AI Assistant */}
                 {aiSubTab === 'ask' && (
                   <div className="flex flex-col h-56">
                     <div className="flex-1 overflow-y-auto space-y-2 mb-2 pr-1">

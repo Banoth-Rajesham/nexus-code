@@ -1,3 +1,4 @@
+import { en } from './en';
 import { te } from './te';
 import { hi } from './hi';
 import { ta } from './ta';
@@ -23,6 +24,7 @@ export interface LanguagePack {
 }
 
 export const TRANSLATIONS: Record<string, LanguagePack> = {
+  english: en,
   telugu: te,
   hindi: hi,
   tamil: ta,
@@ -40,8 +42,8 @@ export function formatTemplate(template: string, params: Record<string, string |
 }
 
 /**
- * Returns the requested language pack, falling back to Telugu
+ * Returns the requested language pack, defaulting to English
  */
-export function getLanguagePack(nativeLang: NativeLanguageKey): LanguagePack {
-  return TRANSLATIONS[nativeLang] || TRANSLATIONS.telugu;
+export function getLanguagePack(nativeLang: NativeLanguageKey = 'english'): LanguagePack {
+  return TRANSLATIONS[nativeLang] || TRANSLATIONS.english;
 }

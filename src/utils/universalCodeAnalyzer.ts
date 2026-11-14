@@ -13,7 +13,7 @@ export type DynamicCodeAnalysis = RuleBasedCodeAnalysis;
 export function analyzeAnyCodeDynamically(
   code: string,
   progLang: string = 'python',
-  nativeLang: NativeLanguageKey = 'telugu'
+  nativeLang: NativeLanguageKey = 'english'
 ): DynamicCodeAnalysis {
   return analyzeCodeRuleBased(code, progLang, nativeLang);
 }

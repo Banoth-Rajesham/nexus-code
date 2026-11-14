@@ -26,13 +26,13 @@ export interface DeterministicConvertResult {
 export function debugCodeDeterministically(
   code: string,
   progLang: string = 'python',
-  nativeLang: NativeLanguageKey = 'telugu',
+  nativeLang: NativeLanguageKey = 'english',
   errorLog: string = ''
 ): DeterministicDebugResult {
   if (!code || !code.trim()) {
     return {
       hasErrors: false,
-      summary: nativeLang === 'telugu' ? 'కోడ్ ఏమీ ఇవ్వలేదు.' : 'No code provided to debug.',
+      summary: 'No code provided to debug.',
       likelyCauses: [],
       originalCode: '',
       correctedCode: '',
@@ -240,7 +240,7 @@ export function convertCodeDeterministically(
   code: string,
   sourceLang: string = 'python',
   targetLang: string = 'javascript',
-  nativeLang: NativeLanguageKey = 'telugu',
+  nativeLang: NativeLanguageKey = 'english',
   mode: string = 'programming_language'
 ): DeterministicConvertResult {
   if (!code || !code.trim()) {
@@ -438,7 +438,7 @@ export function askCodeDeterministically(
   code: string,
   question: string,
   progLang: string = 'python',
-  nativeLang: NativeLanguageKey = 'telugu'
+  nativeLang: NativeLanguageKey = 'english'
 ): string {
   const q = question.toLowerCase().trim();
   const analysis = analyzeCodeRuleBased(code || '', progLang, nativeLang);

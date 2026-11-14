@@ -19,7 +19,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_KEY = 'bhashacode_auth_token';
+const TOKEN_KEY = 'nexuscode_auth_token';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -91,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signup = async (name: string, email: string, password: string, defaultLanguage = 'telugu') => {
+  const signup = async (name: string, email: string, password: string, defaultLanguage = 'english') => {
     try {
       const res = await fetch('/api/v1/auth/signup', {
         method: 'POST',

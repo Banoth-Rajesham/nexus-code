@@ -38,7 +38,7 @@ export function AppContent() {
         )}
         {currentView === 'dashboard' && <DashboardPage onNavigate={handleNavigate} />}
         {currentView === 'pricing' && <PricingPage onNavigate={handleNavigate} />}
-        {currentView === 'docs' && <DocsPage />}
+        {currentView === 'docs' && <DocsPage onNavigate={handleNavigate} />}
       </main>
 
       {/* Global Authentication Modal */}

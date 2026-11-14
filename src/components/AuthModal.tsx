@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { X, KeyRound, Mail, User as UserIcon, Globe, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { X, KeyRound, Mail, User as UserIcon, Globe, ArrowRight, CheckCircle2, Code } from 'lucide-react';
 import { SUPPORTED_NATIVE_LANGUAGES } from '../types';
 
 export const AuthModal: React.FC = () => {
@@ -9,7 +9,7 @@ export const AuthModal: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [defaultLanguage, setDefaultLanguage] = useState('telugu');
+  const [defaultLanguage, setDefaultLanguage] = useState('english');
   const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export const AuthModal: React.FC = () => {
   const handleDemoLogin = async () => {
     setError(null);
     setLoading(true);
-    const res = await login('student@bhashacode.com', 'Learner@2026');
+    const res = await login('student@nexuscode.dev', 'Learner@2026');
     setLoading(false);
     if (!res.success) {
       setError(res.error || 'Demo login failed');
@@ -87,17 +87,17 @@ export const AuthModal: React.FC = () => {
 
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-10 h-10 rounded-sm bg-[#EBF3FC] text-[#0078D4] mb-3 font-bold text-lg border border-[#0078D4]/20">
-            భ
+          <div className="inline-flex items-center justify-center w-10 h-10 rounded-sm bg-[#0078D4] text-white mb-3 font-bold text-lg shadow-xs">
+            <Code className="w-5 h-5" />
           </div>
           <h3 className="text-xl sm:text-2xl font-bold text-[#242424]">
-            {tab === 'login' && 'Sign in to Microsoft 365'}
+            {tab === 'login' && 'Sign in to NexusCode'}
             {tab === 'signup' && 'Create your free account'}
             {tab === 'forgot' && 'Reset Password'}
           </h3>
           <p className="text-xs text-[#616161] mt-1.5">
-            {tab === 'login' && 'Continue your multilingual programming journey with BhashaCode.'}
-            {tab === 'signup' && 'No credit card required. Free 20 AI code explanations daily.'}
+            {tab === 'login' && 'Continue your visual code exploration with NexusCode.'}
+            {tab === 'signup' && 'No credit card required. Free 20 AI visual blueprints daily.'}
             {tab === 'forgot' && 'Enter your account email and choose a new password.'}
           </p>
         </div>

@@ -96,7 +96,7 @@ export interface ProjectFile {
   isEntry?: boolean;
 }
 
-export type NativeLanguageKey = 'telugu' | 'hindi' | 'tamil' | 'kannada' | 'marathi' | 'bengali' | 'gujarati' | 'english';
+export type NativeLanguageKey = 'english' | 'telugu' | 'hindi' | 'tamil' | 'kannada' | 'marathi' | 'bengali' | 'gujarati';
 
 export interface NativeLanguageOption {
   key: NativeLanguageKey;
@@ -107,14 +107,7 @@ export interface NativeLanguageOption {
 }
 
 export const SUPPORTED_NATIVE_LANGUAGES: NativeLanguageOption[] = [
-  { key: 'telugu', english: 'Telugu', native: 'తెలుగు', greeting: 'నమస్కారం', script: 'Telugu' },
-  { key: 'hindi', english: 'Hindi', native: 'हिन्दी', greeting: 'नमस्ते', script: 'Devanagari' },
-  { key: 'tamil', english: 'Tamil', native: 'தமிழ்', greeting: 'வணக்கம்', script: 'Tamil' },
-  { key: 'kannada', english: 'Kannada', native: 'ಕನ್ನಡ', greeting: 'ನಮಸ್ಕಾರ', script: 'Kannada' },
-  { key: 'marathi', english: 'Marathi', native: 'मराठी', greeting: 'नमस्कार', script: 'Devanagari' },
-  { key: 'bengali', english: 'Bengali', native: 'বাংলা', greeting: 'নমস্কার', script: 'Bengali' },
-  { key: 'gujarati', english: 'Gujarati', native: 'ગુજરાતી', greeting: 'નમસ્તે', script: 'Gujarati' },
-  { key: 'english', english: 'English', native: 'English', greeting: 'Welcome', script: 'Latin' },
+  { key: 'english', english: 'English', native: 'English', greeting: 'Hello', script: 'Latin' },
 ];
 
 export interface ProgrammingLanguageOption {

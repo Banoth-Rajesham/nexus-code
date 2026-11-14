@@ -726,6 +726,9 @@ export function phoneticTransliterate(word: string, lang: NativeLanguageKey): st
 // ─── 3. Curated Indic Dictionaries for Programming Identifiers ───────────────
 
 export const TELUGU_DICTIONARY: Record<string, string> = {
+  agent: 'ఏజెంట్',
+  react: 'రియాక్ట్',
+  series: 'సిరీస్',
   calculate_sum: 'మొత్తం_లెక్క',
   calculatesum: 'మొత్తం_లెక్క',
   calculateSum: 'మొత్తం_లెక్క',
@@ -913,6 +916,7 @@ export const TELUGU_DICTIONARY: Record<string, string> = {
   event: 'ఈవెంట్',
   events: 'ఈవెంట్స్',
   target_count: 'టార్గెట్_కౌంట్',
+  'target count': 'టార్గెట్ కౌంట్',
   occurrences: 'ఎన్ని సార్లు ఉందో',
   occurrence: 'ఒక్కరెన్స్',
   activities: 'యాక్టివిటీస్',
@@ -934,6 +938,9 @@ export const TELUGU_DICTIONARY: Record<string, string> = {
 };
 
 export const HINDI_DICTIONARY: Record<string, string> = {
+  agent: 'एजेंट',
+  react: 'रिएक्ट',
+  series: 'सीरीज',
   calculate_sum: 'योग_गणना',
   calculateSum: 'योग_गणना',
   format_result: 'रिजल्ट_प्रारूप',
@@ -1025,6 +1032,9 @@ export const HINDI_DICTIONARY: Record<string, string> = {
 };
 
 export const TAMIL_DICTIONARY: Record<string, string> = {
+  agent: 'ஏஜென்ட்',
+  react: 'ரியாக்ட்',
+  series: 'சீரிஸ்',
   calculate_sum: 'கூட்டுத்தொகை_கணக்கிடு',
   calculateSum: 'கூட்டுத்தொகை_கணக்கிடு',
   format_result: 'முடிவு_வடிவமைப்பு',
@@ -1096,6 +1106,9 @@ export const TAMIL_DICTIONARY: Record<string, string> = {
 };
 
 export const KANNADA_DICTIONARY: Record<string, string> = {
+  agent: 'ಏಜೆಂಟ್',
+  react: 'ರಿಯಾಕ್ಟ್',
+  series: 'ಸಿರೀಸ್',
   calculate_sum: 'ಮೊತ್ತ_ಲೆಕ್ಕ',
   calculateSum: 'ಮೊತ್ತ_ಲೆಕ್ಕ',
   format_result: 'ಫಲಿತಾಂಶ_ಸ್ವರೂಪ',
@@ -1167,6 +1180,9 @@ export const KANNADA_DICTIONARY: Record<string, string> = {
 };
 
 export const MARATHI_DICTIONARY: Record<string, string> = {
+  agent: 'एजंट',
+  react: 'रिएक्ट',
+  series: 'सीरीज',
   calculate_sum: 'योग_गणना',
   calculateSum: 'योग_गणना',
   format_result: 'रिजल्ट_प्रारूप',
@@ -1230,6 +1246,9 @@ export const MARATHI_DICTIONARY: Record<string, string> = {
 };
 
 export const BENGALI_DICTIONARY: Record<string, string> = {
+  agent: 'এজেন্ট',
+  react: 'রিয়্যাক্ট',
+  series: 'সিরিজ',
   calculate_sum: 'যোগফল_গণনা',
   calculateSum: 'যোগফল_গণনা',
   format_result: 'ফলাফল_ফরম্যাট',
@@ -1292,6 +1311,9 @@ export const BENGALI_DICTIONARY: Record<string, string> = {
 };
 
 export const GUJARATI_DICTIONARY: Record<string, string> = {
+  agent: 'એજન્ટ',
+  react: 'રિએક્ટ',
+  series: 'સીરીઝ',
   calculate_sum: 'સરવાળો_ગણના',
   calculateSum: 'સરવાળો_ગણના',
   format_result: 'પરિણામ_સ્વરૂપ',
@@ -1585,19 +1607,17 @@ function transliterateStringLiteral(literal: string, lang: NativeLanguageKey): s
   // Check known compound strings in dictionary (e.g. "Target count:")
   const dict = NATIVE_DICTIONARIES[lang];
   const innerTrim = inner.trim();
-  const innerLower = innerTrim.toLowerCase().replace(/[:,\s]+$/, '');
-  if (dict && dict[innerLower]) {
-    const suffix = inner.slice(inner.lastIndexOf(innerTrim) + innerTrim.length);
-    const prefix = inner.slice(0, inner.indexOf(innerTrim));
-    return `${quote}${prefix}${dict[innerLower]}${suffix}${quote}`;
+  const stripped = innerTrim.replace(/[:,\s]+$/, '');
+  const trailingPunct = innerTrim.slice(stripped.length);
+  const innerLower = stripped.toLowerCase();
+  const innerUnderscore = innerLower.replace(/\s+/g, '_');
+  if (dict && (dict[innerLower] || dict[innerUnderscore])) {
+    const matched = dict[innerLower] || dict[innerUnderscore];
+    return `${quote}${matched}${trailingPunct}${quote}`;
   }
 
-  // Replace words inside inner string
-  const transliteratedInner = inner.replace(/[a-zA-Z_]+/g, (match) => {
-    return transliterateWord(match, lang);
-  });
-
-  return `${quote}${transliteratedInner}${quote}`;
+  // Preserve all other string literals untouched (data, user messages, URLs, JSON keys, etc.)
+  return literal;
 }
 
 // ─── 8. Comment Transliteration ────────────────────────────────────────────────

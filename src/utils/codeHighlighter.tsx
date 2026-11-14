@@ -207,7 +207,7 @@ export function tokenizeLine(line: string): HighlightToken[] {
 /**
  * React Component to render syntax-colored line
  */
-export const HighlightedLine: React.FC<{ line: string }> = ({ line }) => {
+export const HighlightedLine: React.FC<{ line: string }> = React.memo(({ line }) => {
   const tokens = tokenizeLine(line);
   return (
     <span>
@@ -216,7 +216,6 @@ export const HighlightedLine: React.FC<{ line: string }> = ({ line }) => {
           key={idx}
           style={{
             color: t.color,
-            fontStyle: t.isComment ? 'italic' : 'normal',
           }}
         >
           {t.text}
@@ -224,15 +223,15 @@ export const HighlightedLine: React.FC<{ line: string }> = ({ line }) => {
       ))}
     </span>
   );
-};
+});
 
 // Shared VS Code font stack and pixel-perfect editor styles
-export const VSCODE_MONO_FONT = '"Cascadia Code", "Fira Code", Consolas, "Courier New", monospace';
+export const VSCODE_MONO_FONT = 'Consolas, "Cascadia Code", "Fira Code", "Courier New", monospace';
 
 export const CODE_EDITOR_SHARED_STYLE: React.CSSProperties = {
   fontFamily: VSCODE_MONO_FONT,
-  fontSize: '13px',
-  lineHeight: '24px',
+  fontSize: '14.5px',
+  lineHeight: '26px',
   letterSpacing: '0px',
   wordSpacing: '0px',
   tabSize: 4,
@@ -242,11 +241,15 @@ export const CODE_EDITOR_SHARED_STYLE: React.CSSProperties = {
   wordWrap: 'normal',
   overflowWrap: 'normal',
   fontVariantLigatures: 'none',
+  fontKerning: 'none',
   WebkitFontSmoothing: 'antialiased',
+  MozOsxFontSmoothing: 'grayscale',
+  textRendering: 'optimizeLegibility',
   boxSizing: 'border-box',
-  padding: '12px',
+  padding: '14px 18px',
   margin: 0,
   border: 0,
+  willChange: 'scroll-position',
 };
 
 /**
@@ -256,7 +259,7 @@ export const HighlightedCodeBlock: React.FC<{
   code: string;
   highlightedLine?: number | null;
   onLineHover?: (lineNum: number | null) => void;
-}> = ({ code, highlightedLine, onLineHover }) => {
+}> = React.memo(({ code, highlightedLine, onLineHover }) => {
   const lines = code.split('\n');
 
   return (
@@ -270,13 +273,17 @@ export const HighlightedCodeBlock: React.FC<{
             onMouseEnter={onLineHover ? () => onLineHover(lineNum) : undefined}
             onMouseLeave={onLineHover ? () => onLineHover(null) : undefined}
             style={{
-              height: '24px',
-              lineHeight: '24px',
+              height: '26px',
+              minHeight: '26px',
+              maxHeight: '26px',
+              lineHeight: '26px',
               padding: 0,
               margin: 0,
               whiteSpace: 'pre',
-              backgroundColor: isHovered ? 'rgba(38, 79, 120, 0.4)' : undefined,
-              borderRadius: isHovered ? '2px' : undefined,
+              boxSizing: 'border-box',
+              backgroundColor: isHovered ? 'rgba(255, 255, 255, 0.04)' : undefined,
+              borderTop: isHovered ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid transparent',
+              borderBottom: isHovered ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid transparent',
             }}
           >
             <HighlightedLine line={line} />
@@ -286,4 +293,4 @@ export const HighlightedCodeBlock: React.FC<{
       })}
     </div>
   );
-};
+});

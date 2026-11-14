@@ -23,7 +23,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [nameInput, setNameInput] = useState(user?.name || '');
-  const [langInput, setLangInput] = useState(user?.defaultLanguage || 'telugu');
+  const [langInput, setLangInput] = useState(user?.defaultLanguage || 'english');
   const [settingsSuccess, setSettingsSuccess] = useState(false);
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   };
 
   const handleDeleteAccount = async () => {
-    if (!confirm('Permanently delete your BhashaCode account and all saved projects? This cannot be undone.')) return;
+    if (!confirm('Permanently delete your NexusCode account and all saved projects? This cannot be undone.')) return;
     try {
       const res = await fetch('/api/v1/auth/account', {
         method: 'DELETE',

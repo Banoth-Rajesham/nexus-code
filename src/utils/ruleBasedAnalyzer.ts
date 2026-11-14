@@ -85,7 +85,7 @@ interface ParsedLoop {
 export function analyzeCodeRuleBased(
   code: string,
   progLang: string = 'python',
-  nativeLang: NativeLanguageKey = 'telugu'
+  nativeLang: NativeLanguageKey = 'english'
 ): RuleBasedCodeAnalysis {
   const pack = getLanguagePack(nativeLang);
   const lines = code.split('\n');
