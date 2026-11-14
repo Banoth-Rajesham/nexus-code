@@ -1,15 +1,10 @@
 import { NativeLanguageKey } from '../types';
 
 // ============================================================================
-// BHASHA CODE DETERMINISTIC PHONETIC TRANSLITERATION ENGINE v2
-// ─ Universal dynamic transliteration of user-defined identifiers.
-// ─ Phonetic transliteration into 7 Indic scripts: Telugu, Hindi, Tamil,
-//   Kannada, Marathi, Bengali, Gujarati.
-// ─ Comments are preserved byte-for-byte unchanged.
-// ─ String literals & docstrings are preserved byte-for-byte unchanged.
-// ─ Keywords, built-in methods, imports, numbers, syntax preserved exactly.
-// ─ Consistent transliteration across definitions, references, and member calls.
-// ─ 0 latency · 0 external APIs · 0 LLMs · 100% deterministic.
+// DETERMINISTIC INDIC CODE TRANSLITERATION ENGINE
+// Multi-script instant syntax-aware code transliterator for:
+// Telugu, Hindi, Tamil, Kannada, Marathi, Bengali, Gujarati, English.
+// 0 latency, 0 external APIs, 0 LLM dependency, 100% deterministic.
 // ============================================================================
 
 // ─── 1. Native UI Word Mappings ──────────────────────────────────────────────
@@ -46,646 +41,893 @@ export const NATIVE_PSEUDO_WORD: Record<NativeLanguageKey, string> = {
   english: 'Pseudocode',
 };
 
-// ─── 2. Brahmic Script Specifications ─────────────────────────────────────────
-export interface ScriptMapping {
+// ─── 2. Brahmic Script Specifications for Phonetic Fallback ───────────────────
+export interface IndicScriptSpec {
   virama: string;
-  independentVowels: Record<string, string>;
+  startVowels: Record<string, string>;
   matras: Record<string, string>;
   consonants: Record<string, string>;
-  hasTrailingVirama: boolean;
 }
 
-export type IndicScriptSpec = ScriptMapping;
-
-export const SCRIPT_MAPPINGS: Record<string, ScriptMapping> = {
+export const INDIC_SCRIPTS: Record<string, IndicScriptSpec> = {
   telugu: {
     virama: '\u0C4D', // ్
-    independentVowels: {
-      A: 'అ', AA: 'ఆ', AE: 'యా', AY: 'ఏ', AI: 'ఐ',
-      E: 'ఎ', EE: 'ఈ', I: 'ఇ', O: 'ఒ', OH: 'ఓ',
-      U: 'ఉ', OO: 'ఊ', YU: 'యూ', AU: 'ఔ', OI: 'ఆయ్', AH: 'అ',
+    startVowels: {
+      aa: 'ఆ', ee: 'ఈ', ii: 'ఈ', oo: 'ఊ', uu: 'ఊ', ai: 'ఐ', au: 'ఔ', ou: 'ఔ',
+      ea: 'ఈ', oa: 'ఓ', a: 'అ', e: 'ఎ', i: 'ఇ', o: 'ఒ', u: 'ఉ'
     },
     matras: {
-      A: '',
-      AA: '\u0C3E', // ా
-      AE: '\u0C4D\u0C2F\u0C3E', // ్యా
-      AY: '\u0C47', // ే
-      AI: '\u0C48', // ై
-      E: '\u0C46', // ె
-      EE: '\u0C40', // ీ
-      I: '\u0C3F', // ి
-      O: '\u0C4A', // ొ
-      OH: '\u0C4B', // ో
-      U: '\u0C41', // ు
-      OO: '\u0C42', // ూ
-      YU: '\u0C4D\u0C2F\u0C42', // ్యూ
-      AU: '\u0C4C', // ౌ
-      OI: '\u0C3E\u0C2F\u0C4D', // ాయ్
-      AH: '\u0C3E', // ా
+      aa: '\u0C3E', ee: '\u0C40', ii: '\u0C40', oo: '\u0C42', uu: '\u0C42',
+      ai: '\u0C48', ay: '\u0C47', au: '\u0C4C', ou: '\u0C4C', ow: '\u0C4C',
+      ea: '\u0C40', oa: '\u0C4B', a: '\u0C3E', e: '\u0C46', i: '\u0C3F',
+      o: '\u0C4A', u: '\u0C41'
     },
     consonants: {
-      k: 'క', kh: 'ఖ', g: 'గ', gh: 'ఘ', ch: 'చ', j: 'జ',
-      t: 'ట', th: 'థ', d: 'డ', dh: 'ధ', n: 'న', p: 'ప',
-      f: 'ఫ', ph: 'ఫ', b: 'బ', bh: 'భ', m: 'మ', y: 'య',
-      r: 'ర', l: 'ల', v: 'వ', w: 'వ', s: 'స', sh: 'ష', h: 'హ', z: 'జ్',
-    },
-    hasTrailingVirama: true,
+      sch: 'స్క్', str: 'స్ట్ర', spr: 'స్ప్ర', spl: 'స్ప్ల', scr: 'స్క్ర',
+      thr: 'థ్ర', shr: 'శ్ర', chr: 'క్ర', ph: 'ఫ', th: 'థ', sh: 'ష్', ch: 'చ్',
+      gh: 'ఘ', kh: 'ఖ', jh: 'ఝ', dh: 'ధ', bh: 'భ', ng: 'ంగ్', nk: 'ంక్', ck: 'క్',
+      qu: 'క్వ', wh: 'వ్', st: 'స్ట', sp: 'స్ప', sk: 'స్క', sc: 'స్క', sm: 'స్మ',
+      sn: 'స్న', sl: 'స్ల', sw: 'స్వ', pl: 'ప్ల', pr: 'ప్ర', bl: 'బ్ల', br: 'బ్ర',
+      tr: 'ట్ర', dr: 'డ్ర', cl: 'క్ల', cr: 'క్ర', gl: 'గ్ల', gr: 'గ్ర', fl: 'ఫ్ల',
+      fr: 'ఫ్ర', k: 'క', g: 'గ', j: 'జ', t: 'ట', d: 'డ', n: 'న', p: 'ప',
+      f: 'ఫ', b: 'బ', m: 'మ', y: 'య', r: 'ర', l: 'ల', v: 'వ', w: 'వ',
+      s: 'స', h: 'హ', x: 'క్స్', z: 'జ్', q: 'క్', c: 'క'
+    }
   },
   hindi: {
     virama: '\u094D', // ्
-    independentVowels: {
-      A: 'अ', AA: 'आ', AE: 'ऐ', AY: 'ए', AI: 'आइ',
-      E: 'ए', EE: 'ई', I: 'इ', O: 'ओ', OH: 'ओ',
-      U: 'उ', OO: 'ऊ', YU: 'यू', AU: 'आउ', OI: 'ऑय', AH: 'आ',
+    startVowels: {
+      aa: 'आ', ee: 'ई', ii: 'ई', oo: 'ऊ', uu: 'ऊ', ai: 'ऐ', au: 'औ', ou: 'औ',
+      ea: 'ई', oa: 'ओ', a: 'अ', e: 'ए', i: 'इ', o: 'ओ', u: 'उ'
     },
     matras: {
-      A: '',
-      AA: '\u093E', // ा
-      AE: '\u0948', // ै
-      AY: '\u0947', // े
-      AI: '\u093E\u0907', // ाइ
-      E: '\u0947', // े
-      EE: '\u0940', // ी
-      I: '\u093F', // ि
-      O: '\u094B', // ो
-      OH: '\u094B', // ो
-      U: '\u0941', // ु
-      OO: '\u0942', // ू
-      YU: '\u094D\u092F\u0942', // ्यू
-      AU: '\u093E\u0909', // ाउ
-      OI: '\u0949\u092F', // ॉय
-      AH: '\u093E', // ा
+      aa: '\u093E', ee: '\u0940', ii: '\u0940', oo: '\u0942', uu: '\u0942',
+      ai: '\u0948', ay: '\u0947', au: '\u094C', ou: '\u094C', ow: '\u094C',
+      ea: '\u0940', oa: '\u094B', a: '\u093E', e: '\u0947', i: '\u093F',
+      o: '\u094B', u: '\u0941'
     },
     consonants: {
-      k: 'क', kh: 'ख', g: 'ग', gh: 'घ', ch: 'च', j: 'ज',
-      t: 'ट', th: 'थ', d: 'ड', dh: 'ध', n: 'न', p: 'प',
-      f: 'फ़', ph: 'फ', b: 'ब', bh: 'भ', m: 'म', y: 'य',
-      r: 'र', l: 'ल', v: 'व', w: 'व', s: 'स', sh: 'श', h: 'ह', z: 'ज़',
-    },
-    hasTrailingVirama: false,
+      sch: 'स्क', str: 'स्ट्र', spr: 'स्प्र', spl: 'स्प्ल', scr: 'स्क्र',
+      thr: 'थ्र', shr: 'श्र', chr: 'क्र', ph: 'फ', th: 'थ', sh: 'श', ch: 'च',
+      gh: 'घ', kh: 'ख', jh: 'झ', dh: 'ध', bh: 'भ', ng: 'ंग', nk: 'ंक', ck: 'क',
+      qu: 'क्व', wh: 'व', st: 'स्ट', sp: 'स्प', sk: 'स्क', sc: 'स्क', sm: 'स्म',
+      sn: 'स्न', sl: 'स्ल', sw: 'स्व', pl: 'प्ल', pr: 'प्र', bl: 'ब्ल', br: 'ब्र',
+      tr: 'ट्र', dr: 'ड्र', cl: 'क्ल', cr: 'क्र', gl: 'ग्ल', gr: 'ग्र', fl: 'फ्ल',
+      fr: 'फ्र', k: 'क', g: 'ग', j: 'ज', t: 'ट', d: 'ड', n: 'न', p: 'प',
+      f: 'फ', b: 'ब', m: 'म', y: 'य', r: 'र', l: 'ल', v: 'व', w: 'व',
+      s: 'स', h: 'ह', x: 'क्स', z: 'ज़', q: 'क', c: 'क'
+    }
   },
   tamil: {
     virama: '\u0BCD', // ்
-    independentVowels: {
-      A: 'அ', AA: 'ஆ', AE: 'யா', AY: 'ஏ', AI: 'ஐ',
-      E: 'எ', EE: 'ஈ', I: 'இ', O: 'ஒ', OH: 'ஓ',
-      U: 'உ', OO: 'ஊ', YU: 'யூ', AU: 'ஔ', OI: 'ஆய்', AH: 'அ',
+    startVowels: {
+      aa: 'ஆ', ee: 'ஈ', ii: 'ஈ', oo: 'ஊ', uu: 'ஊ', ai: 'ஐ', au: 'ஔ', ou: 'ஔ',
+      ea: 'ஈ', oa: 'ஓ', a: 'அ', e: 'எ', i: 'இ', o: 'ஒ', u: 'உ'
     },
     matras: {
-      A: '',
-      AA: '\u0BBE', // ா
-      AE: '\u0BCD\u0BAF\u0BBE', // ்யா
-      AY: '\u0BC7', // ே
-      AI: '\u0BC8', // ை
-      E: '\u0BC6', // ெ
-      EE: '\u0BC0', // ீ
-      I: '\u0BBF', // ி
-      O: '\u0BCA', // ொ
-      OH: '\u0BCB', // ோ
-      U: '\u0BC1', // ு
-      OO: '\u0BC2', // ூ
-      YU: '\u0BCD\u0BAF\u0BC2', // ்யூ
-      AU: '\u0BCC', // ௌ
-      OI: '\u0BBE\u0BAF\u0BCD', // ாய்
-      AH: '\u0BBE', // ா
+      aa: '\u0BBE', ee: '\u0BC0', ii: '\u0BC0', oo: '\u0BC2', uu: '\u0BC2',
+      ai: '\u0BC8', ay: '\u0BC7', au: '\u0BCC', ou: '\u0BCC', ow: '\u0BCC',
+      ea: '\u0BC0', oa: '\u0BCA', a: '\u0BBE', e: '\u0BC6', i: '\u0BBF',
+      o: '\u0BCA', u: '\u0BC1'
     },
     consonants: {
-      k: 'க', kh: 'க', g: 'க', gh: 'க', ch: 'ச', j: 'ஜ',
-      t: 'ட', th: 'த', d: 'ட', dh: 'ட', n: 'ந', p: 'ப',
-      f: 'ப', ph: 'ப', b: 'ப', bh: 'ப', m: 'ம', y: 'ய',
-      r: 'ர', l: 'ல', v: 'வ', w: 'வ', s: 'ஸ', sh: 'ஷ', h: 'ஹ', z: 'ஜ',
-    },
-    hasTrailingVirama: true,
+      sch: 'ஸ்க்', str: 'ஸ்ட்ர', spr: 'ஸ்ப்ர', spl: 'ஸ்ப்ல', scr: 'ஸ்க்ர',
+      thr: 'த்ர', shr: 'ஸ்ர', chr: 'க்ர', ph: 'ப்', th: 'த்', sh: 'ஷ்', ch: 'ச்',
+      gh: 'க்', kh: 'க்', jh: 'ஜ்', dh: 'ட்', bh: 'ப்', ng: 'ங்', nk: 'ங்க்', ck: 'க்',
+      qu: 'க்வ', wh: 'வ்', st: 'ஸ்ட', sp: 'ஸ்ப', sk: 'ஸ்க', sc: 'ஸ்க', sm: 'ஸ்ம',
+      sn: 'ஸ்ந', sl: 'ஸ்ல', sw: 'ஸ்வ', pl: 'ப்ல', pr: 'ப்ர', bl: 'ப்ல', br: 'ப்ர',
+      tr: 'ட்ர', dr: 'ட்ர', cl: 'க்ல', cr: 'க்ர', gl: 'க்ல', gr: 'க்ர', fl: 'ப்ல',
+      fr: 'ப்ர', k: 'க', g: 'க', j: 'ஜ', t: 'ட', d: 'ட', n: 'ந', p: 'ப',
+      f: 'ப', b: 'ப', m: 'ம', y: 'ய', r: 'ர', l: 'ல', v: 'வ', w: 'வ',
+      s: 'ஸ', h: 'ஹ', x: 'க்ஸ்', z: 'ஜ', q: 'க', c: 'க'
+    }
   },
   kannada: {
     virama: '\u0CCD', // ್
-    independentVowels: {
-      A: 'ಅ', AA: 'ಆ', AE: 'ಯಾ', AY: 'ಏ', AI: 'ಐ',
-      E: 'ಎ', EE: 'ಈ', I: 'ಇ', O: 'ಒ', OH: 'ಓ',
-      U: 'ಉ', OO: 'ಊ', YU: 'ಯೂ', AU: 'ಔ', OI: 'ಆಯ್', AH: 'ಅ',
+    startVowels: {
+      aa: 'ಆ', ee: 'ಈ', ii: 'ಈ', oo: 'ಊ', uu: 'ಊ', ai: 'ಐ', au: 'ಔ', ou: 'ಔ',
+      ea: 'ಈ', oa: 'ಓ', a: 'ಅ', e: 'ಎ', i: 'ಇ', o: 'ಒ', u: 'ಉ'
     },
     matras: {
-      A: '',
-      AA: '\u0CBE', // ಾ
-      AE: '\u0CCD\u0CAF\u0CBE', // ್ಯಾ
-      AY: '\u0CC7', // ೇ
-      AI: '\u0CC8', // ೈ
-      E: '\u0CC6', // ೆ
-      EE: '\u0CC0', // ೀ
-      I: '\u0CBF', // ಿ
-      O: '\u0CCA', // ೊ
-      OH: '\u0CCB', // ೋ
-      U: '\u0CC1', // ು
-      OO: '\u0CC2', // ೂ
-      YU: '\u0CCD\u0CAF\u0CC2', // ್ಯೂ
-      AU: '\u0CCC', // ೌ
-      OI: '\u0CBE\u0CAF\u0CCD', // ಾಯ್
-      AH: '\u0CBE', // ಾ
+      aa: '\u0CBE', ee: '\u0CC0', ii: '\u0CC0', oo: '\u0CC2', uu: '\u0CC2',
+      ai: '\u0CC8', ay: '\u0CC7', au: '\u0CCC', ou: '\u0CCC', ow: '\u0CCC',
+      ea: '\u0CC0', oa: '\u0CCA', a: '\u0CBE', e: '\u0CC6', i: '\u0CBF',
+      o: '\u0CCA', u: '\u0CC1'
     },
     consonants: {
-      k: 'ಕ', kh: 'ಖ', g: 'ಗ', gh: 'ಘ', ch: 'ಚ', j: 'ಜ',
-      t: 'ಟ', th: 'ಥ', d: 'ಡ', dh: 'ಧ', n: 'ನ', p: 'ಪ',
-      f: 'ಫ', ph: 'ಫ', b: 'ಬ', bh: 'ಭ', m: 'ಮ', y: 'ಯ',
-      r: 'ರ', l: 'ಲ', v: 'ವ', w: 'ವ', s: 'ಸ', sh: 'ಶ', h: 'ಹ', z: 'ಜ',
-    },
-    hasTrailingVirama: true,
+      sch: 'ಸ್ಕ್', str: 'ಸ್ಟ್ರ', spr: 'ಸ್ಪ್ರ', spl: 'ಸ್ಪ್ಲ', scr: 'ಸ್ಕ್ರ',
+      thr: 'ಥ್ರ', shr: 'ಶ್ರ', chr: 'ಕ್ರ', ph: 'ಫ', th: 'ಥ', sh: 'ಶ್', ch: 'ಚ್',
+      gh: 'ಘ', kh: 'ಖ', jh: 'ಝ', dh: 'ಧ', bh: 'ಭ', ng: 'ಂಗ್', nk: 'ಂಕ್', ck: 'ಕ್',
+      qu: 'ಕ್ವ', wh: 'ವ್', st: 'ಸ್ಟ', sp: 'ಸ್ಪ', sk: 'ಸ್ಕ', sc: 'ಸ್ಕ', sm: 'ಸ್ಮ',
+      sn: 'ಸ್ನ', sl: 'ಸ್ಲ', sw: 'ಸ್ವ', pl: 'ಪ್ಲ', pr: 'ಪ್ರ', bl: 'ಬ್ಲ', br: 'ಬ್ರ',
+      tr: 'ಟ್ರ', dr: 'ಡ್ರ', cl: 'ಕ್ಲ', cr: 'ಕ್ರ', gl: 'ಗ್ಲ', gr: 'ಗ್ರ', fl: 'ಫ್ಲ',
+      fr: 'ಫ್ರ', k: 'ಕ', g: 'ಗ', j: 'ಜ', t: 'ಟ', d: 'ಡ', n: 'ನ', p: 'ಪ',
+      f: 'ಫ', b: 'ಬ', m: 'ಮ', y: 'ಯ', r: 'ರ', l: 'ಲ', v: 'ವ', w: 'ವ',
+      s: 'ಸ', h: 'ಹ', x: 'ಕ್ಸ್', z: 'ಜ', q: 'ಕ', c: 'ಕ'
+    }
   },
   marathi: {
-    virama: '\u094D',
-    independentVowels: {
-      A: 'अ', AA: 'आ', AE: 'ऐ', AY: 'ए', AI: 'आई',
-      E: 'ए', EE: 'ई', I: 'इ', O: 'ओ', OH: 'ओ',
-      U: 'उ', OO: 'ऊ', YU: 'यू', AU: 'औ', OI: 'ऑय', AH: 'आ',
+    virama: '\u094D', // ्
+    startVowels: {
+      aa: 'आ', ee: 'ई', ii: 'ई', oo: 'ऊ', uu: 'ऊ', ai: 'ऐ', au: 'औ', ou: 'औ',
+      ea: 'ई', oa: 'ओ', a: 'अ', e: 'ए', i: 'इ', o: 'ओ', u: 'उ'
     },
     matras: {
-      A: '', AA: '\u093E', AE: '\u0948', AY: '\u0947', AI: '\u093E\u0908',
-      E: '\u0947', EE: '\u0940', I: '\u093F', O: '\u094B', OH: '\u094B',
-      U: '\u0941', OO: '\u0942', YU: '\u094D\u092F\u0942', AU: '\u094C',
-      OI: '\u0949\u092F', AH: '\u093E',
+      aa: '\u093E', ee: '\u0940', ii: '\u0940', oo: '\u0942', uu: '\u0942',
+      ai: '\u0948', ay: '\u0947', au: '\u094C', ou: '\u094C', ow: '\u094C',
+      ea: '\u0940', oa: '\u094B', a: '\u093E', e: '\u0947', i: '\u093F',
+      o: '\u094B', u: '\u0941'
     },
     consonants: {
-      k: 'क', kh: 'ख', g: 'ग', gh: 'घ', ch: 'च', j: 'ज',
-      t: 'ट', th: 'थ', d: 'ड', dh: 'ध', n: 'न', p: 'प',
-      f: 'फ', ph: 'फ', b: 'ब', bh: 'भ', m: 'म', y: 'य',
-      r: 'र', l: 'ल', v: 'व', w: 'व', s: 'स', sh: 'श', h: 'ह', z: 'झ',
-    },
-    hasTrailingVirama: false,
+      sch: 'स्क', str: 'स्ट्र', spr: 'स्प्र', spl: 'स्प्ल', scr: 'स्क्र',
+      thr: 'थ्र', shr: 'श्र', chr: 'क्र', ph: 'फ', th: 'थ', sh: 'श', ch: 'च',
+      gh: 'घ', kh: 'ख', jh: 'झ', dh: 'ध', bh: 'भ', ng: 'ंग', nk: 'ंक', ck: 'क',
+      qu: 'क्व', wh: 'व', st: 'स्ट', sp: 'स्प', sk: 'स्क', sc: 'स्क', sm: 'स्म',
+      sn: 'स्न', sl: 'स्ल', sw: 'स्व', pl: 'प्ल', pr: 'प्र', bl: 'ब्ल', br: 'ब्र',
+      tr: 'ट्र', dr: 'ड्र', cl: 'क्ल', cr: 'क्र', gl: 'ग्ल', gr: 'ग्र', fl: 'फ्ल',
+      fr: 'फ्र', k: 'क', g: 'ग', j: 'ज', t: 'ट', d: 'ड', n: 'न', p: 'प',
+      f: 'फ', b: 'ब', m: 'म', y: 'य', r: 'र', l: 'ल', v: 'व', w: 'व',
+      s: 'स', h: 'ह', x: 'क्स', z: 'झ', q: 'क', c: 'क'
+    }
   },
   bengali: {
-    virama: '\u09CD',
-    independentVowels: {
-      A: 'অ', AA: 'আ', AE: 'অ্যা', AY: 'এ', AI: 'আই',
-      E: 'এ', EE: 'ঈ', I: 'ই', O: 'ও', OH: 'ও',
-      U: 'উ', OO: 'ঊ', YU: 'ইউ', AU: 'আউ', OI: 'অয়', AH: 'আ',
+    virama: '\u09CD', // ্
+    startVowels: {
+      aa: 'আ', ee: 'ঈ', ii: 'ঈ', oo: 'ঊ', uu: 'ঊ', ai: 'ঐ', au: 'ঔ', ou: 'ঔ',
+      ea: 'ঈ', oa: 'ও', a: 'অ', e: 'এ', i: 'ই', o: 'ও', u: 'উ'
     },
     matras: {
-      A: '', AA: '\u09BE', AE: '\u09CD\u09AF\u09BE', AY: '\u09C7', AI: '\u09BE\u0987',
-      E: '\u09C7', EE: '\u09C0', I: '\u09BF', O: '\u09CB', OH: '\u09CB',
-      U: '\u09C1', OO: '\u09C2', YU: '\u09CD\u09AF\u09C2', AU: '\u09BE\u0989',
-      OI: '\u09AF\u09BC', AH: '\u09BE',
+      aa: '\u09BE', ee: '\u09C0', ii: '\u09C0', oo: '\u09C2', uu: '\u09C2',
+      ai: '\u09C8', ay: '\u09C7', au: '\u09CC', ou: '\u09CC', ow: '\u09CC',
+      ea: '\u09C0', oa: '\u09CB', a: '\u09BE', e: '\u09C7', i: '\u09BF',
+      o: '\u09CB', u: '\u09C1'
     },
     consonants: {
-      k: 'ক', kh: 'খ', g: 'গ', gh: 'ঘ', ch: 'চ', j: 'জ',
-      t: 'ট', th: 'থ', d: 'ড', dh: 'ধ', n: 'ন', p: 'প',
-      f: 'ফ', ph: 'ফ', b: 'ব', bh: 'ভ', m: 'ম', y: 'য',
-      r: 'র', l: 'ল', v: 'ভ', w: 'ভ', s: 'স', sh: 'শ', h: 'হ', z: 'জ',
-    },
-    hasTrailingVirama: false,
+      sch: 'স্ক', str: 'স্ট্র', spr: 'স্প্র', spl: 'স্প্ল', scr: 'স্ক্র',
+      thr: 'থ্র', shr: 'শ্র', chr: 'ক্র', ph: 'ফ', th: 'থ', sh: 'শ', ch: 'চ',
+      gh: 'ঘ', kh: 'খ', jh: 'ঝ', dh: 'ধ', bh: 'ভ', ng: 'ং', nk: 'ংক', ck: 'ক',
+      qu: 'ক্ব', wh: 'ভ', st: 'স্ট', sp: 'স্প', sk: 'স্ক', sc: 'স্ক', sm: 'স্ম',
+      sn: 'স্ন', sl: 'স্ল', sw: 'স্ব', pl: 'প্ল', pr: 'প্র', bl: 'ব্ল', br: 'ব্র',
+      tr: 'ট্র', dr: 'ড্র', cl: 'ক্ল', cr: 'ক্র', gl: 'গ্ল', gr: 'গ্র', fl: 'ফ্ল',
+      fr: 'ফ্র', k: 'ক', g: 'গ', j: 'জ', t: 'ট', d: 'ড', n: 'ন', p: 'প',
+      f: 'ফ', b: 'ব', m: 'ম', y: 'য', r: 'র', l: 'ল', v: 'ভ', w: 'ভ',
+      s: 'স', h: 'হ', x: 'ক্স', z: 'জ', q: 'ক', c: 'ক'
+    }
   },
   gujarati: {
-    virama: '\u0ACD',
-    independentVowels: {
-      A: 'અ', AA: 'આ', AE: 'ઍ', AY: 'એ', AI: 'આઇ',
-      E: 'એ', EE: 'ઈ', I: 'ઇ', O: 'ઓ', OH: 'ઓ',
-      U: 'ઉ', OO: 'ઊ', YU: 'યૂ', AU: 'આઉ', OI: 'ઑય', AH: 'આ',
+    virama: '\u0ACD', // ્
+    startVowels: {
+      aa: 'આ', ee: 'ઈ', ii: 'ઈ', oo: 'ઊ', uu: 'ઊ', ai: 'ઐ', au: 'ઔ', ou: 'ઔ',
+      ea: 'ઈ', oa: 'ઓ', a: 'અ', e: 'એ', i: 'ઇ', o: 'ઓ', u: 'ઉ'
     },
     matras: {
-      A: '', AA: '\u0ABE', AE: '\u0AC5', AY: '\u0AC7', AI: '\u0ABE\u0A87',
-      E: '\u0AC7', EE: '\u0AC0', I: '\u0ABF', O: '\u0ACB', OH: '\u0ACB',
-      U: '\u0AC1', OO: '\u0AC2', YU: '\u0ACD\u0AAF\u0AC2', AU: '\u0ABE\u0A89',
-      OI: '\u0AC9\u0AAF', AH: '\u0ABE',
+      aa: '\u0ABE', ee: '\u0AC0', ii: '\u0AC0', oo: '\u0AC2', uu: '\u0AC2',
+      ai: '\u0AC8', ay: '\u0AC7', au: '\u0ACC', ou: '\u0ACC', ow: '\u0ACC',
+      ea: '\u0AC0', oa: '\u0ACB', a: '\u0ABE', e: '\u0AC7', i: '\u0ABF',
+      o: '\u0ACB', u: '\u0AC1'
     },
     consonants: {
-      k: 'ક', kh: 'ખ', g: 'ગ', gh: 'ઘ', ch: 'ચ', j: 'જ',
-      t: 'ટ', th: 'થ', d: 'ડ', dh: 'ધ', n: 'ન', p: 'પ',
-      f: 'ફ', ph: 'ફ', b: 'બ', bh: 'ભ', m: 'મ', y: 'ય',
-      r: 'ર', l: 'લ', v: 'વ', w: 'વ', s: 'સ', sh: 'શ', h: 'હ', z: 'ઝ',
-    },
-    hasTrailingVirama: false,
-  },
+      sch: 'સ્ક', str: 'સ્ટ્ર', spr: 'સ્પ્ર', spl: 'સ્પ્લ', scr: 'સ્ક્ર',
+      thr: 'થ્ર', shr: 'શ્ર', chr: 'ક્ર', ph: 'ફ', th: 'થ', sh: 'શ', ch: 'ચ',
+      gh: 'ઘ', kh: 'ખ', jh: 'ઝ', dh: 'ધ', bh: 'ભ', ng: 'ંગ', nk: 'ંક', ck: 'ક',
+      qu: 'ક્વ', wh: 'વ', st: 'સ્ટ', sp: 'સ્પ', sk: 'સ્ક', sc: 'સ્ક', sm: 'સ્મ',
+      sn: 'સ્ન', sl: 'સ્લ', sw: 'સ્વ', pl: 'પ્લ', pr: 'પ્ર', bl: 'બ્લ', br: 'બ્ર',
+      tr: 'ટ્ર', dr: 'ડ્ર', cl: 'ક્લ', cr: 'ક્ર', gl: 'ગ્લ', gr: 'ગ્ર', fl: 'ફ્લ',
+      fr: 'ફ્ર', k: 'ક', g: 'ગ', j: 'જ', t: 'ટ', d: 'ડ', n: 'ન', p: 'પ',
+      f: 'ફ', b: 'બ', m: 'મ', y: 'ય', r: 'ર', l: 'લ', v: 'વ', w: 'વ',
+      s: 'સ', h: 'હ', x: 'ક્સ', z: 'ઝ', q: 'ક', c: 'ક'
+    }
+  }
 };
 
-export const INDIC_SCRIPTS = SCRIPT_MAPPINGS;
-
-type Phoneme = { type: 'vowel'; val: string } | { type: 'consonant'; val: string };
+const VOWEL_SET = new Set(['a', 'e', 'i', 'o', 'u']);
 
 /**
- * Universal English Word to Phoneme Converter
- * Incorporates natural phonological rules, suffixes, syllable divisions,
- * and silent-letter heuristics.
+ * Universal Brahmic Phonetic Transliteration Engine
+ * Deterministically transliterates any unknown English identifier to the target Indic script.
  */
-export function englishWordToPhonemes(word: string): Phoneme[] {
-  const w = word.toLowerCase();
-  const phonemes: Phoneme[] = [];
-  const len = w.length;
-  let i = 0;
-
-  // Specific high-frequency programming prefixes
-  if (w.startsWith('agent')) {
-    phonemes.push({ type: 'vowel', val: 'AY' });
-    phonemes.push({ type: 'consonant', val: 'j' });
-    phonemes.push({ type: 'vowel', val: 'E' });
-    phonemes.push({ type: 'consonant', val: 'n' });
-    phonemes.push({ type: 'consonant', val: 't' });
-    i = 5;
-    if (i >= len) return phonemes;
-  }
-  if (w.startsWith('unit')) {
-    phonemes.push({ type: 'vowel', val: 'YU' });
-    phonemes.push({ type: 'consonant', val: 'n' });
-    phonemes.push({ type: 'vowel', val: 'I' });
-    phonemes.push({ type: 'consonant', val: 't' });
-    i = 4;
-    if (i >= len) return phonemes;
-  }
-  if (w.startsWith('user')) {
-    phonemes.push({ type: 'vowel', val: 'YU' });
-    phonemes.push({ type: 'consonant', val: 'j' });
-    phonemes.push({ type: 'vowel', val: 'A' });
-    phonemes.push({ type: 'consonant', val: 'r' });
-    i = 4;
-    if (i >= len) return phonemes;
-  }
-  if (w.startsWith('util')) {
-    phonemes.push({ type: 'vowel', val: 'YU' });
-    phonemes.push({ type: 'consonant', val: 't' });
-    phonemes.push({ type: 'vowel', val: 'I' });
-    phonemes.push({ type: 'consonant', val: 'l' });
-    i = 4;
-    if (i >= len) return phonemes;
-  }
-
-  while (i < len) {
-    const remaining = w.slice(i);
-
-    // End-of-word suffixes
-    if (remaining.startsWith('tion') || remaining.startsWith('sion')) {
-      phonemes.push({ type: 'consonant', val: 'sh' });
-      phonemes.push({ type: 'vowel', val: 'A' });
-      phonemes.push({ type: 'consonant', val: 'n' });
-      i += 4;
-      continue;
-    }
-    if (remaining.startsWith('ture')) {
-      phonemes.push({ type: 'consonant', val: 'ch' });
-      phonemes.push({ type: 'vowel', val: 'A' });
-      phonemes.push({ type: 'consonant', val: 'r' });
-      i += 4;
-      continue;
-    }
-    if (remaining === 'ing' && i > 0) {
-      phonemes.push({ type: 'vowel', val: 'I' });
-      phonemes.push({ type: 'consonant', val: 'n' });
-      phonemes.push({ type: 'consonant', val: 'g' });
-      i += 3;
-      continue;
-    }
-    if ((remaining === 'er' || remaining === 'or' || remaining === 'ar') && i > 0) {
-      phonemes.push({ type: 'vowel', val: 'A' });
-      phonemes.push({ type: 'consonant', val: 'r' });
-      i += 2;
-      continue;
-    }
-    if (remaining === 'al' && i > 0) {
-      phonemes.push({ type: 'vowel', val: 'A' });
-      phonemes.push({ type: 'consonant', val: 'l' });
-      i += 2;
-      continue;
-    }
-    if (remaining === 'le' && i > 0) {
-      phonemes.push({ type: 'vowel', val: 'I' });
-      phonemes.push({ type: 'consonant', val: 'l' });
-      i += 2;
-      continue;
-    }
-
-    // Silent 'e' at end of word
-    if (i === len - 1 && w[i] === 'e' && len >= 3) {
-      i++;
-      continue;
-    }
-
-    // Special patterns: hand, func, count, etc.
-    if (remaining.startsWith('hand')) {
-      phonemes.push({ type: 'consonant', val: 'h' });
-      phonemes.push({ type: 'vowel', val: 'AE' });
-      phonemes.push({ type: 'consonant', val: 'n' });
-      phonemes.push({ type: 'consonant', val: 'd' });
-      i += 4;
-      continue;
-    }
-    if (remaining.startsWith('func')) {
-      phonemes.push({ type: 'consonant', val: 'f' });
-      phonemes.push({ type: 'vowel', val: 'A' });
-      phonemes.push({ type: 'consonant', val: 'n' });
-      phonemes.push({ type: 'consonant', val: 'k' });
-      i += 4;
-      continue;
-    }
-    if (remaining.startsWith('count')) {
-      phonemes.push({ type: 'consonant', val: 'k' });
-      phonemes.push({ type: 'vowel', val: 'AU' });
-      phonemes.push({ type: 'consonant', val: 'n' });
-      phonemes.push({ type: 'consonant', val: 't' });
-      i += 5;
-      continue;
-    }
-    if (remaining.startsWith('weath')) {
-      phonemes.push({ type: 'consonant', val: 'v' });
-      phonemes.push({ type: 'vowel', val: 'E' });
-      phonemes.push({ type: 'consonant', val: 'th' });
-      i += 5;
-      continue;
-    }
-    if (remaining.startsWith('search')) {
-      phonemes.push({ type: 'consonant', val: 's' });
-      phonemes.push({ type: 'vowel', val: 'E' });
-      phonemes.push({ type: 'consonant', val: 'r' });
-      phonemes.push({ type: 'consonant', val: 'ch' });
-      i += 6;
-      continue;
-    }
-
-    // Consonant digraphs
-    if (remaining.startsWith('ch')) {
-      phonemes.push({ type: 'consonant', val: 'ch' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('sh')) {
-      phonemes.push({ type: 'consonant', val: 'sh' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('ph')) {
-      phonemes.push({ type: 'consonant', val: 'f' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('th')) {
-      phonemes.push({ type: 'consonant', val: 'th' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('ck')) {
-      phonemes.push({ type: 'consonant', val: 'k' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('qu')) {
-      phonemes.push({ type: 'consonant', val: 'k' });
-      phonemes.push({ type: 'consonant', val: 'v' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('wh')) {
-      phonemes.push({ type: 'consonant', val: 'v' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('wr')) {
-      phonemes.push({ type: 'consonant', val: 'r' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('kn') && i === 0) {
-      phonemes.push({ type: 'consonant', val: 'n' });
-      i += 2;
-      continue;
-    }
-
-    // Soft 'c' (followed by e, i, y -> s)
-    if (w[i] === 'c' && i + 1 < len && (w[i + 1] === 'e' || w[i + 1] === 'i' || w[i + 1] === 'y')) {
-      phonemes.push({ type: 'consonant', val: 's' });
-      i++;
-      continue;
-    }
-
-    // Soft 'g' (e.g. register, page, range, logic, agent, digit, message, origin, integer)
-    if (w[i] === 'g' && i + 1 < len && (w[i + 1] === 'e' || w[i + 1] === 'i')) {
-      const softGPrefixes = ['regis', 'page', 'range', 'logic', 'agent', 'digit', 'messa', 'origin', 'integ', 'manag', 'packag', 'challeng'];
-      if (softGPrefixes.some(p => w.includes(p))) {
-        phonemes.push({ type: 'consonant', val: 'j' });
-        i++;
-        continue;
-      }
-    }
-
-    // Vowel digraphs
-    if (remaining.startsWith('ight')) {
-      phonemes.push({ type: 'vowel', val: 'AI' });
-      phonemes.push({ type: 'consonant', val: 't' });
-      i += 4;
-      continue;
-    }
-    if (remaining.startsWith('ee') || remaining.startsWith('ea')) {
-      phonemes.push({ type: 'vowel', val: 'EE' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('oo')) {
-      phonemes.push({ type: 'vowel', val: 'OO' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('ou') || remaining.startsWith('ow')) {
-      phonemes.push({ type: 'vowel', val: 'AU' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('ai') || remaining.startsWith('ay')) {
-      phonemes.push({ type: 'vowel', val: 'AY' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('oi') || remaining.startsWith('oy')) {
-      phonemes.push({ type: 'vowel', val: 'OI' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('oa')) {
-      phonemes.push({ type: 'vowel', val: 'OH' });
-      i += 2;
-      continue;
-    }
-    if (remaining.startsWith('au') || remaining.startsWith('aw')) {
-      phonemes.push({ type: 'vowel', val: 'AA' });
-      i += 2;
-      continue;
-    }
-
-    // Single vowels
-    const ch = w[i];
-    if (ch === 'a') {
-      if (i + 2 < len && w[i + 2] === 'e' && (i + 2 === len - 1 || !'aeiou'.includes(w[i + 3]))) {
-        phonemes.push({ type: 'vowel', val: 'AY' });
-      } else if (remaining.startsWith('alcu')) {
-        phonemes.push({ type: 'vowel', val: 'AE' });
-      } else if (i === 0 && len > 4 && (remaining.startsWith('amou') || remaining.startsWith('acco') || remaining.startsWith('addr') || remaining.startsWith('arra'))) {
-        phonemes.push({ type: 'vowel', val: 'A' });
-      } else if (i === len - 1) {
-        phonemes.push({ type: 'vowel', val: 'AA' });
-      } else if (['cat', 'calc', 'bank', 'pack', 'app', 'tax', 'val', 'mat', 'stack', 'track', 'branch', 'cart'].some(p => remaining.startsWith(p) || w.startsWith(p))) {
-        phonemes.push({ type: 'vowel', val: 'AE' });
-      } else {
-        phonemes.push({ type: 'vowel', val: 'AA' });
-      }
-      i++;
-      continue;
-    }
-
-    if (ch === 'e') {
-      if (i === 0 && (remaining.startsWith('even') || remaining.startsWith('equa'))) {
-        phonemes.push({ type: 'vowel', val: 'EE' });
-      } else {
-        phonemes.push({ type: 'vowel', val: 'E' });
-      }
-      i++;
-      continue;
-    }
-
-    if (ch === 'i') {
-      if (i + 2 < len && w[i + 2] === 'e' && (i + 2 === len - 1 || !'aeiou'.includes(w[i + 3]))) {
-        phonemes.push({ type: 'vowel', val: 'AI' });
-      } else if (i === 0 && remaining.startsWith('item')) {
-        phonemes.push({ type: 'vowel', val: 'AI' });
-      } else if (remaining.startsWith('ind') || remaining.startsWith('ign')) {
-        phonemes.push({ type: 'vowel', val: 'AI' });
-      } else {
-        phonemes.push({ type: 'vowel', val: 'I' });
-      }
-      i++;
-      continue;
-    }
-
-    if (ch === 'o') {
-      if (i + 2 < len && w[i + 2] === 'e' && (i + 2 === len - 1 || !'aeiou'.includes(w[i + 3]))) {
-        phonemes.push({ type: 'vowel', val: 'OH' });
-      } else if (remaining.startsWith('otal') || remaining.startsWith('onus') || remaining.startsWith('ocus')) {
-        phonemes.push({ type: 'vowel', val: 'OH' });
-      } else {
-        phonemes.push({ type: 'vowel', val: 'O' });
-      }
-      i++;
-      continue;
-    }
-
-    if (ch === 'u') {
-      if (remaining.startsWith('unit') || remaining.startsWith('user') || remaining.startsWith('util') || remaining.startsWith('unic')) {
-        phonemes.push({ type: 'vowel', val: 'YU' });
-      } else if (['cust', 'prod', 'numb', 'sum', 'struc', 'instruc', 'butt', 'run', 'sub'].some(p => remaining.startsWith(p) || w.startsWith(p))) {
-        phonemes.push({ type: 'vowel', val: 'A' });
-      } else {
-        phonemes.push({ type: 'vowel', val: 'U' });
-      }
-      i++;
-      continue;
-    }
-
-    if (ch === 'y') {
-      if (i === len - 1 && len > 1) {
-        phonemes.push({ type: 'vowel', val: 'EE' });
-      } else if (i > 0 && i < len - 1 && !'aeiou'.includes(w[i - 1]) && !'aeiou'.includes(w[i + 1])) {
-        phonemes.push({ type: 'vowel', val: 'I' });
-      } else if (remaining.startsWith('ype') || remaining.startsWith('yte')) {
-        phonemes.push({ type: 'vowel', val: 'AI' });
-      } else {
-        phonemes.push({ type: 'consonant', val: 'y' });
-      }
-      i++;
-      continue;
-    }
-
-    // Consonants
-    if (ch === 'c') {
-      phonemes.push({ type: 'consonant', val: 'k' });
-    } else if (ch === 'x') {
-      phonemes.push({ type: 'consonant', val: 'k' });
-      phonemes.push({ type: 'consonant', val: 's' });
-    } else if (ch === 'q') {
-      phonemes.push({ type: 'consonant', val: 'k' });
-    } else if (['b', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z'].includes(ch)) {
-      phonemes.push({ type: 'consonant', val: ch });
-    }
-    i++;
-  }
-
-  return phonemes;
-}
-
-/**
- * Phonetic Transliteration of a single atomic word
- */
-export function phoneticTransliterateWord(word: string, lang: NativeLanguageKey): string {
+export function phoneticTransliterate(word: string, lang: NativeLanguageKey): string {
   if (lang === 'english' || !word) return word;
-  const spec = SCRIPT_MAPPINGS[lang];
+  const spec = INDIC_SCRIPTS[lang];
   if (!spec) return word;
 
-  const phonemes = englishWordToPhonemes(word);
+  const w = word.toLowerCase();
   let out = '';
+  let i = 0;
   let lastWasConsonant = false;
 
-  for (let i = 0; i < phonemes.length; i++) {
-    const p = phonemes[i];
+  while (i < w.length) {
+    // Check soft c ('ce', 'ci', 'cy' -> 's')
+    if (w[i] === 'c' && i + 1 < w.length && (w[i + 1] === 'e' || w[i + 1] === 'i' || w[i + 1] === 'y')) {
+      if (lastWasConsonant) out += spec.virama;
+      out += spec.consonants['s'];
+      lastWasConsonant = true;
+      i++;
+      continue;
+    }
 
-    if (p.type === 'vowel') {
-      if (lastWasConsonant) {
-        const matra = spec.matras[p.val] !== undefined ? spec.matras[p.val] : spec.matras['A'];
-        out += matra;
-      } else {
-        const indep = spec.independentVowels[p.val] || spec.independentVowels['A'];
-        out += indep;
+    // Check vowels
+    if (VOWEL_SET.has(w[i])) {
+      let vKey = w[i];
+      if (i + 1 < w.length && spec.matras[w.slice(i, i + 2)]) {
+        vKey = w.slice(i, i + 2);
       }
+
+      if (lastWasConsonant) {
+        if (vKey === 'a' && i + vKey.length < w.length) {
+          // implicit vowel inside word
+        } else {
+          out += spec.matras[vKey] || '';
+        }
+      } else {
+        out += spec.startVowels[vKey] || vKey;
+      }
+      i += vKey.length;
       lastWasConsonant = false;
-    } else {
-      const char = spec.consonants[p.val] || p.val;
+      continue;
+    }
+
+    // Consonants (greedy 3, 2, 1 match)
+    let match = '';
+    let matchLen = 0;
+    for (const len of [3, 2, 1]) {
+      const sub = w.slice(i, i + len);
+      if (spec.consonants[sub]) {
+        match = spec.consonants[sub];
+        matchLen = len;
+        break;
+      }
+    }
+
+    if (match) {
       if (lastWasConsonant) {
         out += spec.virama;
       }
-      out += char;
+      out += match;
       lastWasConsonant = true;
+      i += matchLen;
+    } else {
+      i++;
     }
   }
 
-  if (lastWasConsonant && spec.hasTrailingVirama && !out.endsWith(spec.virama)) {
+  // Final virama check for South Indian scripts
+  if (lastWasConsonant && (lang === 'telugu' || lang === 'tamil' || lang === 'kannada') && !out.endsWith(spec.virama)) {
     out += spec.virama;
   }
 
   return out;
 }
 
-export function phoneticTransliterate(word: string, lang: NativeLanguageKey): string {
-  return phoneticTransliterateWord(word, lang);
-}
+// ─── 3. Curated Indic Dictionaries for Programming Identifiers ───────────────
 
-/**
- * Transliterates compound words (snake_case, camelCase, PascalCase, numbers)
- */
-export function transliterateCompoundWord(word: string, lang: NativeLanguageKey): string {
-  if (lang === 'english' || !word) return word;
+export const TELUGU_DICTIONARY: Record<string, string> = {
+  calculate_sum: 'మొత్తం_లెక్క',
+  calculatesum: 'మొత్తం_లెక్క',
+  calculateSum: 'మొత్తం_లెక్క',
+  format_result: 'రిజల్ట్_ఫార్మాట్',
+  formatResult: 'రిజల్ట్_ఫార్మాట్',
+  count_number: 'నంబర్_కౌంట్',
+  count: 'కౌంట్',
+  target: 'టార్గెట్',
+  arr: 'అర్ర్',
+  array: 'అర్రే',
+  arrays: 'అర్రేస్',
+  num: 'నంబర్',
+  number: 'నంబర్',
+  numbers: 'నంబర్స్',
+  nums: 'నంబర్స్',
+  result: 'రిజల్ట్',
+  results: 'రిజల్ట్స్',
+  val: 'వాల్యూ',
+  value: 'వాల్యూ',
+  values: 'వాల్యూస్',
+  item: 'ఐటమ్',
+  items: 'ఐటమ్స్',
+  elem: 'ఎలిమెంట్',
+  element: 'ఎలిమెంట్',
+  elements: 'ఎలిమెంట్స్',
+  idx: 'ఇండెక్స్',
+  index: 'ఇండెక్స్',
+  indices: 'ఇండిసెస్',
+  total: 'టోటల్',
+  sum: 'సమ్',
+  average: 'యావరేజ్',
+  avg: 'యావరేజ్',
+  calculate_average: 'యావరేజ్_కాలిక్యులేట్',
+  calculateAverage: 'యావరేజ్_కాలిక్యులేట్',
+  score: 'స్కోర్',
+  scores: 'స్కోర్స్',
+  grade: 'గ్రేడ్',
+  grades: 'గ్రేడ్స్',
+  temp: 'టెంప్',
+  temporary: 'టెంపరరీ',
+  data: 'డేటా',
+  database: 'డేటాబేస్',
+  table: 'టేబుల్',
+  row: 'రో',
+  col: 'కాల్',
+  column: 'కాలమ్',
+  columns: 'కాలమ్స్',
+  matrix: 'మాట్రిక్స్',
+  key: 'కీ',
+  keys: 'కీస్',
+  text: 'టెక్స్ట్',
+  string: 'స్ట్రింగ్',
+  strings: 'స్ట్రింగ్స్',
+  char: 'క్యార్',
+  chars: 'క్యార్స్',
+  character: 'క్యారెక్టర్',
+  characters: 'క్యారెక్టర్స్',
+  length: 'లెంగ్త్',
+  len: 'లెన్',
+  size: 'సైజ్',
+  width: 'విడ్త్',
+  height: 'హైట్',
+  max: 'మాక్స్',
+  maximum: 'మాక్సిమమ్',
+  min: 'మిన్',
+  minimum: 'మినిమమ్',
+  flag: 'ఫ్లాగ్',
+  found: 'ఫౌండ్',
+  is_valid: 'ఈజ్_వ్యాలిడ్',
+  valid: 'వ్యాలిడ్',
+  invalid: 'ఇన్వ్యాలిడ్',
+  check: 'చెక్',
+  find: 'ఫైండ్',
+  search: 'సెర్చ్',
+  binary_search: 'బైనరీ_సెర్చ్',
+  binarySearch: 'బైనరీ_సెర్చ్',
+  linear_search: 'లీనియర్_సెర్చ్',
+  sort: 'సార్ట్',
+  sorted: 'సార్టెడ్',
+  filter: 'ఫిల్టర్',
+  filter_even_numbers: 'ఈవెన్_నంబర్స్_ఫిల్టర్',
+  filterEvenNumbers: 'ఈవెన్_నంబర్స్_ఫిల్టర్',
+  even_numbers: 'ఈవెన్_నంబర్స్',
+  evens: 'ఈవెన్స్',
+  odds: 'ఆడ్స్',
+  even: 'ఈవెన్',
+  odd: 'ఆడ్',
+  user: 'యూజర్',
+  users: 'యూజర్స్',
+  user_name: 'యూజర్_నేమ్',
+  username: 'యూజర్‌నేమ్',
+  name: 'నేమ్',
+  names: 'నేమ్స్',
+  first_name: 'ఫస్ట్_నేమ్',
+  last_name: 'లాస్ట్_నేమ్',
+  first: 'ఫస్ట్',
+  last: 'లాస్ట్',
+  middle: 'మిడిల్',
+  start: 'స్టార్ట్',
+  end: 'ఎండ్',
+  step: 'స్టెప్',
+  left: 'లెఫ్ట్',
+  right: 'రైట్',
+  mid: 'మిడ్',
+  low: 'లో',
+  high: 'హై',
+  head: 'హెడ్',
+  tail: 'టైల్',
+  node: 'నోడ్',
+  nodes: 'నోడ్స్',
+  next: 'నెక్స్ట్',
+  prev: 'ప్రివ్',
+  previous: 'ప్రీవియస్',
+  tree: 'ట్రీ',
+  root: 'రూట్',
+  leaf: 'లీఫ్',
+  parent: 'పేరెంట్',
+  child: 'చైల్డ్',
+  children: 'చిల్డ్రన్',
+  graph: 'గ్రాఫ్',
+  vertex: 'వర్టెక్స్',
+  edge: 'ఎడ్జ్',
+  edges: 'ఎడ్జెస్',
+  queue: 'క్యూ',
+  stack: 'స్టాక్',
+  append: 'అపెండ్',
+  appended: 'అపెండెడ్',
+  push: 'పుష్',
+  pop: 'పాప్',
+  peek: 'పీక్',
+  top: 'టాప్',
+  bottom: 'బాటమ్',
+  input: 'ఇన్పుట్',
+  output: 'అవుట్పుట్',
+  file: 'ఫైల్',
+  files: 'ఫైల్స్',
+  path: 'పాత్',
+  dir: 'డైర్',
+  directory: 'డైరెక్టరీ',
+  folder: 'ఫోల్డర్',
+  code: 'కోడ్',
+  message: 'మెసేజ్',
+  messages: 'మెసేజెస్',
+  status: 'స్టేటస్',
+  error: 'ఎర్రర్',
+  errors: 'ఎర్రర్స్',
+  success: 'సక్సెస్',
+  failed: 'ఫెయిల్డ్',
+  point: 'పాయింట్',
+  points: 'పాయింట్స్',
+  x: 'ఎక్స్',
+  y: 'వై',
+  z: 'జెడ్',
+  i: 'ఐ',
+  j: 'జె',
+  k: 'కె',
+  n: 'ఎన్',
+  m: 'ఎమ్',
+  s: 'ఎస్',
+  t: 'టి',
+  p: 'పి',
+  q: 'క్యూ',
+  req: 'రిక్వెస్ట్',
+  res: 'రెస్పాన్స్',
+  request: 'రిక్వెస్ట్',
+  response: 'రెస్పాన్స్',
+  param: 'పారామ్',
+  params: 'పారామ్స్',
+  parameter: 'పారామీటర్',
+  parameters: 'పారామీటర్స్',
+  arg: 'ఆర్గ్',
+  args: 'ఆర్గ్స్',
+  kwargs: 'క్వార్గ్స్',
+  config: 'కాన్ఫిగ్',
+  options: 'ఆప్షన్స్',
+  props: 'ప్రాప్స్',
+  state: 'స్టేట్',
+  context: 'కాంటెక్స్ట్',
+  helper: 'హెల్పర్',
+  util: 'యూటిల్',
+  utils: 'యూటిల్స్',
+  process: 'ప్రాసెస్',
+  handler: 'హ్యాండ్లర్',
+  handle: 'హ్యాండిల్',
+  event: 'ఈవెంట్',
+  events: 'ఈవెంట్స్',
+  target_count: 'టార్గెట్_కౌంట్',
+  occurrences: 'ఎన్ని సార్లు ఉందో',
+  occurrence: 'ఒక్కరెన్స్',
+  activities: 'యాక్టివిటీస్',
+  local: 'లోకల్',
+  weather: 'వెదర్',
+  condition: 'కండిషన్',
+  weather_condition: 'వెదర్_కండిషన్',
+  check_local_activities: 'చెక్_లోకల్_యాక్టివిటీస్',
+  museum: 'మ్యూజియం',
+  library: 'లైబ్రరీ',
+  park: 'పార్క్',
+  sunny: 'సన్నీ',
+  to: 'కు',
+  for: 'కోసం',
+  from: 'నుండి',
+  in: 'లో',
+  with: 'తో',
+  is: 'అవును',
+};
 
-  // 1. snake_case
-  if (word.includes('_')) {
-    return word.split('_').map(part => {
-      if (!part) return '';
-      return transliterateCompoundWord(part, lang);
-    }).join('_');
-  }
+export const HINDI_DICTIONARY: Record<string, string> = {
+  calculate_sum: 'योग_गणना',
+  calculateSum: 'योग_गणना',
+  format_result: 'रिजल्ट_प्रारूप',
+  formatResult: 'रिजल्ट_प्रारूप',
+  helper: 'हेल्पर',
+  helpers: 'हेल्पर्स',
+  utils: 'यूटिल्स',
+  count_number: 'काउंट_नंबर',
+  count: 'काउंट',
+  target: 'टार्गेट',
+  arr: 'ऐर्र',
+  array: 'ऐरे',
+  arrays: 'ऐरेस',
+  num: 'नंबर',
+  number: 'नंबर',
+  numbers: 'नंबर्स',
+  nums: 'नंबर्स',
+  result: 'रिजल्ट',
+  results: 'रिजल्ट्स',
+  val: 'वैल्यू',
+  value: 'वैल्यू',
+  values: 'वैल्यूज़',
+  item: 'आइटम',
+  items: 'आइटम्स',
+  elem: 'एलिमेंट',
+  element: 'एलिमेंट',
+  elements: 'एलिमेंट्स',
+  idx: 'इंडेक्स',
+  index: 'इंडेक्स',
+  indices: 'इंडिसेस',
+  total: 'टोटल',
+  sum: 'सम',
+  average: 'औसत',
+  avg: 'औसत',
+  score: 'स्कोर',
+  scores: 'स्कोर्स',
+  grade: 'ग्रेड',
+  grades: 'ग्रेड्स',
+  temp: 'टेंप',
+  data: 'डेटा',
+  user: 'यूजर',
+  users: 'यूजर्स',
+  username: 'यूजरनेम',
+  name: 'नाम',
+  names: 'नाम',
+  first: 'पहला',
+  last: 'अंतिम',
+  start: 'स्टार्ट',
+  end: 'एंड',
+  step: 'स्टेप',
+  left: 'लेफ्ट',
+  right: 'राइट',
+  mid: 'मिड',
+  low: 'लो',
+  high: 'हाई',
+  size: 'साइज',
+  length: 'लेंथ',
+  len: 'लेन',
+  min: 'मिन',
+  max: 'मैक्स',
+  flag: 'फ्लैग',
+  check: 'चेक',
+  find: 'फाइंड',
+  search: 'सर्च',
+  binary_search: 'बाइनरी_सर्च',
+  binarySearch: 'बाइनरी_सर्च',
+  filter: 'फ़िल्टर',
+  filter_even_numbers: 'फ़िल्टर_इवन_नंबर्स',
+  filterEvenNumbers: 'फ़िल्टर_इवन_नंबर्स',
+  even_numbers: 'इवन_नंबर्स',
+  evens: 'इवन्स',
+  odds: 'ऑड्स',
+  even: 'इवन',
+  odd: 'ऑड',
+  occurrences: 'कितनी बार आया',
+  activities: 'गतिविधियां',
+  local: 'लोकल',
+  weather: 'मौसम',
+  condition: 'कंडीशन',
+  weather_condition: 'मौसम_कंडीशन',
+  check_local_activities: 'चेक_लोकल_गतिविधियां',
+  museum: 'म्यूजियम',
+  library: 'लाइब्रेरी',
+  park: 'पार्क',
+  sunny: 'धूप',
+  target_count: 'टार्गेट_काउंट',
+  msg: 'मैसेज',
+  message: 'मैसेज',
+};
 
-  // 2. Trailing/Embedded numbers (e.g. item1, user123, matrix3x3)
-  const alphaNumParts = word.match(/([a-zA-Z]+|\d+)/g);
-  if (alphaNumParts && alphaNumParts.length > 1 && alphaNumParts.some(p => /^\d+$/.test(p))) {
-    return alphaNumParts.map(p => /^\d+$/.test(p) ? p : transliterateCompoundWord(p, lang)).join('');
-  }
+export const TAMIL_DICTIONARY: Record<string, string> = {
+  calculate_sum: 'கூட்டுத்தொகை_கணக்கிடு',
+  calculateSum: 'கூட்டுத்தொகை_கணக்கிடு',
+  format_result: 'முடிவு_வடிவமைப்பு',
+  formatResult: 'முடிவு_வடிவமைப்பு',
+  helper: 'உதவியாளர்',
+  utils: 'யூடில்ஸ்',
+  count_number: 'கவுண்ட்_நம்பர்',
+  count: 'கவுண்ட்',
+  target: 'டார்கெட்',
+  arr: 'அர்ர்',
+  array: 'அரே',
+  arrays: 'அரேஸ்',
+  num: 'நம்பர்',
+  number: 'நம்பர்',
+  numbers: 'நம்பர்ஸ்',
+  nums: 'நம்பர்ஸ்',
+  result: 'ரிசல்ட்',
+  results: 'ரிசல்ட்ஸ்',
+  val: 'வேல்யூ',
+  value: 'வேல்யூ',
+  values: 'வேல்யூஸ்',
+  item: 'ஐட்டம்',
+  items: 'ஐட்டம்ஸ்',
+  elem: 'எலிமெண்ட்',
+  element: 'எலிமெண்ட்',
+  elements: 'எலிமெண்ட்ஸ்',
+  idx: 'இன்டெக்ஸ்',
+  index: 'இன்டெக்ஸ்',
+  indices: 'இன்டிசஸ்',
+  total: 'டோட்டல்',
+  sum: 'சம்',
+  average: 'ஆவரேஜ்',
+  avg: 'ஆவரேஜ்',
+  score: 'ஸ்கோர்',
+  scores: 'ஸ்கோர்ஸ்',
+  data: 'டேட்டா',
+  user: 'யூசர்',
+  users: 'யூசர்ஸ்',
+  username: 'யூசர்நேம்',
+  name: 'நேம்',
+  start: 'ஸ்டார்ட்',
+  end: 'எண்ட்',
+  left: 'லெஃப்ட்',
+  right: 'ரைட்',
+  mid: 'மிட்',
+  low: 'லோ',
+  high: 'ஹை',
+  size: 'சைஸ்',
+  length: 'லென்த்',
+  len: 'லென்',
+  min: 'மின்',
+  max: 'மேக்ஸ்',
+  flag: 'ஃபிளாக்',
+  search: 'செர்ச்',
+  binary_search: 'பைனரி_செர்ச்',
+  binarySearch: 'பைனரி_செர்ச்',
+  filter: 'ஃபில்டர்',
+  filter_even_numbers: 'ஃபில்டர்_ஈவன்_நம்பர்ஸ்',
+  filterEvenNumbers: 'ஃபில்டர்_ஈவன்_நம்பர்ஸ்',
+  evens: 'ஈவன்ஸ்',
+  even: 'ஈவன்',
+  odd: 'ஆட்',
+  occurrences: 'எத்தனை முறை உள்ளது',
+  activities: 'ஆக்டிவிட்டிஸ்',
+  weather: 'வெதர்',
+  condition: 'கண்டிஷன்',
+  weather_condition: 'வெதர்_கண்டிஷன்',
+  target_count: 'டார்கெட்_கவுண்ட்',
+};
 
-  // 3. camelCase / PascalCase
-  const camelParts = word.replace(/([a-z0-9])([A-Z])/g, '$1\0$2').split('\0');
-  if (camelParts.length > 1) {
-    return camelParts.map(p => transliterateCompoundWord(p, lang)).join('');
-  }
+export const KANNADA_DICTIONARY: Record<string, string> = {
+  calculate_sum: 'ಮೊತ್ತ_ಲೆಕ್ಕ',
+  calculateSum: 'ಮೊತ್ತ_ಲೆಕ್ಕ',
+  format_result: 'ಫಲಿತಾಂಶ_ಸ್ವರೂಪ',
+  formatResult: 'ಫಲಿತಾಂಶ_ಸ್ವರೂಪ',
+  helper: 'ಸಹಾಯಕ',
+  utils: 'ಯುಟಿಲ್ಸ್',
+  count_number: 'ಕೌಂಟ್_ನಂಬರ್',
+  count: 'ಕೌಂಟ್',
+  target: 'ಟಾರ್ಗೆಟ್',
+  arr: 'ಅರ್ರ್',
+  array: 'ಅರೇ',
+  arrays: 'ಅರೇಸ್',
+  num: 'ನಂಬರ್',
+  number: 'ನಂಬರ್',
+  numbers: 'ನಂಬರ್ಸ್',
+  nums: 'ನಂಬರ್ಸ್',
+  result: 'ರಿಸಲ್ಟ್',
+  results: 'ರಿಸಲ್ಟ್ಸ್',
+  val: 'ವ್ಯಾಲ್ಯೂ',
+  value: 'ವ್ಯಾಲ್ಯೂ',
+  values: 'ವ್ಯಾಲ್ಯೂಸ್',
+  item: 'ಐಟಮ್',
+  items: 'ಐಟಮ್ಸ್',
+  elem: 'ಎಲಿಮೆಂಟ್',
+  element: 'ಎಲಿಮೆಂಟ್',
+  elements: 'ಎಲಿಮೆಂಟ್ಸ್',
+  idx: 'ಇಂಡೆಕ್ಸ್',
+  index: 'ಇಂಡೆಕ್ಸ್',
+  indices: 'ಇಂಡಿಸೆಸ್',
+  total: 'ಟೋಟಲ್',
+  sum: 'ಸಮ್',
+  average: 'ಆವರೇಜ್',
+  avg: 'ಆವರೇಜ್',
+  score: 'ಸ್ಕೋರ್',
+  scores: 'ಸ್ಕೋರ್ಸ್',
+  data: 'ಡೇಟಾ',
+  user: 'ಯೂಸರ್',
+  users: 'ಯೂಸರ್ಸ್',
+  username: 'ಯೂಸರ್‌ನೇಮ್',
+  name: 'ನೇಮ್',
+  start: 'ಸ್ಟಾರ್ಟ್',
+  end: 'ಎಂಡ್',
+  left: 'ಲೆಫ್ಟ್',
+  right: 'ರೈಟ್',
+  mid: 'ಮಿಡ್',
+  low: 'ಲೋ',
+  high: 'ಹೈ',
+  size: 'ಸೈಜ್',
+  length: 'ಲೆಂಗ್ತ್',
+  len: 'ಲೆನ್',
+  min: 'ಮಿನ್',
+  max: 'ಮ್ಯಾಕ್ಸ್',
+  flag: 'ಫ್ಲ್ಯಾಗ್',
+  search: 'ಸರ್ಚ್',
+  binary_search: 'ಬೈನರಿ_ಸರ್ಚ್',
+  binarySearch: 'ಬೈನರಿ_ಸರ್ಚ್',
+  filter: 'ಫಿಲ್ಟರ್',
+  filter_even_numbers: 'ಫಿಲ್ಟರ್_ಈವನ್_ನಂಬರ್ಸ್',
+  filterEvenNumbers: 'ಫಿಲ್ಟರ್_ಈವನ್_ನಂಬರ್ಸ್',
+  evens: 'ಈವನ್ಸ್',
+  even: 'ಈವನ್',
+  odd: 'ಆಡ್',
+  occurrences: 'ಎಷ್ಟು ಬಾರಿ ಇದೆ',
+  activities: 'ಆಕ್ಟಿವಿಟೀಸ್',
+  weather: 'ವೆದರ್',
+  condition: 'ಕಂಡೀಷನ್',
+  weather_condition: 'ವೆದರ್_ಕಂಡೀಷನ್',
+  target_count: 'ಟಾರ್ಗೆಟ್_ಕೌಂಟ್',
+};
 
-  // 4. Atomic word
-  return phoneticTransliterateWord(word, lang);
-}
+export const MARATHI_DICTIONARY: Record<string, string> = {
+  calculate_sum: 'योग_गणना',
+  calculateSum: 'योग_गणना',
+  format_result: 'रिजल्ट_प्रारूप',
+  formatResult: 'रिजल्ट_प्रारूप',
+  helper: 'हेल्पर',
+  helpers: 'हेल्पर्स',
+  utils: 'यूटिल्स',
+  count_number: 'काउंट_नंबर',
+  count: 'काउंट',
+  target: 'टार्गेट',
+  arr: 'ऐर्र',
+  array: 'ऐरे',
+  arrays: 'ऐरेस',
+  num: 'नंबर',
+  number: 'नंबर',
+  numbers: 'नंबर्स',
+  nums: 'नंबर्स',
+  result: 'रिजल्ट',
+  results: 'रिजल्ट्स',
+  val: 'व्हॅल्यू',
+  value: 'व्हॅल्यू',
+  values: 'व्हॅल्यूज',
+  item: 'आयटम',
+  items: 'आयटम्स',
+  elem: 'एलिमेंट',
+  element: 'एलिमेंट',
+  elements: 'एलिमेंट्स',
+  idx: 'इंडेक्स',
+  index: 'इंडेक्स',
+  indices: 'इंडिसेस',
+  total: 'टोटल',
+  sum: 'सम',
+  average: 'सरासरी',
+  avg: 'सरासरी',
+  score: 'स्कोर',
+  scores: 'स्कोर्स',
+  data: 'डेटा',
+  user: 'युझर',
+  users: 'युझर्स',
+  name: 'नेम',
+  start: 'स्टार्ट',
+  end: 'एंड',
+  left: 'लेफ्ट',
+  right: 'राइट',
+  mid: 'मिड',
+  low: 'लो',
+  high: 'हाय',
+  size: 'साइज',
+  length: 'लेंथ',
+  len: 'लेन',
+  search: 'सर्च',
+  binary_search: 'बायनरी_सर्च',
+  binarySearch: 'बायनरी_सर्च',
+  filter: 'फिल्टर',
+  filter_even_numbers: 'फिल्टर_इव्हन_नंबर्स',
+  filterEvenNumbers: 'फिल्टर_इव्हन_नंबर्स',
+  even: 'इव्हन',
+  odd: 'ऑड',
+  occurrences: 'किती वेळा आले',
+  target_count: 'टार्गेट_काउंट',
+};
 
-// ─── 3. Legacy Dictionaries for Backward Compatibility ────────────────────────
-export const TELUGU_DICTIONARY: Record<string, string> = {};
-export const HINDI_DICTIONARY: Record<string, string> = {};
-export const TAMIL_DICTIONARY: Record<string, string> = {};
-export const KANNADA_DICTIONARY: Record<string, string> = {};
-export const MARATHI_DICTIONARY: Record<string, string> = {};
-export const BENGALI_DICTIONARY: Record<string, string> = {};
-export const GUJARATI_DICTIONARY: Record<string, string> = {};
+export const BENGALI_DICTIONARY: Record<string, string> = {
+  calculate_sum: 'যোগফল_গণনা',
+  calculateSum: 'যোগফল_গণনা',
+  format_result: 'ফলাফল_ফরম্যাট',
+  formatResult: 'ফলাফল_ফরম্যাট',
+  helper: 'সহায়িকা',
+  utils: 'ইউটিলস',
+  count_number: 'কাউন্ট_নাম্বার',
+  count: 'কাউন্ট',
+  target: 'টার্গেট',
+  arr: 'অ্যার্',
+  array: 'অ্যারে',
+  arrays: 'অ্যারেস',
+  num: 'নাম্বার',
+  number: 'নাম্বার',
+  numbers: 'নাম্বার্স',
+  nums: 'নাম্বার্স',
+  result: 'রেজাল্ট',
+  results: 'রেজাল্টস',
+  val: 'ভ্যালু',
+  value: 'ভ্যালু',
+  values: 'ভ্যালুস',
+  item: 'আইটেম',
+  items: 'আইটেমস',
+  elem: 'এলিমেন্ট',
+  element: 'এলিমেন্ট',
+  elements: 'এলিমেন্টস',
+  idx: 'ইনডেক্স',
+  index: 'ইনডেক্স',
+  indices: 'ইনডিসেস',
+  total: 'টোটাল',
+  sum: 'সাম',
+  average: 'অ্যাভারেজ',
+  avg: 'অ্যাভারেজ',
+  score: 'স্কোর',
+  scores: 'স্কোরস',
+  data: 'ডেটা',
+  user: 'ইউজার',
+  users: 'ইউজার্স',
+  name: 'নেম',
+  start: 'স্টার্ট',
+  end: 'এন্ড',
+  left: 'লেফট',
+  right: 'রাইট',
+  mid: 'মিড',
+  low: 'লো',
+  high: 'হাই',
+  size: 'সাইজ',
+  length: 'লেংথ',
+  len: 'লেন',
+  search: 'সার্চ',
+  binary_search: 'বাইনারি_সার্চ',
+  binarySearch: 'বাইনারি_সার্চ',
+  filter: 'ফিল্টার',
+  filter_even_numbers: 'ফিল্টার_ইভেন_নাম্বার্স',
+  filterEvenNumbers: 'ফিল্টার_ইভেন_নাম্বার্স',
+  even: 'ইভেন',
+  odd: 'অড',
+  occurrences: 'কত বার আছে',
+  target_count: 'টার্গেট_কাউন্ট',
+};
+
+export const GUJARATI_DICTIONARY: Record<string, string> = {
+  calculate_sum: 'સરવાળો_ગણના',
+  calculateSum: 'સરવાળો_ગણના',
+  format_result: 'પરિણામ_સ્વરૂપ',
+  formatResult: 'પરિણામ_સ્વરૂપ',
+  helper: 'મદદનીશ',
+  utils: 'યુટિલ્સ',
+  count_number: 'કાઉન્ટ_નંબર',
+  count: 'કાઉન્ટ',
+  target: 'ટાર્ગેટ',
+  arr: 'એર્ર',
+  array: 'એરે',
+  arrays: 'એરેસ',
+  num: 'નંબર',
+  number: 'નંબર',
+  numbers: 'નંબર્સ',
+  nums: 'નંબર્સ',
+  result: 'રિઝલ્ટ',
+  results: 'રિઝલ્ટ્સ',
+  val: 'વેલ્યુ',
+  value: 'વેલ્યુ',
+  values: 'વેલ્યુઝ',
+  item: 'આઇટમ',
+  items: 'આઇટમ્સ',
+  elem: 'એલિમેન્ટ',
+  element: 'એલિમેન્ટ',
+  elements: 'એલિમેન્ટ્સ',
+  idx: 'ઇન્ડેક્સ',
+  index: 'ઇન્ડેક્સ',
+  indices: 'ઇન્ડિસેસ',
+  total: 'ટોટલ',
+  sum: 'સમ',
+  average: 'એવરેજ',
+  avg: 'એવરેજ',
+  score: 'સ્કોર',
+  scores: 'સ્કોર્સ',
+  data: 'ડેટા',
+  user: 'યુઝર',
+  users: 'યુઝર્સ',
+  name: 'નેમ',
+  start: 'સ્ટાર્ટ',
+  end: 'એન્ડ',
+  left: 'લેફ્ટ',
+  right: 'રાઇટ',
+  mid: 'મિડ',
+  low: 'લો',
+  high: 'હાઇ',
+  size: 'સાઇઝ',
+  length: 'લેન્થ',
+  len: 'લેન',
+  search: 'સર્ચ',
+  binary_search: 'બાઈનરી_સર્ચ',
+  binarySearch: 'બાઈનરી_સર્ચ',
+  filter: 'ફિલ્ટર',
+  filter_even_numbers: 'ફિલ્ટર_ઇવન_નંબર્સ',
+  filterEvenNumbers: 'ફિલ્ટર_ઇવન_નંબર્સ',
+  even: 'ઇવન',
+  odd: 'ઓડ',
+  occurrences: 'કેટલી વાર છે',
+  target_count: 'ટાર્ગેટ_કાઉન્ટ',
+};
 
 export const NATIVE_DICTIONARIES: Record<string, Record<string, string>> = {
   telugu: TELUGU_DICTIONARY,
@@ -697,13 +939,57 @@ export const NATIVE_DICTIONARIES: Record<string, Record<string, string>> = {
   gujarati: GUJARATI_DICTIONARY,
 };
 
-export const TELUGU_COMMENT_PHRASES: Record<string, string> = {};
-export const HINDI_COMMENT_PHRASES: Record<string, string> = {};
-export const TAMIL_COMMENT_PHRASES: Record<string, string> = {};
-export const KANNADA_COMMENT_PHRASES: Record<string, string> = {};
-export const MARATHI_COMMENT_PHRASES: Record<string, string> = {};
-export const BENGALI_COMMENT_PHRASES: Record<string, string> = {};
-export const GUJARATI_COMMENT_PHRASES: Record<string, string> = {};
+// ─── 4. Comment Phrases per Language ───────────────────────────────────────────
+export const TELUGU_COMMENT_PHRASES: Record<string, string> = {
+  'count occurrences in array': 'నంబర్ కౌంట్ అర్రే లో టార్గెట్ నంబర్ ఎన్ని సార్లు ఉందో కౌంట్ చేయాలి',
+  'count occurrences in list': 'నంబర్ కౌంట్ లిస్ట్ లో టార్గెట్ నంబర్ ఎన్ని సార్లు ఉందో కౌంట్ చేయాలి',
+  'count occurrences': 'ఎన్ని సార్లు ఉందో కౌంట్ చేయడం',
+  'find target in array': 'అర్రే లో టార్గెట్ వెతకడం',
+  'find target': 'టార్గెట్ వెతకడం',
+  'binary search': 'బైనరీ సెర్చ్',
+  'binary search in array': 'అర్రే లో బైనరీ సెర్చ్',
+  'calculate average': 'యావరేజ్ లెక్కించడం',
+  'filter even numbers': 'ఈవెన్ నంబర్స్ ఫిల్టర్ చేయడం',
+  'off-by-one and division by zero vulnerability': 'ఇండెక్స్ బగ్ మరియు జీరో డివిజన్ సమస్య',
+};
+
+export const HINDI_COMMENT_PHRASES: Record<string, string> = {
+  'count occurrences in array': 'ऐरे में टारगेट कितनी बार आया काउंट करना',
+  'count occurrences in list': 'लिस्ट में टारगेट कितनी बार आया काउंट करना',
+  'binary search': 'बाइनरी सर्च',
+  'binary search in array': 'ऐरे में बाइनरी सर्च',
+  'calculate average': 'औसत निकालना',
+  'filter even numbers': 'इवन नंबर्स फ़िल्टर करना',
+};
+
+export const TAMIL_COMMENT_PHRASES: Record<string, string> = {
+  'count occurrences in array': 'அரேயில் டார்கெட் எத்தனை முறை உள்ளது கவுண்ட் செய்தல்',
+  'count occurrences in list': 'பட்டியலில் டார்கெட் எத்தனை முறை உள்ளது கவுண்ட் செய்தல்',
+  'binary search': 'பைனரி செர்ச்',
+  'binary search in array': 'அரேயில் பைனரி செர்ச்',
+};
+
+export const KANNADA_COMMENT_PHRASES: Record<string, string> = {
+  'count occurrences in array': 'ಅರೇಯಲ್ಲಿ ಟಾರ್ಗೆಟ್ ಎಷ್ಟು ಬಾರಿ ಇದೆ ಕೌಂಟ್ ಮಾಡುವುದು',
+  'count occurrences in list': 'ಪಟ್ಟಿಯಲ್ಲಿ ಟಾರ್ಗೆಟ್ ಎಷ್ಟು ಬಾರಿ ಇದೆ ಕೌಂಟ್ ಮಾಡುವುದು',
+  'binary search': 'ಬೈನರಿ ಸರ್ಚ್',
+  'binary search in array': 'ಅರೇಯಲ್ಲಿ ಬೈನರಿ ಸರ್ಚ್',
+};
+
+export const MARATHI_COMMENT_PHRASES: Record<string, string> = {
+  'count occurrences in array': 'ऐरे मध्ये टार्गेट किती वेळा आले काउंट करणे',
+  'binary search in array': 'ऐरे मध्ये बायनरी सर्च',
+};
+
+export const BENGALI_COMMENT_PHRASES: Record<string, string> = {
+  'count occurrences in array': 'অ্যারেতে টার্গেট কত বার আছে কাউন্ট করা',
+  'binary search in array': 'অ্যারেতে বাইনারি সার্চ',
+};
+
+export const GUJARATI_COMMENT_PHRASES: Record<string, string> = {
+  'count occurrences in array': 'એરેમાં ટાર્ગેટ કેટલી વાર છે કાઉન્ટ કરવું',
+  'binary search in array': 'એરેમાં બાઈનરી સર્ચ',
+};
 
 export const NATIVE_COMMENT_PHRASES: Record<string, Record<string, string>> = {
   telugu: TELUGU_COMMENT_PHRASES,
@@ -715,7 +1001,7 @@ export const NATIVE_COMMENT_PHRASES: Record<string, Record<string, string>> = {
   gujarati: GUJARATI_COMMENT_PHRASES,
 };
 
-// ─── 4. Preserved Keywords across Python, Java, JS, TS, C, C++ ──────────────────
+// ─── 5. Preserved Keywords across Python, Java, JS, TS, C, C++ ──────────────────
 export const PRESERVED_KEYWORDS = new Set([
   // Python keywords
   'def', 'return', 'if', 'elif', 'else', 'while', 'for', 'in', 'is', 'not', 'and', 'or',
@@ -723,10 +1009,10 @@ export const PRESERVED_KEYWORDS = new Set([
   'raise', 'with', 'global', 'nonlocal', 'lambda', 'assert', 'async', 'await', 'del',
   'yield', 'self',
 
-  // C / C++ keywords & preprocessor (Note: 'register' removed to avoid collision with user identifiers)
+  // C / C++ keywords & preprocessor
   'include', 'define', 'ifdef', 'ifndef', 'endif', 'pragma', 'undef',
   'namespace', 'using', 'std', 'cout', 'cin', 'endl', 'printf', 'scanf',
-  'struct', 'union', 'typedef', 'sizeof', 'goto', 'auto', 'volatile', 'extern',
+  'struct', 'union', 'typedef', 'sizeof', 'goto', 'auto', 'register', 'volatile', 'extern',
   'template', 'typename', 'virtual', 'override', 'explicit', 'friend', 'inline', 'constexpr',
   'nullptr', 'NULL',
 
@@ -742,235 +1028,293 @@ export const PRESERVED_KEYWORDS = new Set([
   'function', 'func', 'fn', 'const', 'let', 'var', 'typeof', 'instanceof', 'export',
   'type', 'declare', 'module', 'require', 'readonly', 'keyof', 'infer', 'never', 'unknown', 'any',
   'console', 'log', 'error', 'warn', 'info', 'Math', 'JSON', 'Promise', 'Array', 'Object',
-  'Date', 'Number',
 
   // Built-in functions & types
   'print', 'len', 'range', 'input', 'str', 'list', 'dict', 'set', 'tuple', 'open',
   'abs', 'min', 'max', 'sum', 'round', 'enumerate', 'zip', 'map', 'filter', 'sorted',
-  'reversed', 'isinstance', 'issubclass', 'help', 'dir', 'id',
-
-  // Popular standard libraries & external modules
-  'math', 'sys', 'os', 'json', 'time', 'datetime', 'random', 're', 'collections',
-  'itertools', 'functools', 'urllib', 'requests', 'http', 'asyncio', 'sqlite3',
-  'pathlib', 'logging', 'subprocess', 'threading', 'multiprocessing', 'shutil',
-  'tempfile', 'copy', 'heapq', 'bisect', 'hashlib', 'uuid', 'base64', 'unittest', 'pytest',
-  'typing', 'List', 'Dict', 'Set', 'Tuple', 'Optional', 'Union', 'Any', 'Callable',
-  'numpy', 'np', 'pandas', 'pd', 'matplotlib', 'plt', 'scipy', 'sklearn', 'torch', 'tensorflow',
-  'fs', 'path', 'express', 'react', 'useState', 'useEffect', 'useMemo', 'useRef', 'useCallback',
+  'reversed', 'isinstance', 'issubclass',
 
   // Literals
   'True', 'False', 'None', 'true', 'false', 'null', 'undefined'
 ]);
 
-// Common built-in object methods (Never transliterate standard standard object method names)
-export const BUILTIN_OBJECT_METHODS = new Set([
-  'append', 'pop', 'push', 'shift', 'unshift', 'extend', 'insert', 'remove', 'clear',
-  'index', 'count', 'sort', 'reverse', 'keys', 'values', 'items', 'get', 'update',
-  'split', 'join', 'strip', 'lstrip', 'rstrip', 'replace', 'find', 'startswith', 'endswith',
-  'lower', 'upper', 'format', 'encode', 'decode', 'read', 'write', 'close', 'flush', 'seek',
-  'slice', 'splice', 'reduce', 'forEach', 'includes', 'indexOf', 'lastIndexOf', 'substring',
-  'toUpperCase', 'toLowerCase', 'charAt', 'charCodeAt', 'trim', 'trimStart', 'trimEnd',
-  'sqrt', 'pow', 'ceil', 'floor', 'round', 'sin', 'cos', 'tan', 'exp',
-  'length', 'size', 'toString', 'valueOf', 'json', 'status', 'send',
-  '__init__', '__str__', '__repr__', '__len__', '__main__', '__name__', '__doc__',
-]);
-
-export const SINGLE_LETTER_VARS = new Set([
-  'i', 'j', 'k', 'n', 'm', 'x', 'y', 'z', 's', 't', 'p', 'q', 'r', 'v', 'w', 'u', 'e', 'f', 'g', 'h', 'c', 'a', 'b', 'd', 'l', 'o'
-]);
-
-// ─── 5. Single Word Transliteration Function ──────────────────────────────────
+// ─── 6. Single Word Transliteration Function ──────────────────────────────────
 export function transliterateWord(word: string, lang: NativeLanguageKey): string {
   if (lang === 'english' || !word) return word;
-  if (PRESERVED_KEYWORDS.has(word) || SINGLE_LETTER_VARS.has(word.toLowerCase())) return word;
-  return transliterateCompoundWord(word, lang);
+
+  const lower = word.toLowerCase();
+  const dict = NATIVE_DICTIONARIES[lang] || TELUGU_DICTIONARY;
+
+  // 1. Direct dictionary match
+  if (dict[lower]) {
+    return dict[lower];
+  }
+
+  // 2. Snake_case compound (e.g. count_number, weather_condition, cout_work)
+  if (word.includes('_')) {
+    const parts = word.split('_');
+    const translatedParts = parts.map((part) => {
+      if (!part) return '';
+      return transliterateWord(part, lang);
+    });
+    return translatedParts.join('_');
+  }
+
+  // 3. Trailing digits (e.g. num1, item2)
+  const numMatch = word.match(/^([a-zA-Z]+)(\d+)$/);
+  if (numMatch) {
+    const base = transliterateWord(numMatch[1], lang);
+    return `${base}${numMatch[2]}`;
+  }
+
+  // 4. CamelCase or PascalCase compound (e.g. filterEvenNumbers, calculateSalary, BinarySearch)
+  const camelParts = word.replace(/([a-z0-9])([A-Z])/g, '$1_$2').split('_');
+  if (camelParts.length > 1) {
+    return camelParts.map((p) => transliterateWord(p, lang)).join('_');
+  }
+
+  // 5. Fallback: Deterministic universal phonetic transliteration
+  return phoneticTransliterate(word, lang);
 }
 
+// Backward-compatible alias
 export function transliterateWordToTelugu(word: string): string {
   return transliterateWord(word, 'telugu');
 }
 
-// ─── 6. Universal Syntax-Aware Code Transliterator ────────────────────────────
-export function transliterateCodeUniversal(code: string, lang: NativeLanguageKey = 'telugu'): string {
-  if (lang === 'english' || !code) return code;
+// ─── 7. String Literal Transliteration ─────────────────────────────────────────
+function transliterateStringLiteral(literal: string, lang: NativeLanguageKey): string {
+  if (lang === 'english' || !literal) return literal;
 
-  // Document-level identifier consistency cache
-  const identifierCache = new Map<string, string>();
+  let quote = '"';
+  let inner = literal;
+  if (literal.startsWith('"""') && literal.endsWith('"""')) {
+    quote = '"""';
+    inner = literal.slice(3, -3);
+  } else if (literal.startsWith("'''") && literal.endsWith("'''")) {
+    quote = "'''";
+    inner = literal.slice(3, -3);
+  } else if (literal.startsWith('"') && literal.endsWith('"')) {
+    quote = '"';
+    inner = literal.slice(1, -1);
+  } else if (literal.startsWith("'") && literal.endsWith("'")) {
+    quote = "'";
+    inner = literal.slice(1, -1);
+  } else if (literal.startsWith('`') && literal.endsWith('`')) {
+    quote = '`';
+    inner = literal.slice(1, -1);
+  } else {
+    return literal;
+  }
 
-  const getTransliterated = (ident: string): string => {
-    if (identifierCache.has(ident)) {
-      return identifierCache.get(ident)!;
-    }
-    const res = transliterateCompoundWord(ident, lang);
-    identifierCache.set(ident, res);
-    return res;
-  };
+  // Preserve file paths and import paths
+  if (
+    inner.startsWith('./') ||
+    inner.startsWith('../') ||
+    inner.startsWith('/') ||
+    /\.(py|js|ts|jsx|tsx|json|html|css|png|jpg|svg)$/i.test(inner)
+  ) {
+    return literal;
+  }
 
-  const len = code.length;
-  let out = '';
+  // Check known compound strings in dictionary (e.g. "Target count:")
+  const dict = NATIVE_DICTIONARIES[lang];
+  const innerTrim = inner.trim();
+  const innerLower = innerTrim.toLowerCase().replace(/[:,\s]+$/, '');
+  if (dict && dict[innerLower]) {
+    const suffix = inner.slice(inner.lastIndexOf(innerTrim) + innerTrim.length);
+    const prefix = inner.slice(0, inner.indexOf(innerTrim));
+    return `${quote}${prefix}${dict[innerLower]}${suffix}${quote}`;
+  }
+
+  // Replace words inside inner string
+  const transliteratedInner = inner.replace(/[a-zA-Z_]+/g, (match) => {
+    return transliterateWord(match, lang);
+  });
+
+  return `${quote}${transliteratedInner}${quote}`;
+}
+
+// ─── 8. Comment Transliteration ────────────────────────────────────────────────
+function transliterateComment(comment: string, lang: NativeLanguageKey): string {
+  if (lang === 'english' || !comment) return comment;
+
+  // Match prefix (#, //, /*, *)
+  const match = comment.match(/^(\s*(?:#|\/\/|\/\*|\*)\s*)(.*)$/);
+  if (!match) return comment;
+
+  const prefix = match[1];
+  const text = match[2];
+
+  const phrases = NATIVE_COMMENT_PHRASES[lang];
+  const textLower = text.trim().toLowerCase();
+
+  if (phrases && phrases[textLower]) {
+    return `${prefix}${phrases[textLower]}`;
+  }
+
+  // Transliterate individual words
+  const transliteratedText = text.replace(/[a-zA-Z_]+/g, (w) => {
+    return transliterateWord(w, lang);
+  });
+
+  return `${prefix}${transliteratedText}`;
+}
+
+// ─── 9. Syntax-Aware Line Transliterator ───────────────────────────────────────
+export function transliterateCodeLine(line: string, lang: NativeLanguageKey): string {
+  if (lang === 'english' || !line) return line;
+
+  // 1. Preserve indentation
+  const indentMatch = line.match(/^(\s*)/);
+  const indent = indentMatch ? indentMatch[1] : '';
+  const trimmed = line.slice(indent.length);
+
+  if (!trimmed) return line;
+
+  // 2. Preserve C/C++ preprocessor directives (#include, #define, #ifdef, #ifndef, #endif, #pragma)
+  if (/^#(include|define|ifdef|ifndef|endif|pragma|undef|if|elif|else)\b/.test(trimmed)) {
+    return line;
+  }
+
+  // 2b. Module Import Handling: Preserve module paths & external library names across files
+  const fromImportMatch = trimmed.match(/^from\s+([a-zA-Z0-9_.]+)\s+import\s+(.+)$/);
+  if (fromImportMatch) {
+    const modulePath = fromImportMatch[1];
+    const rawItems = fromImportMatch[2];
+    const transliteratedItems = rawItems.split(',').map((item) => {
+      const trimmedItem = item.trim();
+      if (!trimmedItem) return item;
+      const asMatch = trimmedItem.match(/^([a-zA-Z0-9_]+)\s+as\s+([a-zA-Z0-9_]+)$/);
+      if (asMatch) {
+        return `${transliterateWord(asMatch[1], lang)} as ${transliterateWord(asMatch[2], lang)}`;
+      }
+      return transliterateWord(trimmedItem, lang);
+    }).join(', ');
+    return `${indent}from ${modulePath} import ${transliteratedItems}`;
+  }
+
+  const importMatch = trimmed.match(/^import\s+(.+)$/);
+  if (importMatch && !trimmed.includes('from ')) {
+    const rawModules = importMatch[1];
+    const processed = rawModules.split(',').map((item) => {
+      const trimmedItem = item.trim();
+      const asMatch = trimmedItem.match(/^([a-zA-Z0-9_.]+)\s+as\s+([a-zA-Z0-9_]+)$/);
+      if (asMatch) {
+        return `${asMatch[1]} as ${transliterateWord(asMatch[2], lang)}`;
+      }
+      return trimmedItem;
+    }).join(', ');
+    return `${indent}import ${processed}`;
+  }
+
+  // 3. Full line comments
+  if (trimmed.startsWith('#') || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+    return `${indent}${transliterateComment(trimmed, lang)}`;
+  }
+
+  // 4. Tokenize line syntax-aware
+  let out = indent;
   let i = 0;
 
-  while (i < len) {
-    // 1. Python Triple-Quoted Docstrings (""" ... """ or ''' ... ''')
-    if (
-      (code.slice(i, i + 3) === '"""' || code.slice(i, i + 3) === "'''") ||
-      ((code[i] === 'f' || code[i] === 'r' || code[i] === 'b') && (code.slice(i + 1, i + 4) === '"""' || code.slice(i + 1, i + 4) === "'''"))
-    ) {
-      let startIdx = i;
-      if (code[i] === 'f' || code[i] === 'r' || code[i] === 'b') {
-        i++;
-      }
-      const quoteStr = code.slice(i, i + 3);
-      i += 3;
-      const endIdx = code.indexOf(quoteStr, i);
-      if (endIdx !== -1) {
-        out += code.slice(startIdx, endIdx + 3);
-        i = endIdx + 3;
-      } else {
-        out += code.slice(startIdx);
-        break;
-      }
-      continue;
+  while (i < trimmed.length) {
+    const char = trimmed[i];
+
+    // Comments: # or // or /* ... */
+    if (char === '#' || (char === '/' && trimmed[i + 1] === '/')) {
+      const commentPart = trimmed.slice(i);
+      out += transliterateComment(commentPart, lang);
+      break;
     }
 
-    // 2. Regular Strings ("...", '...', `...`)
-    if (
-      code[i] === '"' || code[i] === "'" || code[i] === '`' ||
-      ((code[i] === 'f' || code[i] === 'r' || code[i] === 'b') && (code[i + 1] === '"' || code[i + 1] === "'"))
-    ) {
-      const startIdx = i;
-      let quoteChar = code[i];
-      if (code[i] === 'f' || code[i] === 'r' || code[i] === 'b') {
-        quoteChar = code[i + 1];
+    if (char === '/' && trimmed[i + 1] === '*') {
+      const endComment = trimmed.indexOf('*/', i + 2);
+      if (endComment !== -1) {
+        const commentPart = trimmed.slice(i, endComment + 2);
+        out += transliterateComment(commentPart, lang);
+        i = endComment + 2;
+        continue;
+      } else {
+        const commentPart = trimmed.slice(i);
+        out += transliterateComment(commentPart, lang);
+        break;
+      }
+    }
+
+    // String literals: "...", '...', `...`, f"...", f'...'
+    if (char === '"' || char === "'" || char === '`' || (char === 'f' && (trimmed[i + 1] === '"' || trimmed[i + 1] === "'"))) {
+      let quoteChar = char;
+      const start = i;
+      let isFString = false;
+      if (char === 'f') {
+        isFString = true;
+        quoteChar = trimmed[i + 1];
         i++;
       }
-      i++; // skip opening quote
-      while (i < len && code[i] !== quoteChar && code[i] !== '\n') {
-        if (code[i] === '\\' && i + 1 < len) {
+      i++; // skip open quote
+      while (i < trimmed.length && trimmed[i] !== quoteChar) {
+        if (trimmed[i] === '\\' && i + 1 < trimmed.length) {
           i += 2;
         } else {
           i++;
         }
       }
-      if (i < len && code[i] === quoteChar) {
-        i++; // skip closing quote
-      }
-      out += code.slice(startIdx, i);
+      if (i < trimmed.length) i++; // skip close quote
+      const rawString = trimmed.slice(start, i);
+      const strLiteral = isFString ? rawString.slice(1) : rawString;
+      const trans = transliterateStringLiteral(strLiteral, lang);
+      out += isFString ? `f${trans}` : trans;
       continue;
     }
 
-    // 3. Multi-line Block Comments (/* ... */)
-    if (code[i] === '/' && code[i + 1] === '*') {
-      const endComment = code.indexOf('*/', i + 2);
-      if (endComment !== -1) {
-        out += code.slice(i, endComment + 2);
-        i = endComment + 2;
-      } else {
-        out += code.slice(i);
-        break;
-      }
-      continue;
-    }
-
-    // 4. Single-line Comments (# ... or // ...)
-    if (code[i] === '#' || (code[i] === '/' && code[i + 1] === '/')) {
-      const nextNewline = code.indexOf('\n', i);
-      if (nextNewline !== -1) {
-        out += code.slice(i, nextNewline);
-        i = nextNewline;
-      } else {
-        out += code.slice(i);
-        break;
-      }
-      continue;
-    }
-
-    // 5. C/C++ Preprocessor Directives (#include, #define, etc.)
-    if (code[i] === '#' && (i === 0 || code[i - 1] === '\n')) {
-      const lineEnd = code.indexOf('\n', i);
-      const directive = lineEnd !== -1 ? code.slice(i, lineEnd) : code.slice(i);
-      out += directive;
-      i += directive.length;
-      continue;
-    }
-
-    // 6. Identifiers [a-zA-Z_$][a-zA-Z0-9_$]*
-    if (/[a-zA-Z_$]/.test(code[i])) {
-      const startIdx = i;
-      while (i < len && /[a-zA-Z0-9_$]/.test(code[i])) {
+    // Identifiers and Keywords: [a-zA-Z_][a-zA-Z0-9_]*
+    if (/[a-zA-Z_]/.test(char)) {
+      const start = i;
+      while (i < trimmed.length && /[a-zA-Z0-9_]/.test(trimmed[i])) {
         i++;
       }
-      const token = code.slice(startIdx, i);
+      const token = trimmed.slice(start, i);
 
-      // Check Python dunders (__init__, __str__, etc.)
-      if (token.startsWith('__') && token.endsWith('__')) {
+      // Preserve programming keywords intact in English
+      if (PRESERVED_KEYWORDS.has(token)) {
         out += token;
-        continue;
+      } else {
+        // Transliterate identifier to target native script
+        out += transliterateWord(token, lang);
       }
-
-      // Check context: preceded by dot? (obj.method)
-      let prevNonWs = startIdx - 1;
-      while (prevNonWs >= 0 && /\s/.test(code[prevNonWs]) && code[prevNonWs] !== '\n') prevNonWs--;
-      const isMemberAccess = prevNonWs >= 0 && code[prevNonWs] === '.';
-
-      let objectToken = '';
-      if (isMemberAccess) {
-        let dotIdx = prevNonWs;
-        let objEnd = dotIdx - 1;
-        while (objEnd >= 0 && /\s/.test(code[objEnd]) && code[objEnd] !== '\n') objEnd--;
-        let objStart = objEnd;
-        while (objStart >= 0 && /[a-zA-Z0-9_$]/.test(code[objStart])) objStart--;
-        objectToken = code.slice(objStart + 1, objEnd + 1);
-      }
-
-      // Check if followed by dot (e.g. math.sqrt, user.name)
-      let nextNonWs = i;
-      while (nextNonWs < len && /\s/.test(code[nextNonWs]) && code[nextNonWs] !== '\n') nextNonWs++;
-      const isFollowedByDot = nextNonWs < len && code[nextNonWs] === '.';
-
-      // Rules:
-      // A. Preserved Keywords & single letters
-      if (PRESERVED_KEYWORDS.has(token) || SINGLE_LETTER_VARS.has(token.toLowerCase())) {
-        out += token;
-        continue;
-      }
-
-      // B. Standard library/built-in module method (e.g. math.sqrt, console.log)
-      const isStandardObject = PRESERVED_KEYWORDS.has(objectToken) && objectToken !== 'self' && objectToken !== 'this';
-      if (isMemberAccess && (isStandardObject || BUILTIN_OBJECT_METHODS.has(token))) {
-        out += token;
-        continue;
-      }
-
-      // C. Standard built-in object methods on user objects (e.g. user_list.append)
-      if (isMemberAccess && BUILTIN_OBJECT_METHODS.has(token)) {
-        out += token;
-        continue;
-      }
-
-      // D. Followed by dot and is a standard module (e.g. math., os., console.)
-      if (isFollowedByDot && PRESERVED_KEYWORDS.has(token)) {
-        out += token;
-        continue;
-      }
-
-      // E. Eligible User Identifier
-      out += getTransliterated(token);
       continue;
     }
 
-    // 7. Operators, numbers, punctuation, whitespace
-    out += code[i];
+    // Numbers: \d+(\.\d+)?
+    if (/\d/.test(char)) {
+      const start = i;
+      while (i < trimmed.length && /[\d.xXa-fA-F]/.test(trimmed[i])) {
+        i++;
+      }
+      out += trimmed.slice(start, i);
+      continue;
+    }
+
+    // Whitespace
+    if (/\s/.test(char)) {
+      out += char;
+      i++;
+      continue;
+    }
+
+    // Operators and Punctuation (=, ==, +=, +, -, *, /, :, (, ), [, ], {, }, ,, ., ->, ::)
+    out += char;
     i++;
   }
 
   return out;
 }
 
+// ─── 10. Multi-line Code Transliterator ───────────────────────────────────────
 export function transliterateCode(code: string, lang: NativeLanguageKey = 'telugu'): string {
-  return transliterateCodeUniversal(code, lang);
-}
+  if (lang === 'english' || !code) return code;
 
-export function transliterateCodeLine(line: string, lang: NativeLanguageKey): string {
-  return transliterateCodeUniversal(line, lang);
+  const lines = code.split('\n');
+  const transliteratedLines = lines.map((line) => transliterateCodeLine(line, lang));
+  return transliteratedLines.join('\n');
 }
