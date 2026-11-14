@@ -57,6 +57,8 @@ import { debugCodeDeterministically, convertCodeDeterministically, askCodeDeterm
 import { analyzeCodeRuleBased } from '../utils/ruleBasedAnalyzer';
 import { parseVisualBlueprint, VisualBlueprintLine } from '../utils/visualBlueprint';
 import { BlueprintIcon } from '../components/BlueprintIcon';
+import { Icon } from '@iconify/react';
+import { FileIcon, LanguageIcon } from '../components/FileIcon';
 
 interface WorkspacePageProps {
   onNavigate: (view: string) => void;
@@ -1259,12 +1261,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
               onClick={() => setLangDropOpen((v) => !v)}
               className="flex items-center gap-2 px-2.5 py-1.5 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] rounded-md text-xs font-semibold transition-colors"
             >
-              <span
-                className="w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center shrink-0"
-                style={{ background: langColor + '33', color: langColor, border: `1px solid ${langColor}55` }}
-              >
-                {langIcon}
-              </span>
+              <LanguageIcon language={progLang} width={18} height={18} />
               <span>{currentLang?.name || progLang}</span>
               <ChevronDown className="w-3 h-3 opacity-60" />
             </button>
@@ -1276,12 +1273,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                     onClick={() => handleLangChange(l.key)}
                     className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-[#21262d] transition-colors ${progLang === l.key ? 'bg-[#21262d] text-white font-bold' : 'text-slate-300'}`}
                   >
-                    <span
-                      className="w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center shrink-0"
-                      style={{ background: (LANG_COLORS[l.key] || '#888') + '33', color: LANG_COLORS[l.key] || '#888' }}
-                    >
-                      {LANG_ICONS[l.key] || l.key.slice(0, 2).toUpperCase()}
-                    </span>
+                    <LanguageIcon language={l.key} width={18} height={18} />
                     {l.name}
                   </button>
                 ))}
@@ -1381,7 +1373,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
             title="Toggle Terminal Console"
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors border ${showConsole ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'}`}
           >
-            <Terminal className="w-3.5 h-3.5" />
+            <Icon icon="flat-color-icons:command-line" width={16} height={16} className="shrink-0" />
             <span className="hidden sm:inline">Console</span>
             {terminalOutput && (
               <span className={`w-2 h-2 rounded-full ${terminalOutput.success ? 'bg-emerald-400' : 'bg-rose-400 animate-pulse'}`} />
@@ -1470,7 +1462,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
             <div className="p-3 border-b border-[#30363d]">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Folder className="w-3.5 h-3.5 text-blue-400" /> Project Files
+                  <Icon icon="vscode-icons:default-folder" width={16} height={16} className="shrink-0" /> Project Files
                 </span>
                 <div className="flex items-center gap-1">
                   <button
@@ -1532,7 +1524,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                     onClick={() => handleOpenFile(file.id)}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <FileCode className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <FileIcon filename={file.name} width={16} height={16} />
                       {editingFileId === file.id ? (
                         <input
                           autoFocus
@@ -1772,7 +1764,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       onClick={() => setActiveFileId(file.id)}
                       className={`group flex items-center gap-2 px-3 py-1.5 text-xs font-mono rounded-t-md border-t-2 cursor-pointer transition-colors ${file.id === activeFile.id ? 'bg-[#1e1e1e] border-blue-500 text-white font-bold' : 'bg-[#161b22] border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#21262d]'}`}
                     >
-                      <FileCode className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <FileIcon filename={file.name} width={16} height={16} />
                       <span>{file.name}</span>
                       {file.isEntry && (
                         <span className="text-[8px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1 rounded font-sans uppercase">
@@ -1812,7 +1804,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 {/* Left Pane Header */}
                 <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <FileIcon filename={activeFile.name} width={15} height={15} />
                     <span className="font-semibold text-slate-200">
                       {activeFile.name} {activeFile.isEntry ? '(Main Entry)' : ''}
                     </span>
@@ -2037,24 +2029,27 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                     <div className="flex bg-[#21262d] border border-[#30363d] rounded text-[10px] font-medium overflow-hidden">
                       <button
                         onClick={() => setBlueprintMode('aligned')}
-                        className={`px-2 py-0.5 transition-colors ${blueprintMode === 'aligned' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors ${blueprintMode === 'aligned' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
                         title="Line-by-line arrows aligned with editor"
                       >
-                        Line Blueprint
+                        <Icon icon="flat-color-icons:flow-chart" width={13} height={13} className="shrink-0" />
+                        <span>Line Blueprint</span>
                       </button>
                       <button
                         onClick={() => setBlueprintMode('blocks')}
-                        className={`px-2 py-0.5 transition-colors ${blueprintMode === 'blocks' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors ${blueprintMode === 'blocks' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
                         title="Grouped architectural blocks like Excalidraw"
                       >
-                        Architecture Blocks
+                        <Icon icon="flat-color-icons:mind-map" width={13} height={13} className="shrink-0" />
+                        <span>Architecture Blocks</span>
                       </button>
                       <button
                         onClick={() => setBlueprintMode('code')}
-                        className={`px-2 py-0.5 transition-colors ${blueprintMode === 'code' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors ${blueprintMode === 'code' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
                         title="Pure pseudocode representation"
                       >
-                        Pseudocode
+                        <Icon icon="flat-color-icons:document" width={13} height={13} className="shrink-0" />
+                        <span>Pseudocode</span>
                       </button>
                     </div>
 

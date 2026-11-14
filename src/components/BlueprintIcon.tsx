@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '@iconify/react';
 import {
   Terminal,
   Cpu,
@@ -158,6 +159,27 @@ export const BLUEPRINT_ICON_STYLES: Record<string, IconStyleDef> = {
   },
 };
 
+export const BLUEPRINT_ICONIFY_MAP: Record<string, string> = {
+  'terminal': 'flat-color-icons:command-line',
+  'cpu': 'flat-color-icons:electronics',
+  'search': 'flat-color-icons:search',
+  'folder-tree': 'vscode-icons:default-folder',
+  'file-code': 'vscode-icons:file-type-python',
+  'bot': 'flat-color-icons:assistant',
+  'brain': 'flat-color-icons:idea',
+  'wrench': 'flat-color-icons:support',
+  'shield': 'flat-color-icons:privacy',
+  'workflow': 'flat-color-icons:flow-chart',
+  'file-text': 'flat-color-icons:rules',
+  'corner-down': 'flat-color-icons:right-up',
+  'git-branch': 'flat-color-icons:org-unit',
+  'refresh': 'flat-color-icons:synchronize',
+  'database': 'flat-color-icons:database',
+  'layers': 'flat-color-icons:stack',
+  'boxes': 'flat-color-icons:package',
+  'code': 'flat-color-icons:source-code',
+};
+
 const DEFAULT_STYLE: IconStyleDef = {
   color: 'text-blue-400',
   bg: 'bg-blue-500/15',
@@ -169,16 +191,19 @@ interface BlueprintIconProps {
   name: string;
   className?: string;
   withContainer?: boolean;
+  preferLucide?: boolean;
 }
 
 export const BlueprintIcon: React.FC<BlueprintIconProps> = ({
   name,
   className = 'w-3.5 h-3.5',
   withContainer = false,
+  preferLucide = false,
 }) => {
   const style = BLUEPRINT_ICON_STYLES[name] || DEFAULT_STYLE;
+  const iconifyName = BLUEPRINT_ICONIFY_MAP[name];
 
-  const renderIcon = () => {
+  const renderLucideFallback = () => {
     switch (name) {
       case 'terminal':
         return <Terminal className={className} strokeWidth={2.2} />;
@@ -218,6 +243,21 @@ export const BlueprintIcon: React.FC<BlueprintIconProps> = ({
       default:
         return <Code2 className={className} strokeWidth={2.2} />;
     }
+  };
+
+  const renderIcon = () => {
+    if (!preferLucide && iconifyName) {
+      const size = className.includes('w-4') || className.includes('w-5') ? 18 : 15;
+      return (
+        <Icon
+          icon={iconifyName}
+          width={size}
+          height={size}
+          className="shrink-0"
+        />
+      );
+    }
+    return renderLucideFallback();
   };
 
   if (withContainer) {
