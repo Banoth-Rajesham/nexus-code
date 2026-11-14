@@ -222,7 +222,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
 
     // ─── 1. Imports & Toolkits (ACTUAL CODE -> HAS ARROW) ──────────────────
     if (/^(import\s+|from\s+)/.test(trimmed)) {
-      let icon = '📦';
+      let icon = 'boxes';
       let title = 'Import Library';
       let detail = `Imports external library dependencies into current scope.`;
       let badge = 'Toolkit';
@@ -235,27 +235,27 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       };
 
       if (/\bos\b/.test(trimmed)) {
-        icon = '💻';
+        icon = 'terminal';
         badge = 'System Info';
         title = 'Access System Info (Env Vars)';
         detail = 'Provides access to operating system interfaces, environment variables, and process info.';
       } else if (/\bre\b|\bregex\b/.test(trimmed)) {
-        icon = '🔍';
+        icon = 'search';
         badge = 'Pattern Search';
         title = 'Search & Match Patterns';
         detail = 'Compiles and evaluates regular expressions for advanced string search and extraction.';
       } else if (/\bsys\b/.test(trimmed)) {
-        icon = '🖥️';
+        icon = 'cpu';
         badge = 'Interpreter';
         title = 'Get Interpreter Path';
         detail = 'Accesses Python runtime parameters, interpreter paths, and standard I/O pipes.';
       } else if (/pathlib|path/i.test(trimmed)) {
-        icon = '📁';
+        icon = 'folder-tree';
         badge = 'Filesystem';
         title = 'Locate Server File';
         detail = 'Constructs cross-platform object-oriented filesystem paths and directory navigation.';
       } else if (/google\.adk\.agents|Agent\b|crewai|langchain|autogen|genai/i.test(trimmed)) {
-        icon = '🤖';
+        icon = 'bot';
         badge = 'Google AI';
         groupTitle = 'Google AI Connection';
         title = 'Google AI & Agent Framework';
@@ -267,7 +267,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
           accent: '#34d399',
         };
       } else if (/lite_llm|LiteLlm|ollama|openai|models?\./i.test(trimmed)) {
-        icon = '🐻';
+        icon = 'brain';
         badge = 'LLM Model';
         groupTitle = 'Google AI Connection';
         title = 'Connect to Ollama / LLM Model';
@@ -279,7 +279,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
           accent: '#c084fc',
         };
       } else if (/llm_response|LlmResponse|types\b|streaming/i.test(trimmed)) {
-        icon = '📄';
+        icon = 'file-code';
         badge = 'Type Schema';
         groupTitle = 'Google AI Connection';
         title = 'Model Types & Schema';
@@ -291,7 +291,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
           accent: '#c084fc',
         };
       } else if (/mcp|McpToolset|mcp_session|mcp_tool/i.test(trimmed)) {
-        icon = '🧰';
+        icon = 'wrench';
         badge = 'MCP Toolset';
         groupTitle = 'Model Context Protocol (MCP) Setup';
         title = 'Create Toolset & Protocol';
@@ -328,7 +328,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
     if (fnMatch) {
       const fnName = fnMatch[1];
       const params = fnMatch[2].trim();
-      let icon = '🎯';
+      let icon = 'workflow';
       let title = `Define ${fnName}()`;
       let detail = params ? `Accepts parameters: (${params}) to process.` : `Encapsulates reusable procedure.`;
       let badge = 'Function';
@@ -341,7 +341,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       };
 
       if (/callback|guard|intercept|auth|security|before_/i.test(fnName)) {
-        icon = '🛡️';
+        icon = 'shield';
         badge = 'Security Interceptor';
         groupTitle = 'Security & Interceptors';
         title = 'Callback Interceptor';
@@ -353,7 +353,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
           accent: '#f43f5e',
         };
       } else if (/agent|react|chat|prompt|ai|get_weather|tool/i.test(fnName)) {
-        icon = '🤖';
+        icon = 'bot';
         badge = 'Tool Function';
         groupTitle = 'Agent Execution Logic';
         title = `Tool Handler: ${fnName}()`;
@@ -393,7 +393,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
         isComment: false,
         hasArrow: true,
         rawText: trimmed,
-        icon: '📋',
+        icon: 'file-text',
         badge: 'System Rules',
         title: 'CRM Assistant Rules & Instructions',
         detail: 'System instructions: A comprehensive guide defining persona, constraints, and operational bounds.',
@@ -419,7 +419,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
         isComment: false,
         hasArrow: true,
         rawText: trimmed,
-        icon: '🧰',
+        icon: 'wrench',
         badge: 'Tool Registry',
         title: 'Tool Registration',
         detail: 'Tool Registration: Attaches MCP toolsets and subroutines to the active agent execution loop.',
@@ -446,7 +446,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
         isComment: false,
         hasArrow: true,
         rawText: trimmed,
-        icon: '📤',
+        icon: 'corner-down',
         badge: 'Return Data',
         title: 'Return Payload Output',
         detail: val ? `Completes function execution and returns payload (${val}).` : 'Exits function execution scope.',
@@ -484,7 +484,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
         isComment: false,
         hasArrow: true,
         rawText: trimmed,
-        icon: '⚡',
+        icon: 'git-branch',
         badge: 'Branch Logic',
         title,
         detail,
@@ -510,7 +510,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
         isComment: false,
         hasArrow: true,
         rawText: trimmed,
-        icon: '🔄',
+        icon: 'refresh',
         badge: 'Loop Cycle',
         title: 'Iterate Sequence',
         detail: `Sequentially iterates over elements in collection until loop condition completes.`,
@@ -539,7 +539,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
         isComment: false,
         hasArrow: true,
         rawText: trimmed,
-        icon: '📌',
+        icon: 'database',
         badge: 'Variable State',
         title: `Assign ${varName}`,
         detail: `Initializes or updates state variable '${varName}' with value (${val}).`,
@@ -567,7 +567,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
         isComment: false,
         hasArrow: true,
         rawText: trimmed,
-        icon: '🗂️',
+        icon: 'layers',
         badge: 'Data Property',
         title: `Property '${keyName}'`,
         detail: `Sets payload property '${keyName}' for structured return data or configuration.`,
@@ -593,7 +593,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
         isComment: false,
         hasArrow: true,
         rawText: trimmed,
-        icon: '📦',
+        icon: 'boxes',
         badge: 'Block Closure',
         title: 'End of Scope',
         detail: 'Closes code structure block and returns indentation to outer context.',
@@ -616,7 +616,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       isComment: false,
       hasArrow: true,
       rawText: trimmed,
-      icon: '⚙️',
+      icon: 'code',
       badge: 'Statement',
       title: 'Execute Instruction',
       detail: `Executes instruction: ${trimmed}`,
@@ -637,7 +637,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
     const firstLine = lines[0];
     return {
       groupTitle,
-      icon: firstLine ? firstLine.icon : '📌',
+      icon: firstLine ? firstLine.icon : 'code',
       lines,
     };
   });

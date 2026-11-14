@@ -23,6 +23,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { SUPPORTED_NATIVE_LANGUAGES, NativeLanguageKey } from '../types';
+import { BlueprintIcon } from '../components/BlueprintIcon';
 
 interface LandingPageProps {
   onNavigate: (view: string, data?: any) => void;
@@ -880,7 +881,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
             {[
               {
-                icon: '💻',
+                icon: 'terminal',
                 title: 'Essential Toolkits',
                 badge: 'System & OS',
                 code: 'import os\nimport sys\nfrom pathlib import Path',
@@ -888,7 +889,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 color: 'border-sky-500/40 bg-sky-500/5 text-sky-400',
               },
               {
-                icon: '🤖',
+                icon: 'bot',
                 title: 'Google AI & Models',
                 badge: 'Autonomous Agents',
                 code: 'from google.adk.agents import Agent\nfrom models import LiteLlm',
@@ -896,7 +897,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 color: 'border-emerald-500/40 bg-emerald-500/5 text-emerald-400',
               },
               {
-                icon: '🧰',
+                icon: 'wrench',
                 title: 'Model Context Protocol',
                 badge: 'MCP Toolset',
                 code: 'tools = [crm_mcp]\nmcp = McpToolset(...)',
@@ -904,12 +905,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 color: 'border-amber-500/40 bg-amber-500/5 text-amber-400',
               },
               {
-                icon: '🎯',
+                icon: 'workflow',
                 title: 'Core Functions & Rules',
                 badge: 'Execution Logic',
                 code: 'def agent_react(values):\n    return { "status": 200 }',
                 desc: 'Orchestrates parameter handling, guardrails, and structured return payloads.',
-                color: 'border-purple-500/40 bg-purple-500/5 text-purple-400',
+                color: 'border-blue-500/40 bg-blue-500/5 text-blue-400',
               },
             ].map((pillar, idx) => (
               <div
@@ -918,7 +919,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl">{pillar.icon}</span>
+                    <BlueprintIcon name={pillar.icon} withContainer className="w-4 h-4" />
                     <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border border-slate-300 text-slate-600 bg-slate-50">
                       {pillar.badge}
                     </span>

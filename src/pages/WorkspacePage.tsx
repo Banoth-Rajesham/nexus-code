@@ -56,6 +56,7 @@ import { NATIVE_CODE_WORD, NATIVE_GUIDE_WORD, NATIVE_PSEUDO_WORD, transliterateW
 import { debugCodeDeterministically, convertCodeDeterministically, askCodeDeterministically } from '../utils/deterministicTools';
 import { analyzeCodeRuleBased } from '../utils/ruleBasedAnalyzer';
 import { parseVisualBlueprint, VisualBlueprintLine } from '../utils/visualBlueprint';
+import { BlueprintIcon } from '../components/BlueprintIcon';
 
 interface WorkspacePageProps {
   onNavigate: (view: string) => void;
@@ -1168,7 +1169,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     }
   };
 
-  // 5. Ask in Bhasha (Deterministic Context-Aware Tutor)
+  // 5. Ask Nexus Assistant (Deterministic Context-Aware Tutor)
   const handleAskAi = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!questionInput.trim()) return;
@@ -1454,7 +1455,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
       {/* ─── MAIN IDE BODY ───────────────────────────────────────────── */}
       <div className={`flex flex-1 min-h-0 overflow-hidden relative ${isDraggingSplit ? 'select-none pointer-events-none' : ''}`}>
-        {/* ══ 1. FILE EXPLORER & BHASHA TOOLS SIDEBAR ══ */}
+        {/* ══ 1. FILE EXPLORER & NEXUS TOOLS SIDEBAR ══ */}
         {(showFileExplorer || mobileView === 'files') && (
           <div
             className={`${
@@ -1673,7 +1674,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
               )}
             </div>
 
-            {/* Section C: Bhasha Tools */}
+            {/* Section C: Nexus Tools */}
             <div className="p-3 border-b border-[#30363d]">
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-2">
                 Visual Analysis Tools
@@ -1968,9 +1969,13 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                               onClick={() => jumpToLine(bLine.lineNumber)}
                               className={`flex items-center justify-center cursor-pointer transition-all ${
                                 isCurrent
-                                  ? 'text-[#38bdf8] scale-110 drop-shadow-[0_0_8px_rgba(56,189,248,0.85)]'
+                                  ? 'scale-115'
                                   : 'text-slate-500 hover:text-slate-200'
                               }`}
+                              style={{
+                                color: isCurrent ? bLine.colorScheme.accent : undefined,
+                                filter: isCurrent ? `drop-shadow(0 0 6px ${bLine.colorScheme.accent})` : undefined,
+                              }}
                               title={`Line ${bLine.lineNumber} -> Click to inspect explanation`}
                             >
                               <svg
@@ -2139,19 +2144,17 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                               key={i}
                               onClick={() => jumpToLine(bLine.lineNumber)}
                               style={{ height: '26px', lineHeight: '26px' }}
-                              className={`group flex items-center gap-2.5 px-3 w-full cursor-pointer transition-all rounded-[3px] border ${
+                              className={`group flex items-center gap-2 px-2.5 w-full cursor-pointer transition-all rounded-[3px] border ${
                                 isCurrent
                                   ? 'bg-[#1e293b] border-blue-500/60 shadow-xs'
                                   : 'border-transparent hover:bg-[#252b36]'
                               }`}
                             >
-                              <span
-                                className={`text-[13px] shrink-0 transition-transform group-hover:scale-125 ${
-                                  isCurrent ? 'scale-110 drop-shadow-[0_0_6px_rgba(56,189,248,0.7)]' : ''
-                                }`}
-                              >
-                                {bLine.icon}
-                              </span>
+                              <BlueprintIcon
+                                name={bLine.icon}
+                                withContainer
+                                className="w-3.5 h-3.5"
+                              />
                               <span
                                 className={`px-1.5 py-0.2 rounded text-[10px] font-semibold uppercase tracking-wider shrink-0 border ${bLine.colorScheme.badgeBg} ${bLine.colorScheme.badgeText} ${bLine.colorScheme.border}`}
                               >
@@ -2183,7 +2186,11 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                         >
                           {/* Group Header */}
                           <div className="flex items-center gap-2.5 border-b border-[#30363d]/80 pb-2.5 mb-3">
-                            <span className="text-lg">{group.icon}</span>
+                            <BlueprintIcon
+                              name={group.icon}
+                              withContainer
+                              className="w-4 h-4"
+                            />
                             <h3 className="text-sm font-bold text-white tracking-tight">
                               {group.groupTitle}
                             </h3>
@@ -2212,7 +2219,11 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                                     {item.rawText}
                                   </code>
                                   <span className="text-slate-400 font-bold shrink-0">──&gt;</span>
-                                  <span className="text-sm">{item.icon}</span>
+                                  <BlueprintIcon
+                                    name={item.icon}
+                                    withContainer
+                                    className="w-3.5 h-3.5"
+                                  />
                                   <span className="text-xs font-semibold text-slate-200">
                                     {item.title}
                                   </span>
