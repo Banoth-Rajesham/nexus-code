@@ -1943,7 +1943,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                     />
                   </div>
 
-                  {/* ─── VISUAL ARROW CONNECTOR RAIL (Exact matching lines) ─── */}
+                  {/* ─── VISUAL ARROW CONNECTOR RAIL (Exact matching code lines ONLY) ─── */}
                   <div
                     ref={arrowsRailRef}
                     className="select-none bg-[#1e1e1e] border-l border-[#30363d]/50 shrink-0 overflow-hidden flex flex-col items-center z-10"
@@ -1954,25 +1954,24 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       boxSizing: 'border-box',
                     }}
                   >
-                    {code.split('\n').map((lineText, i) => {
-                      const hasContent = lineText.trim().length > 0;
-                      const isCurrent = (highlightedLine === i + 1 || activeCursorLine === i + 1);
+                    {visualBlueprint.lines.map((bLine, i) => {
+                      const isCurrent = (highlightedLine === bLine.lineNumber || activeCursorLine === bLine.lineNumber);
                       return (
                         <div
                           key={i}
                           style={{ height: '26px', lineHeight: '26px' }}
                           className="flex items-center justify-center w-full"
                         >
-                          {hasContent ? (
+                          {bLine.hasArrow ? (
                             <button
                               type="button"
-                              onClick={() => jumpToLine(i + 1)}
+                              onClick={() => jumpToLine(bLine.lineNumber)}
                               className={`flex items-center justify-center cursor-pointer transition-all ${
                                 isCurrent
                                   ? 'text-[#38bdf8] scale-110 drop-shadow-[0_0_8px_rgba(56,189,248,0.85)]'
                                   : 'text-slate-500 hover:text-slate-200'
                               }`}
-                              title={`Line ${i + 1} -> Click to inspect explanation`}
+                              title={`Line ${bLine.lineNumber} -> Click to inspect explanation`}
                             >
                               <svg
                                 width="26"
@@ -2024,7 +2023,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       Visual Blueprint & Line Explanations
                     </span>
                     <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono">
-                      {visualBlueprint.totalNonEmpty} Lines Mapped
+                      {visualBlueprint.totalCodeLines} Code Lines Mapped
                     </span>
                   </div>
 
@@ -2126,7 +2125,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       >
                         {visualBlueprint.lines.map((bLine, i) => {
                           const isCurrent = (highlightedLine === bLine.lineNumber || activeCursorLine === bLine.lineNumber);
-                          if (bLine.isEmpty) {
+                          if (!bLine.hasArrow) {
                             return (
                               <div
                                 key={i}

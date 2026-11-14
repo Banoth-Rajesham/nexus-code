@@ -7,6 +7,8 @@
 export interface VisualBlueprintLine {
   lineNumber: number;
   isEmpty: boolean;
+  isComment: boolean;
+  hasArrow: boolean;
   rawText: string;
   icon: string;
   badge: string;
@@ -30,20 +32,27 @@ export interface ArchitectureGroup {
 export function parseVisualBlueprint(code: string, _progLang: string = 'python'): {
   lines: VisualBlueprintLine[];
   groups: ArchitectureGroup[];
+  totalCodeLines: number;
   totalNonEmpty: number;
 } {
   const rawLines = code.split('\n');
   const blueprintLines: VisualBlueprintLine[] = [];
   const groupMap = new Map<string, VisualBlueprintLine[]>();
 
+  let inDocstring: string | null = null;
+  let inBlockComment = false;
+
   rawLines.forEach((raw, idx) => {
     const lineNum = idx + 1;
     const trimmed = raw.trim();
 
+    // ─── 0A. Blank Lines: NO arrow, blank spacer slot ─────────────────────
     if (!trimmed) {
       blueprintLines.push({
         lineNumber: lineNum,
         isEmpty: true,
+        isComment: false,
+        hasArrow: false,
         rawText: '',
         icon: '',
         badge: '',
@@ -60,7 +69,158 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       return;
     }
 
-    // ─── 1. Imports & Toolkits ──────────────────────────────────────────────
+    // ─── 0B. Inside Multiline Docstrings: NO arrow, treated as comments ────
+    if (inDocstring) {
+      if (trimmed.includes(inDocstring)) {
+        inDocstring = null;
+      }
+      blueprintLines.push({
+        lineNumber: lineNum,
+        isEmpty: false,
+        isComment: true,
+        hasArrow: false,
+        rawText: trimmed,
+        icon: '',
+        badge: '',
+        title: '',
+        detail: '',
+        groupTitle: '',
+        colorScheme: {
+          badgeBg: 'transparent',
+          badgeText: 'transparent',
+          border: 'transparent',
+          accent: 'transparent',
+        },
+      });
+      return;
+    }
+
+    // ─── 0C. Inside Multiline Block Comments: NO arrow ────────────────────
+    if (inBlockComment) {
+      if (trimmed.includes('*/')) {
+        inBlockComment = false;
+      }
+      blueprintLines.push({
+        lineNumber: lineNum,
+        isEmpty: false,
+        isComment: true,
+        hasArrow: false,
+        rawText: trimmed,
+        icon: '',
+        badge: '',
+        title: '',
+        detail: '',
+        groupTitle: '',
+        colorScheme: {
+          badgeBg: 'transparent',
+          badgeText: 'transparent',
+          border: 'transparent',
+          accent: 'transparent',
+        },
+      });
+      return;
+    }
+
+    // ─── 0D. Docstrings starting on this line: NO arrow ────────────────────
+    if (trimmed.startsWith('"""')) {
+      if (!trimmed.slice(3).includes('"""')) {
+        inDocstring = '"""';
+      }
+      blueprintLines.push({
+        lineNumber: lineNum,
+        isEmpty: false,
+        isComment: true,
+        hasArrow: false,
+        rawText: trimmed,
+        icon: '',
+        badge: '',
+        title: '',
+        detail: '',
+        groupTitle: '',
+        colorScheme: {
+          badgeBg: 'transparent',
+          badgeText: 'transparent',
+          border: 'transparent',
+          accent: 'transparent',
+        },
+      });
+      return;
+    }
+    if (trimmed.startsWith("'''")) {
+      if (!trimmed.slice(3).includes("'''")) {
+        inDocstring = "'''";
+      }
+      blueprintLines.push({
+        lineNumber: lineNum,
+        isEmpty: false,
+        isComment: true,
+        hasArrow: false,
+        rawText: trimmed,
+        icon: '',
+        badge: '',
+        title: '',
+        detail: '',
+        groupTitle: '',
+        colorScheme: {
+          badgeBg: 'transparent',
+          badgeText: 'transparent',
+          border: 'transparent',
+          accent: 'transparent',
+        },
+      });
+      return;
+    }
+
+    // ─── 0E. Block comment starts: NO arrow ───────────────────────────────
+    if (trimmed.startsWith('/*')) {
+      if (!trimmed.includes('*/')) {
+        inBlockComment = true;
+      }
+      blueprintLines.push({
+        lineNumber: lineNum,
+        isEmpty: false,
+        isComment: true,
+        hasArrow: false,
+        rawText: trimmed,
+        icon: '',
+        badge: '',
+        title: '',
+        detail: '',
+        groupTitle: '',
+        colorScheme: {
+          badgeBg: 'transparent',
+          badgeText: 'transparent',
+          border: 'transparent',
+          accent: 'transparent',
+        },
+      });
+      return;
+    }
+
+    // ─── 0F. Single-line Comments (#, //, *): NO arrow ────────────────────
+    if (trimmed.startsWith('#') || trimmed.startsWith('//') || trimmed.startsWith('*')) {
+      blueprintLines.push({
+        lineNumber: lineNum,
+        isEmpty: false,
+        isComment: true,
+        hasArrow: false,
+        rawText: trimmed,
+        icon: '',
+        badge: '',
+        title: '',
+        detail: '',
+        groupTitle: '',
+        colorScheme: {
+          badgeBg: 'transparent',
+          badgeText: 'transparent',
+          border: 'transparent',
+          accent: 'transparent',
+        },
+      });
+      return;
+    }
+
+    // ─── 1. Imports & Toolkits (ACTUAL CODE -> HAS ARROW) ──────────────────
     if (/^(import\s+|from\s+)/.test(trimmed)) {
       let icon = '📦';
       let title = 'Import Library';
@@ -94,19 +254,19 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
         badge = 'Filesystem';
         title = 'Locate Server File';
         detail = 'Constructs cross-platform object-oriented filesystem paths and directory navigation.';
-      } else if (/google\.adk\.agents|Agent\b|crewai|langchain|autogen/i.test(trimmed)) {
+      } else if (/google\.adk\.agents|Agent\b|crewai|langchain|autogen|genai/i.test(trimmed)) {
         icon = '🤖';
-        badge = 'AI Agent';
+        badge = 'Google AI';
         groupTitle = 'Google AI Connection';
-        title = 'Build the Agent';
-        detail = 'Constructs autonomous AI agent execution runtime with memory and decision capabilities.';
+        title = 'Google AI & Agent Framework';
+        detail = 'Initializes Google GenAI / Agent execution runtime and client interfaces.';
         colorScheme = {
           badgeBg: 'bg-emerald-500/10',
           badgeText: 'text-emerald-300',
           border: 'border-emerald-500/30',
           accent: '#34d399',
         };
-      } else if (/lite_llm|LiteLlm|ollama|openai|gemini|anthropic|models?\./i.test(trimmed)) {
+      } else if (/lite_llm|LiteLlm|ollama|openai|models?\./i.test(trimmed)) {
         icon = '🐻';
         badge = 'LLM Model';
         groupTitle = 'Google AI Connection';
@@ -118,12 +278,12 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
           border: 'border-purple-500/30',
           accent: '#c084fc',
         };
-      } else if (/llm_response|LlmResponse|streaming/i.test(trimmed)) {
+      } else if (/llm_response|LlmResponse|types\b|streaming/i.test(trimmed)) {
         icon = '📄';
-        badge = 'Response Stream';
+        badge = 'Type Schema';
         groupTitle = 'Google AI Connection';
-        title = 'Model Response Parser';
-        detail = 'Parses structured output tokens and message chunks from model completions.';
+        title = 'Model Types & Schema';
+        detail = 'Imports typed definitions for model configuration, tool schemas, and stream handling.';
         colorScheme = {
           badgeBg: 'bg-purple-500/10',
           badgeText: 'text-purple-300',
@@ -147,6 +307,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon,
         badge,
@@ -190,12 +352,12 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
           border: 'border-rose-500/30',
           accent: '#f43f5e',
         };
-      } else if (/agent|react|chat|prompt|ai/i.test(fnName)) {
+      } else if (/agent|react|chat|prompt|ai|get_weather|tool/i.test(fnName)) {
         icon = '🤖';
-        badge = 'Agent Handler';
+        badge = 'Tool Function';
         groupTitle = 'Agent Execution Logic';
-        title = 'Agent Reaction Flow';
-        detail = `Orchestrates agent decision loop with parameters (${params || 'none'}).`;
+        title = `Tool Handler: ${fnName}()`;
+        detail = `Defines callable tool/handler accepting (${params || 'none'}).`;
         colorScheme = {
           badgeBg: 'bg-emerald-500/10',
           badgeText: 'text-emerald-300',
@@ -207,6 +369,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon,
         badge,
@@ -226,6 +390,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon: '📋',
         badge: 'System Rules',
@@ -250,6 +416,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon: '🧰',
         badge: 'Tool Registry',
@@ -275,6 +443,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon: '📤',
         badge: 'Return Data',
@@ -311,6 +481,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon: '⚡',
         badge: 'Branch Logic',
@@ -335,6 +507,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon: '🔄',
         badge: 'Loop Cycle',
@@ -362,6 +536,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon: '📌',
         badge: 'Variable State',
@@ -388,6 +564,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon: '🗂️',
         badge: 'Data Property',
@@ -407,36 +585,13 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       return;
     }
 
-    // ─── 10. Comments ───────────────────────────────────────────────────────
-    if (/^(#|\/\/|\/\*)/.test(trimmed)) {
-      const commentText = trimmed.replace(/^(#|\/\/|\/\*)\s*/, '').replace(/\*\/$/, '');
+    // ─── 10. Closing Brackets ───────────────────────────────────────────────
+    if (/^[}\])]+,?;?$/.test(trimmed)) {
       const item: VisualBlueprintLine = {
         lineNumber: lineNum,
         isEmpty: false,
-        rawText: trimmed,
-        icon: '💡',
-        badge: 'Comment',
-        title: 'Developer Annotation',
-        detail: commentText || 'Inline architectural note or explanation.',
-        groupTitle: 'Developer Notes',
-        colorScheme: {
-          badgeBg: 'bg-slate-500/10',
-          badgeText: 'text-slate-400',
-          border: 'border-slate-500/30',
-          accent: '#94a3b8',
-        },
-      };
-      blueprintLines.push(item);
-      if (!groupMap.has(item.groupTitle)) groupMap.set(item.groupTitle, []);
-      groupMap.get(item.groupTitle)!.push(item);
-      return;
-    }
-
-    // ─── 11. Closing Brackets or General Statement ──────────────────────────
-    if (/^[}\])]+$/.test(trimmed)) {
-      const item: VisualBlueprintLine = {
-        lineNumber: lineNum,
-        isEmpty: false,
+        isComment: false,
+        hasArrow: true,
         rawText: trimmed,
         icon: '📦',
         badge: 'Block Closure',
@@ -454,10 +609,12 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       return;
     }
 
-    // General fallback
+    // ─── 11. General Code Statement Fallback ────────────────────────────────
     const item: VisualBlueprintLine = {
       lineNumber: lineNum,
       isEmpty: false,
+      isComment: false,
+      hasArrow: true,
       rawText: trimmed,
       icon: '⚙️',
       badge: 'Statement',
@@ -485,7 +642,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
     };
   });
 
+  const totalCodeLines = blueprintLines.filter((l) => l.hasArrow).length;
   const totalNonEmpty = blueprintLines.filter((l) => !l.isEmpty).length;
 
-  return { lines: blueprintLines, groups, totalNonEmpty };
+  return { lines: blueprintLines, groups, totalCodeLines, totalNonEmpty };
 }
