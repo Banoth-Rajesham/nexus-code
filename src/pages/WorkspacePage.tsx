@@ -248,6 +248,22 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const [syntaxOverlay, setSyntaxOverlay] = useState(true);
   const [speaking, setSpeaking] = useState(false);
   const [langDropOpen, setLangDropOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  // Close settings dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    if (settingsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [settingsOpen]);
+
   const [stdinInput, setStdinInput] = useState('');
   const [showFileExplorer, setShowFileExplorer] = useState(false);
 
@@ -1294,41 +1310,24 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
       {/* ─── SLIM UNIFIED WORKSPACE TOOLBAR (Ribbons 1 & 2 Merged, max ~38px height) ─── */}
       {!isToolbarCollapsed ? (
         <div className="h-[38px] max-h-[38px] min-h-[38px] flex items-center justify-between px-2.5 bg-[#161b22] border-b border-[#30363d] shrink-0 gap-2 overflow-x-auto no-scrollbar select-none z-30">
-          {/* Left: Brand Back Button + Single Side Menu Toggle + File Tabs + Plus */}
-          <div className="flex items-center gap-1.5 shrink-0 min-w-0">
+          {/* Left: [Nexus logo] [file tab main.py + "+"] */}
+          <div className="flex items-center gap-2 shrink-0 min-w-0">
             {/* Back to Home/Overview button */}
             <button
               onClick={() => onNavigate('landing')}
               title="Return to Nexus Code Overview"
-              className="flex items-center gap-1 px-2 py-1 rounded bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-slate-200 hover:text-white transition-colors shrink-0 group"
+              className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-slate-200 hover:text-white transition-colors shrink-0 group"
             >
               <div className="w-5 h-5 rounded bg-[#0078d4] text-white flex items-center justify-center font-bold text-xs shadow-xs group-hover:scale-105 transition-transform">
                 <Code className="w-3.5 h-3.5" />
               </div>
-              <span className="font-bold text-xs tracking-tight hidden lg:inline">Nexus</span>
-            </button>
-
-            {/* Single Side Menu Toggle Button */}
-            <button
-              onClick={() => setShowFileExplorer((v) => !v)}
-              title={showFileExplorer ? 'Hide Side Menu (Ctrl+B)' : 'Show Side Menu (Ctrl+B)'}
-              className={`flex items-center gap-1.5 px-2 py-1 border rounded text-xs font-semibold transition-colors shrink-0 ${
-                showFileExplorer
-                  ? 'bg-blue-600/25 border-blue-500/60 text-blue-300'
-                  : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:text-white hover:bg-[#30363d]'
-              }`}
-            >
-              {showFileExplorer ? <PanelLeftClose className="w-3.5 h-3.5 text-blue-400" /> : <PanelLeft className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{showFileExplorer ? 'Hide Menu' : 'Side Menu'}</span>
-              <span className="text-[11px] bg-[#30363d] px-1.5 py-0.2 rounded-full font-mono text-slate-200">
-                {files.length}
-              </span>
+              <span className="font-bold text-xs tracking-tight hidden sm:inline">Nexus</span>
             </button>
 
             <div className="h-4 w-px bg-[#30363d] shrink-0" />
 
             {/* File Tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0 max-w-[240px] sm:max-w-[320px] md:max-w-[400px] lg:max-w-[480px]">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0 max-w-[260px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px]">
               {openTabIds.map((tabId) => {
                 const file = files.find((f) => f.id === tabId);
                 if (!file) return null;
@@ -1883,30 +1882,73 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 }}
                 className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#1e1e1e]"
               >
-                {/* Left Pane Header */}
-                <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] text-sm shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <FileIcon filename={activeFile.name} width={18} height={18} />
-                    <span className="font-bold text-sm sm:text-base text-slate-100">
-                      {activeFile.name} {activeFile.isEntry ? '(Main Entry)' : ''}
+                {/* Left Pane Header — Single-line max 36px tall */}
+                <div className="h-[36px] min-h-[36px] max-h-[36px] box-border px-3 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between text-xs sm:text-sm shrink-0 whitespace-nowrap overflow-hidden select-none">
+                  <div className="flex items-center gap-2 min-w-0 shrink">
+                    {!showFileExplorer && (
+                      <button
+                        onClick={() => setShowFileExplorer(true)}
+                        title="Open Side Menu (Ctrl+B)"
+                        className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#21262d] transition-colors shrink-0"
+                      >
+                        <PanelLeft className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <FileIcon filename={activeFile.name} width={15} height={15} />
+                    <span className="font-bold text-xs sm:text-sm text-slate-100 truncate max-w-[130px] sm:max-w-[180px]">
+                      {activeFile.name}
                     </span>
-                    <span className="text-xs text-slate-400 font-mono">Lines: {lineCount}</span>
+                    {activeFile.isEntry && (
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded font-sans uppercase font-bold shrink-0">
+                        Entry
+                      </span>
+                    )}
+                    <span className="text-[11px] text-slate-400 font-mono shrink-0">
+                      Lines: {lineCount}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSyntaxOverlay(!syntaxOverlay)}
-                      title={syntaxOverlay ? 'Switch to Direct Text Mode' : 'Switch to Syntax Highlighting'}
-                      className={`px-3 py-1 rounded text-xs sm:text-sm font-semibold border transition-colors ${syntaxOverlay ? 'bg-blue-950/60 text-blue-300 border-blue-500/30 hover:bg-blue-900/60' : 'bg-[#21262d] text-slate-400 border-[#30363d] hover:text-white'}`}
-                    >
-                      {syntaxOverlay ? '🎨 VS Code Colors' : '📝 Direct Text'}
-                    </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Settings menu: VS Code Colors toggle */}
+                    <div className="relative shrink-0">
+                      <button
+                        onClick={() => setSettingsOpen((v) => !v)}
+                        title="Editor Display Settings"
+                        className={`p-1 rounded transition-colors ${settingsOpen ? 'bg-[#30363d] text-white' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'}`}
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </button>
+                      {settingsOpen && (
+                        <div
+                          ref={settingsRef}
+                          className="absolute right-0 top-full mt-1 w-52 bg-[#161b22] border border-[#30363d] rounded-md shadow-2xl z-50 p-1.5 text-xs select-none"
+                        >
+                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#30363d] mb-1">
+                            Editor Display
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSyntaxOverlay((v) => !v);
+                              setSettingsOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-[#21262d] text-slate-200 transition-colors text-left"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>{syntaxOverlay ? '🎨' : '📝'}</span>
+                              <span>VS Code Colors</span>
+                            </span>
+                            {syntaxOverlay && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     <button
                       onClick={handleCopyEnglish}
                       title="Copy Source Code"
-                      className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
                     >
-                      {copiedEnglish ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                      {copiedEnglish ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                     <button
                       onClick={() => handleDownload(code, activeFile.name)}
@@ -2094,81 +2136,88 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 }}
                 className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#0d1117] border-l border-[#30363d]"
               >
-                {/* Right Header */}
-                <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] text-sm shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="font-bold text-sm sm:text-base text-emerald-400">
+                {/* Right Header — Single-line max 36px tall */}
+                <div className="h-[36px] min-h-[36px] max-h-[36px] box-border px-3 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between text-xs sm:text-sm shrink-0 whitespace-nowrap overflow-hidden select-none">
+                  <div className="flex items-center gap-2 min-w-0 shrink">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span className="font-bold text-xs sm:text-sm text-emerald-400 truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[240px]">
                       {blueprintMode === 'deep'
-                        ? '4-Layer Deep Code Explanation'
-                        : 'Visual Blueprint & Line Explanations'}
+                        ? 'Deep Explanation'
+                        : 'Visual Blueprint'}
                     </span>
-                    <span className="text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-semibold">
+                    <span className="text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono font-semibold shrink-0 whitespace-nowrap">
                       {blueprintMode === 'deep'
-                        ? 'WHAT · WHY · HOW · VERIFY'
-                        : `${visualBlueprint.totalCodeLines} Code Lines Mapped`}
+                        ? '4 Layers'
+                        : `${visualBlueprint.totalCodeLines} lines`}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {/* View Switcher: Aligned Line Blueprint | Architecture Blocks | Pseudocode | Deep Explanation */}
-                    <div className="flex bg-[#21262d] border border-[#30363d] rounded-md text-xs sm:text-sm font-semibold overflow-hidden p-0.5">
+                    <div className="flex bg-[#21262d] border border-[#30363d] rounded text-xs font-semibold overflow-hidden p-0.5 shrink-0">
                       <button
                         onClick={() => setBlueprintMode('aligned')}
-                        className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors rounded ${blueprintMode === 'aligned' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
-                        title="Line-by-line arrows aligned with editor"
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'aligned' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        title="Line Blueprint: Line-by-line annotations aligned with editor"
                       >
-                        <Icon icon="flat-color-icons:flow-chart" width={15} height={15} className="shrink-0" />
-                        <span>Line Blueprint</span>
+                        <Icon icon="flat-color-icons:flow-chart" width={14} height={14} className="shrink-0" />
+                        <span className="hidden xl:inline">Line Blueprint</span>
                       </button>
                       <button
                         onClick={() => setBlueprintMode('blocks')}
-                        className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors rounded ${blueprintMode === 'blocks' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
-                        title="Grouped architectural blocks like Excalidraw"
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'blocks' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        title="Architecture Blocks: Grouped architectural components"
                       >
-                        <Icon icon="flat-color-icons:mind-map" width={15} height={15} className="shrink-0" />
-                        <span>Architecture Blocks</span>
+                        <Icon icon="flat-color-icons:mind-map" width={14} height={14} className="shrink-0" />
+                        <span className="hidden xl:inline">Architecture Blocks</span>
                       </button>
                       <button
                         onClick={() => setBlueprintMode('code')}
-                        className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors rounded ${blueprintMode === 'code' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
-                        title="Pure pseudocode representation"
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'code' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        title="Pseudocode: Pure pseudocode representation"
                       >
-                        <Icon icon="flat-color-icons:document" width={15} height={15} className="shrink-0" />
-                        <span>Pseudocode</span>
+                        <Icon icon="flat-color-icons:document" width={14} height={14} className="shrink-0" />
+                        <span className="hidden xl:inline">Pseudocode</span>
                       </button>
                       <button
                         onClick={() => setBlueprintMode('deep')}
-                        className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors rounded ${blueprintMode === 'deep' ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                        title="4-Layer Deep Explanation: WHAT, WHY, HOW, VERIFY"
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'deep' ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                        title="Deep Explanation: 4-Layer WHAT, WHY, HOW, VERIFY"
                       >
-                        <Icon icon="flat-color-icons:radar-plot" width={15} height={15} className="shrink-0" />
-                        <span>Deep Explanation</span>
+                        <Icon icon="flat-color-icons:radar-plot" width={14} height={14} className="shrink-0" />
+                        <span className="hidden xl:inline">Deep Explanation</span>
                       </button>
                     </div>
 
                     <button
                       onClick={handleCopyNative}
                       title="Copy Blueprint"
-                      className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
                     >
-                      {copiedNative ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                      {copiedNative ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                     <button
                       onClick={() =>
                         handleDownload(nativeTranslation.translatedCode, `${activeFile.name}_blueprint.txt`)
                       }
                       title="Download Blueprint"
-                      className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
                     >
-                      <Download className="w-4 h-4" />
+                      <Download className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
                 {/* Right Body Display with Independent Scrolling & Synchronized Alignment */}
                 <div className="flex-1 flex min-h-0 overflow-hidden relative bg-[#1e1e1e]">
-                  {blueprintMode === 'aligned' ? (
+                  {code.trim() === '' ? (
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none text-slate-500">
+                      <Icon icon="flat-color-icons:document" width={42} height={42} className="mb-3 opacity-60" />
+                      <p className="text-sm font-medium text-slate-400 max-w-sm leading-relaxed">
+                        Type or paste code on the left to see explanations here.
+                      </p>
+                    </div>
+                  ) : blueprintMode === 'aligned' ? (
                     <>
                       {/* Line Numbers aligned with Left Editor */}
                       <div
@@ -2176,6 +2225,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                         className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
                         style={{
                           minWidth: '52px',
+                          width: '52px',
                           fontFamily: VSCODE_MONO_FONT,
                           fontSize: '15px',
                           lineHeight: '26px',
@@ -2208,7 +2258,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                         style={{
                           position: 'absolute',
                           inset: 0,
-                          left: '50px',
+                          left: '52px',
                           overflow: 'auto',
                           paddingTop: '14px',
                           paddingBottom: '14px',
