@@ -59,6 +59,8 @@ import { parseVisualBlueprint, VisualBlueprintLine } from '../utils/visualBluepr
 import { BlueprintIcon } from '../components/BlueprintIcon';
 import { Icon } from '@iconify/react';
 import { FileIcon, LanguageIcon } from '../components/FileIcon';
+import { generateDeepExplanation } from '../utils/deepExplanationAnalyzer';
+import { DeepExplanationView } from '../components/DeepExplanationView';
 
 interface WorkspacePageProps {
   onNavigate: (view: string) => void;
@@ -288,13 +290,18 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   // High-performance deferred code for background translation (zero input lag)
   const deferredCode = useDeferredValue(code);
 
-  // Visual Blueprint View Mode ('aligned' | 'blocks' | 'code')
-  const [blueprintMode, setBlueprintMode] = useState<'aligned' | 'blocks' | 'code'>('aligned');
+  // Visual Blueprint View Mode ('aligned' | 'blocks' | 'code' | 'deep')
+  const [blueprintMode, setBlueprintMode] = useState<'aligned' | 'blocks' | 'code' | 'deep'>('aligned');
 
   // Parse semantic visual blueprint from code (Excalidraw / Architectural style)
   const visualBlueprint = useMemo(() => {
     return parseVisualBlueprint(deferredCode, progLang);
   }, [deferredCode, progLang]);
+
+  // Compute 4-Layer Deep Explanation (WHAT, WHY, HOW, VERIFY) from shared analysis
+  const deepExplanationData = useMemo(() => {
+    return generateDeepExplanation(deferredCode, progLang, explanation || undefined);
+  }, [deferredCode, progLang, explanation]);
 
   // Jump cursor to target line and highlight it
   const jumpToLine = (targetLineNum: number) => {
@@ -2017,15 +2024,19 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="font-semibold text-emerald-400">
-                      Visual Blueprint & Line Explanations
+                      {blueprintMode === 'deep'
+                        ? '4-Layer Deep Code Explanation'
+                        : 'Visual Blueprint & Line Explanations'}
                     </span>
                     <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono">
-                      {visualBlueprint.totalCodeLines} Code Lines Mapped
+                      {blueprintMode === 'deep'
+                        ? 'WHAT · WHY · HOW · VERIFY'
+                        : `${visualBlueprint.totalCodeLines} Code Lines Mapped`}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* View Switcher: Aligned Line Blueprint | Architecture Blocks | Pseudocode */}
+                    {/* View Switcher: Aligned Line Blueprint | Architecture Blocks | Pseudocode | Deep Explanation */}
                     <div className="flex bg-[#21262d] border border-[#30363d] rounded text-[10px] font-medium overflow-hidden">
                       <button
                         onClick={() => setBlueprintMode('aligned')}
@@ -2050,6 +2061,14 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       >
                         <Icon icon="flat-color-icons:document" width={13} height={13} className="shrink-0" />
                         <span>Pseudocode</span>
+                      </button>
+                      <button
+                        onClick={() => setBlueprintMode('deep')}
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors ${blueprintMode === 'deep' ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                        title="4-Layer Deep Explanation: WHAT, WHY, HOW, VERIFY"
+                      >
+                        <Icon icon="flat-color-icons:radar-plot" width={13} height={13} className="shrink-0" />
+                        <span>Deep Explanation</span>
                       </button>
                     </div>
 
@@ -2232,6 +2251,13 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                         </div>
                       ))}
                     </div>
+                  ) : blueprintMode === 'deep' ? (
+                    /* ─── 4-LAYER DEEP EXPLANATION (WHAT, WHY, HOW, VERIFY) ─── */
+                    <DeepExplanationView
+                      analysis={deepExplanationData}
+                      onJumpToLine={jumpToLine}
+                      highlightedLine={highlightedLine || activeCursorLine}
+                    />
                   ) : (
                     /* ─── PSEUDOCODE / CODE VIEW ─── */
                     <>
