@@ -69,6 +69,13 @@ import {
   PythonAnalysisResult,
   TAG_STYLES,
 } from '../utils/pythonTreeSitterEngine';
+import {
+  analyzeIndentation,
+  fixLineIndentation,
+  fixAllIndentation,
+  getDepthColor,
+  CodeIndentAnalysis,
+} from '../utils/indentAnalyzer';
 
 interface WorkspacePageProps {
   onNavigate: (view: string) => void;
@@ -273,6 +280,63 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const [stdinInput, setStdinInput] = useState('');
   const [showFileExplorer, setShowFileExplorer] = useState(false);
 
+  // ─── Rainbow Indents & Error Detection State (persisted to localStorage) ───
+  const [rainbowIndent, setRainbowIndent] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nexus_rainbow_indent') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  const [colorBlindMode, setColorBlindMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nexus_colorblind_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [showWhitespaceDots, setShowWhitespaceDots] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nexus_whitespace_dots') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [hoveredErrorLine, setHoveredErrorLine] = useState<number | null>(null);
+
+  const toggleRainbowIndent = () => {
+    setRainbowIndent((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('nexus_rainbow_indent', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const toggleColorBlindMode = () => {
+    setColorBlindMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('nexus_colorblind_mode', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const toggleWhitespaceDots = () => {
+    setShowWhitespaceDots((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('nexus_whitespace_dots', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   // Focus Mode / Slim Toolbar Collapsed state (persisted to localStorage)
   const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(() => {
     try {
@@ -400,6 +464,28 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [activeCursorLine, highlightedLine]);
+
+  // ─── Real-Time Indentation & Error Analysis (Smooth, $O(N)$ with zero lag) ───
+  const indentAnalysis = useMemo(() => {
+    return analyzeIndentation(code, progLang, activeCursorLine);
+  }, [code, progLang, activeCursorLine]);
+
+  // Quick action: Fix indentation on a single line
+  const handleFixLineIndent = (lineNum: number) => {
+    const lineInfo = indentAnalysis.lines[lineNum - 1];
+    if (lineInfo && typeof lineInfo.suggestedIndent === 'number') {
+      const newCode = fixLineIndentation(code, lineNum, lineInfo.suggestedIndent);
+      handleCodeChange(newCode);
+      setHoveredErrorLine(null);
+    }
+  };
+
+  // Quick action: Fix all indentation across entire document (undoable with Ctrl+Z)
+  const handleFixAllIndent = () => {
+    const newCode = fixAllIndentation(code, indentAnalysis);
+    handleCodeChange(newCode);
+    setHoveredErrorLine(null);
+  };
 
   // Jump cursor to target line and highlight it
   const jumpToLine = (targetLineNum: number) => {
@@ -1970,15 +2056,21 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       {settingsOpen && (
                         <div
                           ref={settingsRef}
-                          className="absolute right-0 top-full mt-1 w-52 bg-[#161b22] border border-[#30363d] rounded-md shadow-2xl z-50 p-1.5 text-xs select-none"
+                          className="absolute right-0 top-full mt-1 w-64 bg-[#161b22] border border-[#30363d] rounded-md shadow-2xl z-50 p-2 text-xs select-none space-y-1"
                         >
-                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#30363d] mb-1">
-                            Editor Display
+                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#30363d] mb-1 flex items-center justify-between">
+                            <span>Editor Display</span>
+                            {indentAnalysis.totalErrors > 0 && (
+                              <span className="text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.2 rounded font-mono">
+                                {indentAnalysis.totalErrors} indent error{indentAnalysis.totalErrors > 1 ? 's' : ''}
+                              </span>
+                            )}
                           </div>
+
+                          {/* VS Code Colors */}
                           <button
                             onClick={() => {
                               setSyntaxOverlay((v) => !v);
-                              setSettingsOpen(false);
                             }}
                             className="w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-[#21262d] text-slate-200 transition-colors text-left"
                           >
@@ -1988,6 +2080,57 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                             </span>
                             {syntaxOverlay && <Check className="w-3.5 h-3.5 text-emerald-400" />}
                           </button>
+
+                          {/* Rainbow Indents Toggle */}
+                          <button
+                            onClick={toggleRainbowIndent}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-[#21262d] text-slate-200 transition-colors text-left"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>🌈</span>
+                              <span>Rainbow Indents</span>
+                            </span>
+                            {rainbowIndent && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                          </button>
+
+                          {/* Color-Blind Friendly Palette */}
+                          <button
+                            onClick={toggleColorBlindMode}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-[#21262d] text-slate-200 transition-colors text-left"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>👁️</span>
+                              <span>Color-Blind Palette</span>
+                            </span>
+                            {colorBlindMode && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                          </button>
+
+                          {/* Whitespace Dots on Indent */}
+                          <button
+                            onClick={toggleWhitespaceDots}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-[#21262d] text-slate-200 transition-colors text-left"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>⬝</span>
+                              <span>Whitespace Dots</span>
+                            </span>
+                            {showWhitespaceDots && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                          </button>
+
+                          {/* Fix All Indentation Button */}
+                          {indentAnalysis.totalErrors > 0 && (
+                            <div className="pt-1.5 mt-1 border-t border-[#30363d]">
+                              <button
+                                onClick={() => {
+                                  handleFixAllIndent();
+                                  setSettingsOpen(false);
+                                }}
+                                className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-semibold text-xs transition-colors shadow-sm"
+                              >
+                                <span>Fix All Indentation ({indentAnalysis.totalErrors})</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2014,9 +2157,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                   {/* Line numbers column */}
                   <div
                     ref={lineNumbersRef}
-                    className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
+                    className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-3 pl-2 shrink-0 border-r border-[#30363d]/50 overflow-hidden relative"
                     style={{
-                      minWidth: '52px',
+                      minWidth: '56px',
                       fontFamily: VSCODE_MONO_FONT,
                       fontSize: '15px',
                       lineHeight: '26px',
@@ -2025,27 +2168,100 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       boxSizing: 'border-box',
                     }}
                   >
-                    {Array.from({ length: Math.max(lineCount, 25) }).map((_, i) => (
-                      <div
-                        key={i}
-                        onClick={() => {
-                          setHighlightedLine(i + 1);
-                          setActiveCursorLine(i + 1);
-                        }}
-                        style={{ height: '26px', lineHeight: '26px' }}
-                        className={`cursor-pointer hover:text-slate-200 transition-colors ${
-                          (highlightedLine === i + 1 || activeCursorLine === i + 1)
-                            ? 'text-[#ffffff] font-bold'
-                            : ''
-                        }`}
-                      >
-                        {i + 1}
-                      </div>
-                    ))}
+                    {Array.from({ length: Math.max(lineCount, 25) }).map((_, i) => {
+                      const lineNum = i + 1;
+                      const lineInfo = indentAnalysis?.lines[i];
+                      const hasError = lineInfo?.hasError;
+                      const isCurrent = (highlightedLine === lineNum || activeCursorLine === lineNum);
+
+                      return (
+                        <div
+                          key={i}
+                          onClick={() => {
+                            setHighlightedLine(lineNum);
+                            setActiveCursorLine(lineNum);
+                            if (hasError) setHoveredErrorLine(lineNum);
+                          }}
+                          onMouseEnter={() => {
+                            if (hasError) setHoveredErrorLine(lineNum);
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredErrorLine((curr) => (curr === lineNum ? null : curr));
+                          }}
+                          style={{ height: '26px', lineHeight: '26px' }}
+                          className={`cursor-pointer transition-colors relative flex items-center justify-end gap-1.5 ${
+                            isCurrent
+                              ? 'text-[#ffffff] font-bold'
+                              : hasError
+                              ? 'text-red-400 font-bold'
+                              : 'hover:text-slate-200'
+                          }`}
+                          title={hasError ? `${lineInfo?.errorMessage} (Click to inspect / fix)` : undefined}
+                        >
+                          {/* Small Red Marker in Gutter for Indentation Errors */}
+                          {hasError && (
+                            <span
+                              className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse shadow-sm shadow-red-500/50"
+                              title={lineInfo?.errorMessage}
+                            />
+                          )}
+                          <span>{lineNum}</span>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Editor Layers with Independent Scrolling */}
                   <div className="flex-1 relative min-h-0 overflow-hidden bg-[#1e1e1e]">
+                    {/* ─── Indentation Error Tooltip Popover ─── */}
+                    {hoveredErrorLine && indentAnalysis.lines[hoveredErrorLine - 1]?.hasError && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '12px',
+                          top: `${Math.max(14, (hoveredErrorLine - 1) * 26 + 14 - (lineNumbersRef.current?.scrollTop || 0))}px`,
+                          zIndex: 60,
+                          maxWidth: '380px',
+                        }}
+                        className="bg-[#161b22] border border-red-500/70 rounded-md shadow-2xl p-2.5 text-xs text-slate-200 pointer-events-auto"
+                      >
+                        <div className="flex items-start gap-2 mb-2">
+                          <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-red-300">Indentation Error (Line {hoveredErrorLine})</p>
+                            <p className="text-slate-300 mt-0.5 leading-snug">
+                              {indentAnalysis.lines[hoveredErrorLine - 1].errorMessage}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 pt-2 border-t border-[#30363d]/80">
+                          <button
+                            type="button"
+                            onClick={() => handleFixLineIndent(hoveredErrorLine)}
+                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-semibold text-[11px] transition-colors shadow-xs"
+                          >
+                            Fix indentation
+                          </button>
+                          {indentAnalysis.totalErrors > 1 && (
+                            <button
+                              type="button"
+                              onClick={handleFixAllIndent}
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded font-semibold text-[11px] transition-colors shadow-xs"
+                            >
+                              Fix all ({indentAnalysis.totalErrors})
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setHoveredErrorLine(null)}
+                            className="ml-auto text-slate-400 hover:text-white text-[11px]"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {syntaxOverlay && (
                       <div
                         ref={englishPreRef}
@@ -2061,7 +2277,13 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       >
                         <HighlightedCodeBlock
                           code={code}
-                          highlightedLine={highlightedLine || activeCursorLine}
+                          highlightedLine={highlightedLine}
+                          activeCursorLine={activeCursorLine}
+                          indentAnalysis={indentAnalysis}
+                          rainbowEnabled={rainbowIndent}
+                          colorBlindMode={colorBlindMode}
+                          showWhitespaceDots={showWhitespaceDots}
+                          isDarkTheme={true}
                         />
                       </div>
                     )}
@@ -2335,6 +2557,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
                             const style = TAG_STYLES[row.tag] || TAG_STYLES.ACTION;
                             const lineBadgeText = row.startLine === row.endLine ? `L${row.startLine}` : `L${row.startLine}-${row.endLine}`;
+                            const lineInfo = indentAnalysis?.lines[row.startLine - 1];
+                            const hasIndentError = lineInfo?.hasError;
+                            const depthColor = getDepthColor(row.depth, colorBlindMode);
 
                             return (
                               <div
@@ -2354,15 +2579,28 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                                     : 'bg-[#161b22]/70 border-[#30363d]/60 hover:bg-[#1a202c] hover:border-slate-500'
                                 }`}
                               >
-                                {/* Guide line accent for indented blocks */}
+                                {/* Guide line accent for indented blocks using exact matching rainbow depth color */}
                                 {row.depth > 0 && (
                                   <div
-                                    className="absolute left-0 top-0 bottom-0 w-[2px] rounded-l"
-                                    style={{ backgroundColor: style.accent, opacity: isCurrent ? 1 : 0.45 }}
+                                    className="absolute left-0 top-0 bottom-0 w-[2.5px] rounded-l"
+                                    style={{
+                                      backgroundColor: depthColor,
+                                      opacity: isCurrent ? 1 : 0.65,
+                                      boxShadow: isCurrent ? `0 0 8px ${depthColor}` : undefined,
+                                    }}
                                   />
                                 )}
 
                                 <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+                                  {/* Small Colored Depth Dot */}
+                                  {row.depth > 0 && (
+                                    <span
+                                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                                      style={{ backgroundColor: depthColor }}
+                                      title={`Indentation level ${row.depth}`}
+                                    />
+                                  )}
+
                                   {/* Line Number Badge */}
                                   <span
                                     className={`text-[11px] font-mono px-1.5 py-0.5 rounded shrink-0 transition-colors ${
@@ -2403,6 +2641,28 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                                     {row.explanation}
                                   </span>
                                 </div>
+
+                                {/* Indentation Error Alert Banner & Quick-Fix Button */}
+                                {hasIndentError && lineInfo && (
+                                  <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded px-2.5 py-1">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="px-1.5 py-0.2 bg-red-600 text-white font-bold rounded text-[10px] uppercase shrink-0">
+                                        ERROR
+                                      </span>
+                                      <span className="truncate">{lineInfo.errorMessage}</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleFixLineIndent(row.startLine);
+                                      }}
+                                      className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[10px] shrink-0 transition-colors shadow-xs"
+                                    >
+                                      Fix Indent
+                                    </button>
+                                  </div>
+                                )}
 
                                 {/* Syntax Error Fix Hint if issue detected */}
                                 {row.hasError && row.errorFixHint && (

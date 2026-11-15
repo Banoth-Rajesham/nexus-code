@@ -1,4 +1,11 @@
 import React from 'react';
+import {
+  CodeIndentAnalysis,
+  DARK_RAINBOW_THEME,
+  LIGHT_RAINBOW_THEME,
+  COLOR_BLIND_RAINBOW_THEME,
+  IndentColorTheme,
+} from './indentAnalyzer';
 
 // ============================================================================
 // VS CODE DARK+ SYNTAX THEME PALETTE
@@ -252,27 +259,59 @@ export const CODE_EDITOR_SHARED_STYLE: React.CSSProperties = {
   willChange: 'scroll-position',
 };
 
-/**
- * React Component to render multi-line syntax colored block with line numbers
- */
-export const HighlightedCodeBlock: React.FC<{
+export interface HighlightedCodeBlockProps {
   code: string;
   highlightedLine?: number | null;
+  activeCursorLine?: number | null;
+  indentAnalysis?: CodeIndentAnalysis | null;
+  rainbowEnabled?: boolean;
+  colorBlindMode?: boolean;
+  showWhitespaceDots?: boolean;
+  isDarkTheme?: boolean;
   onLineHover?: (lineNum: number | null) => void;
-}> = React.memo(({ code, highlightedLine, onLineHover }) => {
+  onFixIndent?: (lineNum: number) => void;
+}
+
+/**
+ * React Component to render multi-line syntax colored block with line numbers and rainbow indents
+ */
+export const HighlightedCodeBlock: React.FC<HighlightedCodeBlockProps> = React.memo(({
+  code,
+  highlightedLine,
+  activeCursorLine,
+  indentAnalysis,
+  rainbowEnabled = true,
+  colorBlindMode = false,
+  showWhitespaceDots = false,
+  isDarkTheme = true,
+  onLineHover,
+}) => {
   const lines = code.split('\n');
+
+  // Select appropriate palette based on settings & theme
+  const theme: IndentColorTheme = colorBlindMode
+    ? COLOR_BLIND_RAINBOW_THEME
+    : isDarkTheme
+    ? DARK_RAINBOW_THEME
+    : LIGHT_RAINBOW_THEME;
 
   return (
     <div style={{ margin: 0, padding: 0, border: 0, fontFamily: VSCODE_MONO_FONT }}>
       {lines.map((line, idx) => {
         const lineNum = idx + 1;
         const isHovered = highlightedLine === lineNum;
+        const isCursorLine = activeCursorLine === lineNum;
+        const lineInfo = indentAnalysis?.lines[idx];
+        const hasError = lineInfo?.hasError || false;
+        const hasBands = rainbowEnabled && lineInfo && lineInfo.bands.length > 0;
+
         return (
           <div
             key={idx}
             onMouseEnter={onLineHover ? () => onLineHover(lineNum) : undefined}
             onMouseLeave={onLineHover ? () => onLineHover(null) : undefined}
             style={{
+              position: 'relative',
               height: '26px',
               minHeight: '26px',
               maxHeight: '26px',
@@ -281,12 +320,94 @@ export const HighlightedCodeBlock: React.FC<{
               margin: 0,
               whiteSpace: 'pre',
               boxSizing: 'border-box',
-              backgroundColor: isHovered ? 'rgba(255, 255, 255, 0.04)' : undefined,
+              backgroundColor: isHovered || isCursorLine ? 'rgba(255, 255, 255, 0.04)' : undefined,
               borderTop: isHovered ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid transparent',
               borderBottom: isHovered ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid transparent',
             }}
           >
-            <HighlightedLine line={line} />
+            {/* ─── RAINBOW INDENTATION BANDS & GUIDE LINES ─── */}
+            {hasBands && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  height: '26px',
+                  lineHeight: '26px',
+                  display: 'flex',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                }}
+              >
+                {lineInfo.bands.map((band, bIdx) => {
+                  const bandWidth = `${band.endChar - band.startChar}ch`;
+                  const bgColor = band.isError
+                    ? theme.errorBand
+                    : theme.bands[band.colorIndex];
+
+                  const guideColor = band.isError
+                    ? theme.errorGuide
+                    : band.isCursorBlock
+                    ? theme.activeGuide
+                    : theme.guides[band.colorIndex];
+
+                  const guideWidth = band.isCursorBlock ? '1.5px' : '1px';
+
+                  return (
+                    <div
+                      key={bIdx}
+                      style={{
+                        width: bandWidth,
+                        height: '26px',
+                        backgroundColor: bgColor,
+                        borderLeft: `${guideWidth} solid ${guideColor}`,
+                        boxSizing: 'border-box',
+                        position: 'relative',
+                      }}
+                    >
+                      {/* Optional faint whitespace dots on hover or toggle */}
+                      {showWhitespaceDots && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-around',
+                            opacity: 0.6,
+                          }}
+                        >
+                          {Array.from({ length: band.endChar - band.startChar }).map((_, dIdx) => (
+                            <span
+                              key={dIdx}
+                              style={{
+                                width: '2px',
+                                height: '2px',
+                                borderRadius: '50%',
+                                backgroundColor: theme.whitespaceDot,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Syntax Colored Code Text with Color-Blind Wavy Underline on Error */}
+            <span
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                textDecoration: colorBlindMode && hasError ? 'underline wavy #ef4444' : undefined,
+                textDecorationThickness: colorBlindMode && hasError ? '2px' : undefined,
+              }}
+            >
+              <HighlightedLine line={line} />
+            </span>
             {line === '' && '\u00A0'}
           </div>
         );
