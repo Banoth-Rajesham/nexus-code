@@ -72,6 +72,7 @@ import {
   parsePythonWithTreeSitter,
   parsePythonFallback,
   PythonAnalysisResult,
+  StatementExplanationRow,
   TAG_STYLES,
 } from '../utils/pythonTreeSitterEngine';
 import {
@@ -407,6 +408,47 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [tabRenameValue, setTabRenameValue] = useState<string>('');
+
+  // Report Wrong Explanation Modal & Notification State
+  const [reportingRow, setReportingRow] = useState<StatementExplanationRow | null>(null);
+  const [reportNote, setReportNote] = useState<string>('');
+  const [reportSuccessToast, setReportSuccessToast] = useState<string | null>(null);
+
+  const handleReportExplanation = (row: StatementExplanationRow) => {
+    setReportingRow(row);
+    setReportNote('');
+  };
+
+  const submitExplanationReport = async () => {
+    if (!reportingRow) return;
+    const payload = {
+      line: reportingRow.startLine,
+      rawCode: reportingRow.rawCode,
+      explanation: reportingRow.explanation,
+      note: reportNote.trim(),
+      language: progLang,
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      await fetch('/api/v1/kb/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch {}
+
+    try {
+      const raw = localStorage.getItem('nexus_wrong_explanation_reports');
+      const existing = raw ? JSON.parse(raw) : [];
+      existing.push(payload);
+      localStorage.setItem('nexus_wrong_explanation_reports', JSON.stringify(existing));
+    } catch {}
+
+    setReportSuccessToast(`Report logged for Line ${reportingRow.startLine}!`);
+    setReportingRow(null);
+    setTimeout(() => setReportSuccessToast(null), 3000);
+  };
 
   // Execution abort & safety refs
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -3236,6 +3278,32 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                                   >
                                     {row.explanation}
                                   </span>
+
+                                  {/* Source Tag & Report Wrong Explanation Flag */}
+                                  <div className="flex items-center gap-1.5 shrink-0 ml-auto select-none">
+                                    <span
+                                      className={`text-[9px] font-mono px-1 py-0.2 rounded font-semibold uppercase ${
+                                        row.sourceType === 'KB'
+                                          ? 'text-sky-300 bg-sky-950/60 border border-sky-800/40'
+                                          : 'text-slate-400 bg-slate-800/60 border border-slate-700/40'
+                                      }`}
+                                      title={row.sourceType === 'KB' ? 'Derived from verified Knowledge Base' : 'Derived directly from code syntax'}
+                                    >
+                                      {row.sourceType || 'LITERAL'}
+                                    </span>
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReportExplanation(row);
+                                      }}
+                                      title="Report wrong explanation"
+                                      className="p-1 rounded text-slate-500 hover:text-amber-400 hover:bg-slate-800/80 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                    >
+                                      <Icon icon="lucide:flag" width={12} height={12} />
+                                    </button>
+                                  </div>
                                 </div>
 
                                 {/* Indentation Error Alert Banner & Quick-Fix Button */}
@@ -3987,6 +4055,81 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: REPORT WRONG EXPLANATION ─── */}
+      {reportingRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-[#161b22] border border-[#30363d] rounded-lg max-w-md w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#30363d]/60 pb-3">
+              <div className="flex items-center gap-2 text-amber-400 font-semibold text-sm">
+                <Icon icon="lucide:flag" width={16} height={16} />
+                <span>Report Inaccurate Explanation</span>
+              </div>
+              <button
+                onClick={() => setReportingRow(null)}
+                className="text-slate-400 hover:text-white p-1 rounded"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div>
+                <span className="text-slate-400 font-medium">Line {reportingRow.startLine}:</span>
+                <code className="block mt-1 font-mono text-emerald-300 bg-[#0d1117] p-2 rounded border border-[#30363d] overflow-x-auto">
+                  {reportingRow.rawCode}
+                </code>
+              </div>
+
+              <div>
+                <span className="text-slate-400 font-medium">Current Explanation:</span>
+                <p className="mt-1 text-slate-200 bg-[#21262d] p-2 rounded border border-[#30363d]">
+                  {reportingRow.explanation}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-medium mb-1">
+                  What is incorrect or how should it be improved? (optional)
+                </label>
+                <textarea
+                  value={reportNote}
+                  onChange={(e) => setReportNote(e.target.value)}
+                  placeholder="e.g. In this context, this should be described as..."
+                  rows={3}
+                  className="w-full bg-[#0d1117] border border-[#30363d] focus:border-blue-500 rounded p-2 text-slate-200 placeholder-slate-500 outline-none resize-none text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#30363d]/40">
+              <button
+                type="button"
+                onClick={() => setReportingRow(null)}
+                className="px-3 py-1.5 rounded text-xs text-slate-300 hover:bg-[#21262d] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitExplanationReport}
+                className="px-3.5 py-1.5 rounded text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <Icon icon="lucide:send" width={12} height={12} />
+                <span>Submit Report</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── TOAST: REPORT SUBMISSION CONFIRMATION ─── */}
+      {reportSuccessToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-amber-600 text-white text-xs font-semibold px-3.5 py-2 rounded-md shadow-2xl flex items-center gap-2">
+          <Icon icon="lucide:check-circle-2" width={16} height={16} />
+          <span>{reportSuccessToast}</span>
         </div>
       )}
 

@@ -391,11 +391,11 @@ export function generateDeepExplanation(
       const isRecursive = new RegExp(`\\b${fnName}\\s*\\(`, 'g').test(restCode);
       if (isRecursive) hasRecursion = true;
 
-      let purpose = `Encapsulates procedure '${fnName}'`;
-      if (/^get_|^fetch_|^find_/i.test(fnName)) purpose = `Retrieves and returns matching data for '${fnName.replace(/^[a-z]+_/i, '')}'`;
-      else if (/^is_|^has_|^check_/i.test(fnName)) purpose = `Evaluates boolean condition or validity of arguments`;
+      let purpose = `Defines routine '${fnName}'`;
+      if (/^get_|^fetch_|^find_/i.test(fnName)) purpose = `Fetches data for '${fnName.replace(/^[a-z]+_/i, '')}'`;
+      else if (/^is_|^has_|^check_/i.test(fnName)) purpose = `Checks boolean condition or validity of arguments`;
       else if (/^calculate_|^compute_|^count_/i.test(fnName)) purpose = `Computes mathematical or algorithmic value`;
-      else if (/^handle_|^process_|^on_/i.test(fnName)) purpose = `Handles procedural lifecycle or event dispatch`;
+      else if (/^handle_|^process_|^on_/i.test(fnName)) purpose = `Handles lifecycle or event dispatch`;
 
       currentFunction = {
         id: `fn_${fnName}_${lineNum}`,
@@ -631,10 +631,10 @@ export function generateDeepExplanation(
       : `${mainComp.kind === 'class' ? 'Class blueprint' : 'Function'} '${mainComp.name}' designed to ${mainComp.purpose.toLowerCase()}.`;
     executiveSummary = `This code defines ${mainComp.name}, accepting (${mainComp.params.map((p) => p.name).join(', ') || 'no arguments'}) and returning ${mainComp.returns[0]?.inferredType || 'result payload'}. It handles data processing in ${codeCount} executable lines.`;
   } else if (components.length > 1) {
-    primaryObjective = `Multi-component module orchestrating ${components.map((c) => c.name).join(', ')}.`;
-    executiveSummary = `Contains ${components.length} procedural units: ${components.map((c) => `${c.name} (${c.kind})`).join(', ')}. Coordinates execution flow across modular subroutines.`;
+    primaryObjective = `Multi-component module coordinating ${components.map((c) => c.name).join(', ')}.`;
+    executiveSummary = `Contains ${components.length} modular units: ${components.map((c) => `${c.name} (${c.kind})`).join(', ')}. Coordinates execution flow across modular subroutines.`;
   } else {
-    primaryObjective = ruleAnalysis.overview || 'Executes procedural script operations';
+    primaryObjective = ruleAnalysis.overview || 'Executes sequential script operations';
     executiveSummary = `Sequential script comprising ${codeCount} statements with ${stateVariables.length} state variables and ${externalDependencies.length} module imports.`;
   }
 
@@ -693,7 +693,7 @@ export function generateDeepExplanation(
   } else if (maxLoopNesting > 1) {
     approachOverview = 'Employs Nested Iteration to evaluate cross-product combinations or multi-dimensional matrix structures.';
   } else {
-    approachOverview = 'Employs a Direct Procedural pipeline with clean modular encapsulation and explicit linear data transformations.';
+    approachOverview = 'Employs a direct sequential pipeline with clean modular structure and explicit linear data transformations.';
   }
 
   if (hasEarlyReturn) {

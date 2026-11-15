@@ -1011,6 +1011,29 @@ app.post('/api/v1/feedback', (req, res) => {
   res.json({ message: 'Thank you for your feedback! Our team reads every submission.' });
 });
 
+// 8. Report Wrong Explanation Endpoint (saves to data/reports/wrong_explanations.jsonl)
+app.post('/api/v1/kb/report', (req, res) => {
+  try {
+    const { line, rawCode, explanation, note, language } = req.body;
+    const report = {
+      id: `rep_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      line: line || null,
+      rawCode: rawCode || '',
+      explanation: explanation || '',
+      note: note || '',
+      language: language || 'python',
+    };
+    const repDir = path.resolve('data/reports');
+    if (!fs.existsSync(repDir)) fs.mkdirSync(repDir, { recursive: true });
+    const repFile = path.join(repDir, 'wrong_explanations.jsonl');
+    fs.appendFileSync(repFile, JSON.stringify(report) + '\n', 'utf-8');
+    res.json({ success: true, message: 'Report recorded successfully.', reportId: report.id });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to save report: ' + err.message });
+  }
+});
+
 // ==========================================
 // Intelligent Fallback Generators for Offline / High-Resilience
 // ==========================================

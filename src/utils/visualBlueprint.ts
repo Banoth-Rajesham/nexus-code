@@ -330,7 +330,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       const params = fnMatch[2].trim();
       let icon = 'workflow';
       let title = `Define ${fnName}()`;
-      let detail = params ? `Accepts parameters: (${params}) to process.` : `Encapsulates reusable procedure.`;
+      let detail = params ? `Accepts parameters: (${params}) to process.` : `Defines reusable routine.`;
       let badge = 'Function';
       let groupTitle = 'Core Functions & Handlers';
       let colorScheme = {
@@ -467,7 +467,7 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
     // ─── 6. Conditionals (if, elif, else) ────────────────────────────────────
     if (/^(if|elif|else)\b/.test(trimmed)) {
       const cond = trimmed.replace(/^(if|elif)\s+/, '').replace(/:$/, '').trim();
-      let title = 'Evaluate Condition';
+      let title = 'Check Condition';
       let detail = `Checks condition: (${cond}) before executing branch.`;
       if (trimmed.startsWith('else')) {
         title = 'Fallback Branch';
@@ -618,8 +618,8 @@ export function parseVisualBlueprint(code: string, _progLang: string = 'python')
       rawText: trimmed,
       icon: 'code',
       badge: 'Statement',
-      title: 'Execute Instruction',
-      detail: `Executes instruction: ${trimmed}`,
+      title: 'Execute Statement',
+      detail: `Runs statement: ${trimmed}`,
       groupTitle: 'Execution Pipeline',
       colorScheme: {
         badgeBg: 'bg-slate-500/10',

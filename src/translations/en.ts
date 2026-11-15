@@ -21,10 +21,10 @@ export const en = {
     comment_line: 'Developer comment: "{text}". Ignored at runtime.',
 
     // Functions
-    function_def: "Defines function '{name}' to encapsulate reusable logic.",
+    function_def: "Defines function '{name}' to organize reusable logic.",
     function_def_params: "Defines function '{name}' accepting parameters ({params}).",
     function_recursive: "Recursive function '{name}' that calls itself to break down problems.",
-    function_call: "Executes function '{name}' and consumes its return result.",
+    function_call: "Runs function '{name}' and consumes its return result.",
     arrow_function: "Defines concise arrow function '{name}'.",
 
     // Returns
@@ -77,15 +77,15 @@ export const en = {
     finally_block: "Cleanup block executed unconditionally after try/except.",
 
     // Fallbacks
-    general_statement: "Executes instruction: {statement}.",
+    general_statement: "Runs statement: {statement}.",
     unsupported_construct: "Language construct detected. Executed by standard runtime.",
   },
 
   // Examples when helpful
   examples: {
-    function: 'Encapsulates logic — takes input arguments and computes a result.',
+    function: 'Reusable logic — takes input arguments and computes a result.',
     loop: 'Sequentially processes each item in a collection or numeric range.',
-    condition: 'Evaluates logic expression and executes corresponding branch.',
+    condition: 'Checks logic expression and executes corresponding branch.',
     variable: 'Named memory location holding state or reference to data.',
     return: 'Passes output value back to caller and exits current scope.',
     print: 'Displays formatted strings or variables on the screen.',
@@ -93,11 +93,11 @@ export const en = {
 
   // Overview templates
   overview: {
-    with_class: "This program implements object-oriented architecture via '{classes}' to encapsulate state and methods.",
+    with_class: "This program implements object-oriented architecture via '{classes}' to manage state and methods.",
     with_recursive: "This program leverages recursive decomposition in '{functions}' to resolve tasks hierarchically.",
     with_functions: "This program processes inputs through modular function pipeline: '{functions}'.",
     with_loops: "This program utilizes iterative loops to traverse data and compute final outcomes.",
-    general: "This program executes top-to-bottom sequential instructions to produce results.",
+    general: "This program runs top-to-bottom sequential operations to produce results.",
   },
 
   // Execution flow steps
@@ -113,7 +113,7 @@ export const en = {
   // Logic summary
   simpleLogicSummary: {
     function_and_loop: 'High-level logic: The code accepts input, iterates through data items step by step, and returns the computed outcome once criteria are met.',
-    function_only: 'High-level logic: Encapsulates reusable algorithmic operations that execute whenever called with parameters.',
+    function_only: 'High-level logic: Reusable algorithmic operations that execute whenever called with parameters.',
     general: 'High-level logic: Linear execution pipeline following standard control flow from entry point to termination.',
   },
 

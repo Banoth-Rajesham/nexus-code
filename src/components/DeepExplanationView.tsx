@@ -200,7 +200,7 @@ export const DeepExplanationView: React.FC<DeepExplanationViewProps> = ({
                     <span>Top-Level Sequential Script</span>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                    This file executes procedural statements sequentially in root scope without wrapping subroutines or classes.
+                    This file executes sequential statements in root scope without wrapping subroutines or classes.
                   </p>
                 </div>
               ) : (
