@@ -17,6 +17,8 @@ import {
   Terminal,
   FileCode,
   ChevronDown,
+  ChevronUp,
+  Code,
   Settings,
   Plus,
   X,
@@ -248,6 +250,37 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const [langDropOpen, setLangDropOpen] = useState(false);
   const [stdinInput, setStdinInput] = useState('');
   const [showFileExplorer, setShowFileExplorer] = useState(false);
+
+  // Focus Mode / Slim Toolbar Collapsed state (persisted to localStorage)
+  const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nexus_workspace_toolbar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleToolbarCollapsed = () => {
+    setIsToolbarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('nexus_workspace_toolbar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Keyboard shortcut Ctrl+Shift+F to toggle focus mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+        e.preventDefault();
+        toggleToolbarCollapsed();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Reactive window width for responsive layout decisions
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
@@ -1257,146 +1290,237 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const langIcon = LANG_ICONS[progLang] || progLang.slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full bg-[#0d1117] text-white overflow-hidden select-text">
-      {/* ─── TOP BAR (Responsive IDE Toolbar) ────────────────────────── */}
-      <div className="flex items-center justify-between px-3.5 py-2 bg-[#161b22] border-b border-[#30363d] shrink-0 gap-2 overflow-x-auto no-scrollbar">
-        {/* Left: Language Picker + File Explorer Toggle + Samples */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          {/* Programming Language Dropdown */}
-          <div className="relative">
+    <div className="flex-1 flex flex-col min-h-0 h-full bg-[#0d1117] text-white overflow-hidden select-text relative">
+      {/* ─── SLIM UNIFIED WORKSPACE TOOLBAR (Ribbons 1 & 2 Merged, max ~38px height) ─── */}
+      {!isToolbarCollapsed ? (
+        <div className="h-[38px] max-h-[38px] min-h-[38px] flex items-center justify-between px-2.5 bg-[#161b22] border-b border-[#30363d] shrink-0 gap-2 overflow-x-auto no-scrollbar select-none z-30">
+          {/* Left: Brand Back Button + Single Side Menu Toggle + File Tabs + Plus */}
+          <div className="flex items-center gap-1.5 shrink-0 min-w-0">
+            {/* Back to Home/Overview button */}
             <button
-              onClick={() => setLangDropOpen((v) => !v)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] rounded-md text-xs sm:text-sm font-semibold transition-colors"
+              onClick={() => onNavigate('landing')}
+              title="Return to Nexus Code Overview"
+              className="flex items-center gap-1 px-2 py-1 rounded bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-slate-200 hover:text-white transition-colors shrink-0 group"
             >
-              <LanguageIcon language={progLang} width={18} height={18} />
-              <span>{currentLang?.name || progLang}</span>
-              <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-            </button>
-            {langDropOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl z-50 w-52 py-1 overflow-hidden">
-                {SUPPORTED_PROG_LANGUAGES.map((l) => (
-                  <button
-                    key={l.key}
-                    onClick={() => handleLangChange(l.key)}
-                    className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm flex items-center gap-2.5 hover:bg-[#21262d] transition-colors ${progLang === l.key ? 'bg-[#21262d] text-white font-bold' : 'text-slate-300'}`}
-                  >
-                    <LanguageIcon language={l.key} width={18} height={18} />
-                    {l.name}
-                  </button>
-                ))}
+              <div className="w-5 h-5 rounded bg-[#0078d4] text-white flex items-center justify-center font-bold text-xs shadow-xs group-hover:scale-105 transition-transform">
+                <Code className="w-3.5 h-3.5" />
               </div>
-            )}
+              <span className="font-bold text-xs tracking-tight hidden lg:inline">Nexus</span>
+            </button>
+
+            {/* Single Side Menu Toggle Button */}
+            <button
+              onClick={() => setShowFileExplorer((v) => !v)}
+              title={showFileExplorer ? 'Hide Side Menu (Ctrl+B)' : 'Show Side Menu (Ctrl+B)'}
+              className={`flex items-center gap-1.5 px-2 py-1 border rounded text-xs font-semibold transition-colors shrink-0 ${
+                showFileExplorer
+                  ? 'bg-blue-600/25 border-blue-500/60 text-blue-300'
+                  : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:text-white hover:bg-[#30363d]'
+              }`}
+            >
+              {showFileExplorer ? <PanelLeftClose className="w-3.5 h-3.5 text-blue-400" /> : <PanelLeft className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{showFileExplorer ? 'Hide Menu' : 'Side Menu'}</span>
+              <span className="text-[11px] bg-[#30363d] px-1.5 py-0.2 rounded-full font-mono text-slate-200">
+                {files.length}
+              </span>
+            </button>
+
+            <div className="h-4 w-px bg-[#30363d] shrink-0" />
+
+            {/* File Tabs */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0 max-w-[240px] sm:max-w-[320px] md:max-w-[400px] lg:max-w-[480px]">
+              {openTabIds.map((tabId) => {
+                const file = files.find((f) => f.id === tabId);
+                if (!file) return null;
+                const isActive = file.id === activeFile.id;
+                return (
+                  <div
+                    key={file.id}
+                    onClick={() => setActiveFileId(file.id)}
+                    className={`group flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded cursor-pointer transition-colors border shrink-0 ${
+                      isActive
+                        ? 'bg-[#1e1e1e] border-blue-500 text-white font-bold'
+                        : 'bg-[#161b22] border-[#30363d]/60 text-slate-400 hover:text-slate-200 hover:bg-[#21262d]'
+                    }`}
+                  >
+                    <FileIcon filename={file.name} width={14} height={14} />
+                    <span className="truncate max-w-[90px]">{file.name}</span>
+                    {file.isEntry && (
+                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1 py-0.2 rounded uppercase font-sans font-bold">
+                        Entry
+                      </span>
+                    )}
+                    <button
+                      onClick={(e) => handleCloseTab(file.id, e)}
+                      className="opacity-50 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
+                      title="Close tab"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+              <button
+                onClick={() => {
+                  setShowFileExplorer(true);
+                  setIsCreatingFile(true);
+                }}
+                title="Add new file"
+                className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
-          {/* Side Menu Toggle Button */}
-          <button
-            onClick={() => setShowFileExplorer((v) => !v)}
-            title={showFileExplorer ? 'Hide Side Menu (Ctrl+B) to expand editors' : 'Show Side Menu (Ctrl+B)'}
-            className={`flex items-center gap-2 px-3 py-1.5 border rounded-md text-xs sm:text-sm font-semibold transition-colors ${showFileExplorer ? 'bg-blue-600/25 border-blue-500/60 text-blue-300' : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:text-white hover:bg-[#30363d]'}`}
-          >
-            {showFileExplorer ? <PanelLeftClose className="w-4 h-4 text-blue-400" /> : <PanelLeft className="w-4 h-4" />}
-            <span className="hidden sm:inline">{showFileExplorer ? 'Hide Menu' : 'Side Menu'}</span>
-            <span className="text-xs bg-[#30363d] px-2 py-0.5 rounded-full font-mono text-slate-200">
-              {files.length}
-            </span>
-          </button>
+          {/* Center: Language Picker + Sample Presets + RUN MAIN.PY BUTTON */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Programming Language Dropdown */}
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setLangDropOpen((v) => !v)}
+                className="flex items-center gap-1.5 px-2 py-1 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] rounded text-xs font-semibold transition-colors"
+              >
+                <LanguageIcon language={progLang} width={15} height={15} />
+                <span className="hidden sm:inline">{currentLang?.name || progLang}</span>
+                <ChevronDown className="w-3 h-3 opacity-60" />
+              </button>
+              {langDropOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl z-50 w-48 py-1 overflow-hidden">
+                  {SUPPORTED_PROG_LANGUAGES.map((l) => (
+                    <button
+                      key={l.key}
+                      onClick={() => handleLangChange(l.key)}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-[#21262d] transition-colors ${progLang === l.key ? 'bg-[#21262d] text-white font-bold' : 'text-slate-300'}`}
+                    >
+                      <LanguageIcon language={l.key} width={16} height={16} />
+                      {l.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Sample Preset Loader */}
-          <select
-            onChange={(e) => {
-              if (e.target.value) {
-                handleLoadSample(e.target.value);
-                e.target.value = '';
-              }
-            }}
-            defaultValue=""
-            className="hidden md:block bg-[#21262d] border border-[#30363d] text-slate-200 text-xs sm:text-sm px-3 py-1.5 rounded-md outline-none cursor-pointer hover:bg-[#30363d] transition-colors"
-          >
-            <option value="" disabled>Load preset sample...</option>
-            <option value="modular_math">Modular Math (Multi-File with Imports)</option>
-            <option value="count_number">Count Occurrences (Python)</option>
-            <option value="binary_search">Binary Search (Python)</option>
-            <option value="buggy_loop">Buggy Loop (Debug AI)</option>
-            <option value="js_filter">Filter Evens (JavaScript)</option>
-          </select>
+            {/* Sample Preset Loader */}
+            <select
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleLoadSample(e.target.value);
+                  e.target.value = '';
+                }
+              }}
+              defaultValue=""
+              className="hidden xl:block bg-[#21262d] border border-[#30363d] text-slate-200 text-xs px-2 py-1 rounded outline-none cursor-pointer hover:bg-[#30363d] transition-colors shrink-0 max-w-[130px] truncate"
+            >
+              <option value="" disabled>Load preset...</option>
+              <option value="modular_math">Modular Math</option>
+              <option value="count_number">Count Occurrences</option>
+              <option value="binary_search">Binary Search</option>
+              <option value="buggy_loop">Buggy Loop</option>
+              <option value="js_filter">Filter Evens</option>
+            </select>
+
+            {/* Run main.py — Always visible and clickable */}
+            <button
+              onClick={handleExecute}
+              disabled={!!loadingAction}
+              title={`Run ${entryFile.name} (Ctrl+Enter)`}
+              className="flex items-center gap-1.5 px-3 py-1 bg-[#238636] hover:bg-[#2ea043] disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded transition-all shadow-xs active:scale-95 shrink-0"
+            >
+              {loadingAction === 'execute' ? (
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Play className="w-3.5 h-3.5 fill-white" />
+              )}
+              <span className="whitespace-nowrap">{loadingAction === 'execute' ? 'Running...' : `Run ${entryFile.name}`}</span>
+            </button>
+          </div>
+
+          {/* Right: View Switcher (Source/Dual/Blueprint) + Console + Save + Focus Mode Collapse */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* 3-Segment Switcher: Source | Dual Split | Blueprint */}
+            <div className="flex items-center bg-[#21262d] border border-[#30363d] rounded p-0.5 text-xs">
+              <button
+                onClick={() => {
+                  setViewLayout('english');
+                  setMobileView('english');
+                }}
+                title="Show Source Code Only"
+                className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'english' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <FileCode className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden sm:inline">Source</span>
+              </button>
+              <button
+                onClick={() => {
+                  setViewLayout('split');
+                }}
+                title="Dual Split View (Source + Visual Blueprint)"
+                className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'split' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <Columns className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Dual Split</span>
+              </button>
+              <button
+                onClick={() => {
+                  setViewLayout('native');
+                  setMobileView('native');
+                }}
+                title="Show Visual Blueprint Only"
+                className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'native' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden sm:inline">Blueprint</span>
+              </button>
+            </div>
+
+            {/* Console Toggle */}
+            <button
+              onClick={() => setShowConsole((v) => !v)}
+              title="Toggle Terminal Console"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-colors border shrink-0 ${
+                showConsole
+                  ? 'bg-blue-600 border-blue-500 text-white'
+                  : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'
+              }`}
+            >
+              <Icon icon="flat-color-icons:command-line" width={15} height={15} className="shrink-0" />
+              <span className="hidden md:inline">Console</span>
+              {terminalOutput && (
+                <span className={`w-1.5 h-1.5 rounded-full ${terminalOutput.success ? 'bg-emerald-400' : 'bg-rose-400 animate-pulse'}`} />
+              )}
+            </button>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSaveProject}
+              title="Save Project"
+              className={`p-1.5 rounded transition-colors shrink-0 ${saveSuccess ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'}`}
+            >
+              {saveSuccess ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Collapse Toolbar (Focus Mode) Button */}
+            <button
+              onClick={toggleToolbarCollapsed}
+              title="Collapse Toolbar into Focus Mode (Ctrl+Shift+F)"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors shrink-0"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-
-        {/* Center: BIG GREEN RUN BUTTON WITH ENTRYPOINT BADGE */}
+      ) : (
+        /* Floating Uncollapse Pill when in Focus Mode */
         <button
-          onClick={handleExecute}
-          disabled={!!loadingAction}
-          title={`Run ${entryFile.name} (Ctrl+Enter)`}
-          className="flex items-center gap-2 px-6 py-2 bg-[#238636] hover:bg-[#2ea043] disabled:opacity-50 text-white font-bold text-sm sm:text-base rounded-md transition-all shadow-md shadow-green-950/40 active:scale-95 shrink-0"
+          onClick={toggleToolbarCollapsed}
+          title="Exit Focus Mode & Expand Toolbar (Ctrl+Shift+F)"
+          className="absolute top-1.5 right-4 z-50 flex items-center gap-1.5 px-2.5 py-1 bg-[#161b22]/90 hover:bg-[#21262d] text-slate-300 hover:text-white border border-[#30363d] rounded-md text-xs font-semibold shadow-lg backdrop-blur-xs transition-all cursor-pointer"
         >
-          {loadingAction === 'execute' ? (
-            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Play className="w-4 h-4 fill-white" />
-          )}
-          <span>{loadingAction === 'execute' ? 'Running...' : `Run ${entryFile.name}`}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-blue-400" />
+          <span>Expand Toolbar (Ctrl+Shift+F)</span>
         </button>
-
-        {/* Right: 3-Way Dual Split Toggle + Console + Save */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Dual Split 3-Segment Switcher (Visible & Responsive across screen sizes) */}
-          <div className="flex items-center bg-[#21262d] border border-[#30363d] rounded-md p-1 text-xs sm:text-sm">
-            <button
-              onClick={() => {
-                setViewLayout('english');
-                setMobileView('english');
-              }}
-              title="Show Source Code Only"
-              className={`px-2.5 py-1 rounded font-medium flex items-center gap-1.5 transition-colors ${viewLayout === 'english' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <FileCode className="w-4 h-4 text-blue-400" />
-              <span className="hidden sm:inline">Source</span>
-            </button>
-            <button
-              onClick={() => {
-                setViewLayout('split');
-              }}
-              title="Dual Split View (Source + Visual Blueprint)"
-              className={`px-2.5 py-1 rounded font-medium flex items-center gap-1.5 transition-colors ${viewLayout === 'split' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <Columns className="w-4 h-4 text-emerald-400" />
-              <span>Dual Split</span>
-            </button>
-            <button
-              onClick={() => {
-                setViewLayout('native');
-                setMobileView('native');
-              }}
-              title="Show Visual Blueprint Only"
-              className={`px-2.5 py-1 rounded font-medium flex items-center gap-1.5 transition-colors ${viewLayout === 'native' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              <span>Blueprint</span>
-            </button>
-          </div>
-
-          {/* Console Toggle Button */}
-          <button
-            onClick={() => setShowConsole((v) => !v)}
-            title="Toggle Terminal Console"
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors border ${showConsole ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'}`}
-          >
-            <Icon icon="flat-color-icons:command-line" width={18} height={18} className="shrink-0" />
-            <span className="hidden sm:inline">Console</span>
-            {terminalOutput && (
-              <span className={`w-2 h-2 rounded-full ${terminalOutput.success ? 'bg-emerald-400' : 'bg-rose-400 animate-pulse'}`} />
-            )}
-          </button>
-
-          {/* Save Button */}
-          <button
-            onClick={handleSaveProject}
-            title="Save Project"
-            className={`p-2 rounded-md transition-colors ${saveSuccess ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'}`}
-          >
-            {saveSuccess ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* ─── MOBILE VIEW SWITCHER (Visible on Mobile < 768px) ── */}
       <div className="flex md:hidden items-center bg-[#161b22] border-b border-[#30363d] px-2 py-1 gap-1 text-xs overflow-x-auto shrink-0">
@@ -1749,55 +1873,6 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
         {/* ══ 2. CENTRAL EDITORS & TABS AREA ══ */}
         {(mobileView !== 'files' || windowWidth >= 768) && (
           <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-            {/* Editor File Tabs Bar (VS Code Style) */}
-            <div className="flex items-center bg-[#161b22] border-b border-[#30363d] px-2 overflow-x-auto no-scrollbar shrink-0">
-              {!showFileExplorer && (
-                <button
-                  onClick={() => setShowFileExplorer(true)}
-                  title="Show Side Menu (Ctrl+B)"
-                  className="hidden md:flex items-center gap-1.5 px-2 py-1 mr-2 text-xs text-blue-400 hover:text-blue-300 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] rounded transition-colors shrink-0"
-                >
-                  <PanelLeft className="w-3.5 h-3.5" />
-                  <span className="text-xs font-semibold">Side Menu</span>
-                </button>
-              )}
-              <div className="flex items-center gap-1.5 py-1">
-                {openTabIds.map((tabId) => {
-                  const file = files.find((f) => f.id === tabId);
-                  if (!file) return null;
-                  return (
-                    <div
-                      key={file.id}
-                      onClick={() => setActiveFileId(file.id)}
-                      className={`group flex items-center gap-2.5 px-4 py-2 text-sm font-mono rounded-t-md border-t-2 cursor-pointer transition-colors ${file.id === activeFile.id ? 'bg-[#1e1e1e] border-blue-500 text-white font-bold' : 'bg-[#161b22] border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#21262d]'}`}
-                    >
-                      <FileIcon filename={file.name} width={18} height={18} />
-                      <span className="text-sm font-medium">{file.name}</span>
-                      {file.isEntry && (
-                        <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-sans uppercase font-bold tracking-wider">
-                          Entry
-                        </span>
-                      )}
-                      <button
-                        onClick={(e) => handleCloseTab(file.id, e)}
-                        className="opacity-60 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
-                        title="Close tab"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  );
-                })}
-                <button
-                  onClick={() => setIsCreatingFile(true)}
-                  title="Add new file"
-                  className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors ml-1"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
             {/* Split Panes Container */}
             <div ref={splitContainerRef} className="flex-1 flex min-h-0 overflow-hidden relative">
               {/* ────── LEFT PANE: SOURCE CODE EDITOR ────── */}
@@ -1809,7 +1884,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#1e1e1e]"
               >
                 {/* Left Pane Header */}
-                <div className="flex items-center justify-between px-4 py-2.5 bg-[#161b22] border-b border-[#30363d] text-sm shrink-0">
+                <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] text-sm shrink-0">
                   <div className="flex items-center gap-2.5">
                     <FileIcon filename={activeFile.name} width={18} height={18} />
                     <span className="font-bold text-sm sm:text-base text-slate-100">
@@ -2020,7 +2095,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#0d1117] border-l border-[#30363d]"
               >
                 {/* Right Header */}
-                <div className="flex items-center justify-between px-4 py-2.5 bg-[#161b22] border-b border-[#30363d] text-sm shrink-0">
+                <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] text-sm shrink-0">
                   <div className="flex items-center gap-2.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="font-bold text-sm sm:text-base text-emerald-400">
