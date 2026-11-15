@@ -139,23 +139,23 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={() => onNavigate('workspace')}
-                className="hidden md:flex items-center gap-1.5 text-xs text-[#3a4c56] hover:text-[#0e1726] px-2 py-1.5 rounded-[4px] transition-colors"
+                className="hidden md:flex items-center gap-1.5 text-sm text-[#3a4c56] hover:text-[#0e1726] px-2.5 py-1.5 rounded-[4px] transition-colors"
                 title="Search algorithms and lessons"
               >
                 <span>Search</span>
-                <Search className="w-3.5 h-3.5 text-[#3a4c56]" />
+                <Search className="w-4 h-4 text-[#3a4c56]" />
               </button>
 
               <button
                 onClick={() => onNavigate('pricing')}
-                className="px-3.5 py-1.5 rounded-[4px] border border-[#8e989e] hover:border-[#0e1726] hover:bg-[#f4fafd] text-[#0e1726] font-semibold text-xs transition-colors"
+                className="px-4 py-1.5 rounded-[4px] border border-[#8e989e] hover:border-[#0e1726] hover:bg-[#f4fafd] text-[#0e1726] font-semibold text-sm transition-colors"
               >
                 Buy now
               </button>
 
               <button
                 onClick={() => openAuthModal('login')}
-                className="px-2.5 py-1.5 text-xs font-semibold text-[#0e1726] hover:underline transition-colors"
+                className="px-3 py-1.5 text-sm font-semibold text-[#0e1726] hover:underline transition-colors"
               >
                 Sign in
               </button>

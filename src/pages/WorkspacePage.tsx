@@ -1259,26 +1259,26 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   return (
     <div className="flex-1 flex flex-col min-h-0 h-full bg-[#0d1117] text-white overflow-hidden select-text">
       {/* ─── TOP BAR (Responsive IDE Toolbar) ────────────────────────── */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] shrink-0 gap-2 overflow-x-auto no-scrollbar">
+      <div className="flex items-center justify-between px-3.5 py-2 bg-[#161b22] border-b border-[#30363d] shrink-0 gap-2 overflow-x-auto no-scrollbar">
         {/* Left: Language Picker + File Explorer Toggle + Samples */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           {/* Programming Language Dropdown */}
           <div className="relative">
             <button
               onClick={() => setLangDropOpen((v) => !v)}
-              className="flex items-center gap-2 px-2.5 py-1.5 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] rounded-md text-xs font-semibold transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] rounded-md text-xs sm:text-sm font-semibold transition-colors"
             >
               <LanguageIcon language={progLang} width={18} height={18} />
               <span>{currentLang?.name || progLang}</span>
-              <ChevronDown className="w-3 h-3 opacity-60" />
+              <ChevronDown className="w-3.5 h-3.5 opacity-60" />
             </button>
             {langDropOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl z-50 w-48 py-1 overflow-hidden">
+              <div className="absolute top-full left-0 mt-1 bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl z-50 w-52 py-1 overflow-hidden">
                 {SUPPORTED_PROG_LANGUAGES.map((l) => (
                   <button
                     key={l.key}
                     onClick={() => handleLangChange(l.key)}
-                    className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-[#21262d] transition-colors ${progLang === l.key ? 'bg-[#21262d] text-white font-bold' : 'text-slate-300'}`}
+                    className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm flex items-center gap-2.5 hover:bg-[#21262d] transition-colors ${progLang === l.key ? 'bg-[#21262d] text-white font-bold' : 'text-slate-300'}`}
                   >
                     <LanguageIcon language={l.key} width={18} height={18} />
                     {l.name}
@@ -1292,11 +1292,11 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           <button
             onClick={() => setShowFileExplorer((v) => !v)}
             title={showFileExplorer ? 'Hide Side Menu (Ctrl+B) to expand editors' : 'Show Side Menu (Ctrl+B)'}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md text-xs font-semibold transition-colors ${showFileExplorer ? 'bg-blue-600/25 border-blue-500/60 text-blue-300' : 'bg-[#21262d] border-[#30363d] text-slate-400 hover:text-white hover:bg-[#30363d]'}`}
+            className={`flex items-center gap-2 px-3 py-1.5 border rounded-md text-xs sm:text-sm font-semibold transition-colors ${showFileExplorer ? 'bg-blue-600/25 border-blue-500/60 text-blue-300' : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:text-white hover:bg-[#30363d]'}`}
           >
-            {showFileExplorer ? <PanelLeftClose className="w-3.5 h-3.5 text-blue-400" /> : <PanelLeft className="w-3.5 h-3.5" />}
+            {showFileExplorer ? <PanelLeftClose className="w-4 h-4 text-blue-400" /> : <PanelLeft className="w-4 h-4" />}
             <span className="hidden sm:inline">{showFileExplorer ? 'Hide Menu' : 'Side Menu'}</span>
-            <span className="text-[10px] bg-[#30363d] px-1.5 py-0.2 rounded-full font-mono text-slate-300">
+            <span className="text-xs bg-[#30363d] px-2 py-0.5 rounded-full font-mono text-slate-200">
               {files.length}
             </span>
           </button>
@@ -1310,7 +1310,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
               }
             }}
             defaultValue=""
-            className="hidden md:block bg-[#21262d] border border-[#30363d] text-slate-300 text-xs px-2.5 py-1.5 rounded-md outline-none cursor-pointer hover:bg-[#30363d] transition-colors"
+            className="hidden md:block bg-[#21262d] border border-[#30363d] text-slate-200 text-xs sm:text-sm px-3 py-1.5 rounded-md outline-none cursor-pointer hover:bg-[#30363d] transition-colors"
           >
             <option value="" disabled>Load preset sample...</option>
             <option value="modular_math">Modular Math (Multi-File with Imports)</option>
@@ -1326,7 +1326,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           onClick={handleExecute}
           disabled={!!loadingAction}
           title={`Run ${entryFile.name} (Ctrl+Enter)`}
-          className="flex items-center gap-2 px-5 py-1.5 bg-[#238636] hover:bg-[#2ea043] disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-md transition-all shadow-md shadow-green-950/40 active:scale-95 shrink-0"
+          className="flex items-center gap-2 px-6 py-2 bg-[#238636] hover:bg-[#2ea043] disabled:opacity-50 text-white font-bold text-sm sm:text-base rounded-md transition-all shadow-md shadow-green-950/40 active:scale-95 shrink-0"
         >
           {loadingAction === 'execute' ? (
             <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1339,16 +1339,16 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
         {/* Right: 3-Way Dual Split Toggle + Console + Save */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Dual Split 3-Segment Switcher (Visible & Responsive across screen sizes) */}
-          <div className="flex items-center bg-[#21262d] border border-[#30363d] rounded-md p-0.5 text-xs">
+          <div className="flex items-center bg-[#21262d] border border-[#30363d] rounded-md p-1 text-xs sm:text-sm">
             <button
               onClick={() => {
                 setViewLayout('english');
                 setMobileView('english');
               }}
               title="Show Source Code Only"
-              className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'english' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2.5 py-1 rounded font-medium flex items-center gap-1.5 transition-colors ${viewLayout === 'english' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
             >
-              <FileCode className="w-3.5 h-3.5 text-blue-400" />
+              <FileCode className="w-4 h-4 text-blue-400" />
               <span className="hidden sm:inline">Source</span>
             </button>
             <button
@@ -1356,9 +1356,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 setViewLayout('split');
               }}
               title="Dual Split View (Source + Visual Blueprint)"
-              className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'split' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2.5 py-1 rounded font-medium flex items-center gap-1.5 transition-colors ${viewLayout === 'split' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
             >
-              <Columns className="w-3.5 h-3.5 text-emerald-400" />
+              <Columns className="w-4 h-4 text-emerald-400" />
               <span>Dual Split</span>
             </button>
             <button
@@ -1367,9 +1367,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 setMobileView('native');
               }}
               title="Show Visual Blueprint Only"
-              className={`px-2 py-1 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'native' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2.5 py-1 rounded font-medium flex items-center gap-1.5 transition-colors ${viewLayout === 'native' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <Sparkles className="w-4 h-4 text-indigo-400" />
               <span>Blueprint</span>
             </button>
           </div>
@@ -1378,9 +1378,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           <button
             onClick={() => setShowConsole((v) => !v)}
             title="Toggle Terminal Console"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors border ${showConsole ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'}`}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors border ${showConsole ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'}`}
           >
-            <Icon icon="flat-color-icons:command-line" width={16} height={16} className="shrink-0" />
+            <Icon icon="flat-color-icons:command-line" width={18} height={18} className="shrink-0" />
             <span className="hidden sm:inline">Console</span>
             {terminalOutput && (
               <span className={`w-2 h-2 rounded-full ${terminalOutput.success ? 'bg-emerald-400' : 'bg-rose-400 animate-pulse'}`} />
@@ -1391,7 +1391,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           <button
             onClick={handleSaveProject}
             title="Save Project"
-            className={`p-1.5 rounded-md transition-colors ${saveSuccess ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'}`}
+            className={`p-2 rounded-md transition-colors ${saveSuccess ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'}`}
           >
             {saveSuccess ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
           </button>
@@ -1468,16 +1468,16 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
             {/* Section A: File Management */}
             <div className="p-3 border-b border-[#30363d]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                   <Icon icon="vscode-icons:default-folder" width={16} height={16} className="shrink-0" /> Project Files
                 </span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setIsCreatingFile(true)}
-                    className="flex items-center gap-1 text-[11px] bg-blue-600 hover:bg-blue-500 text-white font-semibold px-2 py-0.5 rounded transition-colors"
+                    className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold px-2.5 py-1 rounded transition-colors"
                     title="Add new file"
                   >
-                    <Plus className="w-3 h-3" /> New
+                    <Plus className="w-3.5 h-3.5" /> New
                   </button>
                   <button
                     onClick={() => setShowFileExplorer(false)}
@@ -1492,7 +1492,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
               {/* Inline New File Form */}
               {isCreatingFile && (
                 <div className="mb-2 p-2 bg-[#161b22] border border-blue-500/50 rounded-md">
-                  <div className="text-[10px] text-slate-400 mb-1">Enter filename (e.g. helper.py):</div>
+                  <div className="text-xs text-slate-400 mb-1">Enter filename (e.g. helper.py):</div>
                   <div className="flex items-center gap-1">
                     <input
                       type="text"
@@ -1594,17 +1594,17 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
             {/* Section B: Real Multi-File Module Imports */}
             <div className="p-3 border-b border-[#30363d] bg-[#161b22]/40">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
                 <span className="flex items-center gap-1">
-                  <ArrowRight className="w-3 h-3 text-emerald-400" /> Module Imports
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400" /> Module Imports
                 </span>
-                <span className="text-[9px] font-mono text-slate-500">{moduleImports.length} detected</span>
+                <span className="text-[11px] font-mono text-slate-400">{moduleImports.length} detected</span>
               </div>
 
               {/* Circular import alerts */}
               {circularImports.length > 0 && (
-                <div className="mb-2 p-1.5 bg-rose-950/60 border border-rose-500/40 rounded text-[10px] text-rose-300 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3 shrink-0 text-rose-400" />
+                <div className="mb-2 p-2 bg-rose-950/60 border border-rose-500/40 rounded text-xs text-rose-300 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
                   <span>
                     Circular import: {circularImports[0].fileA} ↔ {circularImports[0].fileB}
                   </span>
@@ -1621,7 +1621,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                           handleOpenFile(rel.targetFile.id);
                         }
                       }}
-                      className={`bg-[#0d1117] border p-2 rounded text-[11px] font-mono transition-colors ${rel.isLocal ? 'border-[#30363d] hover:border-blue-500/60 cursor-pointer hover:bg-[#161b22]' : 'border-[#30363d]'}`}
+                      className={`bg-[#0d1117] border p-2.5 rounded text-xs font-mono transition-colors ${rel.isLocal ? 'border-[#30363d] hover:border-blue-500/60 cursor-pointer hover:bg-[#161b22]' : 'border-[#30363d]'}`}
                       title={rel.isLocal ? `Click to open ${rel.moduleName}` : `Import from ${rel.moduleName}`}
                     >
                       <div className="text-slate-400 flex items-center justify-between">
@@ -1629,28 +1629,28 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                           {rel.fromFile} → {rel.moduleName}
                         </span>
                         {rel.isLocal ? (
-                          <span className="text-[9px] text-emerald-400 bg-emerald-950/60 px-1 rounded flex items-center gap-0.5">
-                            <Check className="w-2.5 h-2.5" /> Local
+                          <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                            <Check className="w-3 h-3" /> Local
                           </span>
                         ) : rel.missingFile ? (
-                          <span className="text-[9px] text-rose-400 bg-rose-950/60 px-1 rounded flex items-center gap-0.5">
+                          <span className="text-[10px] font-semibold text-rose-400 bg-rose-950/60 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                             Missing File
                           </span>
                         ) : (
-                          <span className="text-[9px] text-amber-400 bg-amber-950/60 px-1 rounded">Package</span>
+                          <span className="text-[10px] font-semibold text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded">Package</span>
                         )}
                       </div>
 
                       {/* Missing file explanation */}
                       {rel.missingFile && (
-                        <div className="text-[10px] text-rose-400 mt-1 font-sans">
+                        <div className="text-xs text-rose-400 mt-1 font-sans">
                           ⚠️ '{rel.moduleName}.py' not found in workspace.
                         </div>
                       )}
 
                       {/* Missing symbols in local file */}
                       {rel.missingSymbols.length > 0 && (
-                        <div className="text-[10px] text-amber-400 mt-1 font-sans">
+                        <div className="text-xs text-amber-400 mt-1 font-sans">
                           ⚠️ Missing in {rel.targetFile?.name}: {rel.missingSymbols.join(', ')}
                         </div>
                       )}
@@ -1658,7 +1658,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       {/* Translated symbol preview */}
                       <div className="mt-1 text-emerald-300 font-sans text-xs flex flex-wrap gap-1">
                         {rel.importedSymbols.map((sym, sIdx) => (
-                          <span key={sIdx} className="inline-block bg-[#161b22] px-1 rounded text-[11px]">
+                          <span key={sIdx} className="inline-block bg-[#161b22] px-1.5 py-0.5 rounded text-xs">
                             {sym} <span className="text-slate-500">→</span> <span className="font-bold">{rel.translatedSymbols[sIdx]}</span>
                           </span>
                         ))}
@@ -1667,7 +1667,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                   ))}
                 </div>
               ) : (
-                <div className="text-[10px] text-slate-500 font-sans py-1">
+                <div className="text-xs text-slate-400 font-sans py-1">
                   No local or external imports in current files. Type e.g. <code className="text-blue-400">from utils import add</code> to link files.
                 </div>
               )}
@@ -1675,7 +1675,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
             {/* Section C: Nexus Tools */}
             <div className="p-3 border-b border-[#30363d]">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">
                 Visual Analysis Tools
               </span>
               <div className="space-y-1">
@@ -1736,10 +1736,10 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
             {/* Sidebar Footer */}
             <div className="mt-auto p-3 border-t border-[#30363d] bg-[#161b22]/30">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
                 <Zap className="w-3.5 h-3.5 shrink-0" /> Visual Blueprint Active
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+              <div className="text-xs text-slate-400 mt-0.5 leading-snug">
                 Real-Time Code Map & Annotations
               </div>
             </div>
@@ -1758,10 +1758,10 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                   className="hidden md:flex items-center gap-1.5 px-2 py-1 mr-2 text-xs text-blue-400 hover:text-blue-300 bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] rounded transition-colors shrink-0"
                 >
                   <PanelLeft className="w-3.5 h-3.5" />
-                  <span className="text-[11px] font-semibold">Side Menu</span>
+                  <span className="text-xs font-semibold">Side Menu</span>
                 </button>
               )}
-              <div className="flex items-center gap-1 py-1">
+              <div className="flex items-center gap-1.5 py-1">
                 {openTabIds.map((tabId) => {
                   const file = files.find((f) => f.id === tabId);
                   if (!file) return null;
@@ -1769,12 +1769,12 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                     <div
                       key={file.id}
                       onClick={() => setActiveFileId(file.id)}
-                      className={`group flex items-center gap-2 px-3 py-1.5 text-xs font-mono rounded-t-md border-t-2 cursor-pointer transition-colors ${file.id === activeFile.id ? 'bg-[#1e1e1e] border-blue-500 text-white font-bold' : 'bg-[#161b22] border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#21262d]'}`}
+                      className={`group flex items-center gap-2.5 px-4 py-2 text-sm font-mono rounded-t-md border-t-2 cursor-pointer transition-colors ${file.id === activeFile.id ? 'bg-[#1e1e1e] border-blue-500 text-white font-bold' : 'bg-[#161b22] border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#21262d]'}`}
                     >
-                      <FileIcon filename={file.name} width={16} height={16} />
-                      <span>{file.name}</span>
+                      <FileIcon filename={file.name} width={18} height={18} />
+                      <span className="text-sm font-medium">{file.name}</span>
                       {file.isEntry && (
-                        <span className="text-[8px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1 rounded font-sans uppercase">
+                        <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-sans uppercase font-bold tracking-wider">
                           Entry
                         </span>
                       )}
@@ -1783,7 +1783,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                         className="opacity-60 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
                         title="Close tab"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   );
@@ -1791,9 +1791,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 <button
                   onClick={() => setIsCreatingFile(true)}
                   title="Add new file"
-                  className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors ml-1"
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors ml-1"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -1809,29 +1809,29 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#1e1e1e]"
               >
                 {/* Left Pane Header */}
-                <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
-                  <div className="flex items-center gap-2">
-                    <FileIcon filename={activeFile.name} width={15} height={15} />
-                    <span className="font-semibold text-slate-200">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-[#161b22] border-b border-[#30363d] text-sm shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <FileIcon filename={activeFile.name} width={18} height={18} />
+                    <span className="font-bold text-sm sm:text-base text-slate-100">
                       {activeFile.name} {activeFile.isEntry ? '(Main Entry)' : ''}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-mono">Lines: {lineCount}</span>
+                    <span className="text-xs text-slate-400 font-mono">Lines: {lineCount}</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => setSyntaxOverlay(!syntaxOverlay)}
                       title={syntaxOverlay ? 'Switch to Direct Text Mode' : 'Switch to Syntax Highlighting'}
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${syntaxOverlay ? 'bg-blue-950/60 text-blue-300 border-blue-500/30 hover:bg-blue-900/60' : 'bg-[#21262d] text-slate-400 border-[#30363d] hover:text-white'}`}
+                      className={`px-3 py-1 rounded text-xs sm:text-sm font-semibold border transition-colors ${syntaxOverlay ? 'bg-blue-950/60 text-blue-300 border-blue-500/30 hover:bg-blue-900/60' : 'bg-[#21262d] text-slate-400 border-[#30363d] hover:text-white'}`}
                     >
                       {syntaxOverlay ? '🎨 VS Code Colors' : '📝 Direct Text'}
                     </button>
                     <button
                       onClick={handleCopyEnglish}
                       title="Copy Source Code"
-                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
                     >
-                      {copiedEnglish ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedEnglish ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                     <button
                       onClick={() => handleDownload(code, activeFile.name)}
@@ -1850,9 +1850,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                     ref={lineNumbersRef}
                     className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
                     style={{
-                      minWidth: '50px',
+                      minWidth: '52px',
                       fontFamily: VSCODE_MONO_FONT,
-                      fontSize: '14px',
+                      fontSize: '15px',
                       lineHeight: '26px',
                       paddingTop: '14px',
                       paddingBottom: '14px',
@@ -2020,15 +2020,15 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#0d1117] border-l border-[#30363d]"
               >
                 {/* Right Header */}
-                <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="font-semibold text-emerald-400">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-[#161b22] border-b border-[#30363d] text-sm shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="font-bold text-sm sm:text-base text-emerald-400">
                       {blueprintMode === 'deep'
                         ? '4-Layer Deep Code Explanation'
                         : 'Visual Blueprint & Line Explanations'}
                     </span>
-                    <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono">
+                    <span className="text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-semibold">
                       {blueprintMode === 'deep'
                         ? 'WHAT · WHY · HOW · VERIFY'
                         : `${visualBlueprint.totalCodeLines} Code Lines Mapped`}
@@ -2037,37 +2037,37 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
                   <div className="flex items-center gap-2">
                     {/* View Switcher: Aligned Line Blueprint | Architecture Blocks | Pseudocode | Deep Explanation */}
-                    <div className="flex bg-[#21262d] border border-[#30363d] rounded text-[10px] font-medium overflow-hidden">
+                    <div className="flex bg-[#21262d] border border-[#30363d] rounded-md text-xs sm:text-sm font-semibold overflow-hidden p-0.5">
                       <button
                         onClick={() => setBlueprintMode('aligned')}
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors ${blueprintMode === 'aligned' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors rounded ${blueprintMode === 'aligned' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
                         title="Line-by-line arrows aligned with editor"
                       >
-                        <Icon icon="flat-color-icons:flow-chart" width={13} height={13} className="shrink-0" />
+                        <Icon icon="flat-color-icons:flow-chart" width={15} height={15} className="shrink-0" />
                         <span>Line Blueprint</span>
                       </button>
                       <button
                         onClick={() => setBlueprintMode('blocks')}
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors ${blueprintMode === 'blocks' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors rounded ${blueprintMode === 'blocks' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
                         title="Grouped architectural blocks like Excalidraw"
                       >
-                        <Icon icon="flat-color-icons:mind-map" width={13} height={13} className="shrink-0" />
+                        <Icon icon="flat-color-icons:mind-map" width={15} height={15} className="shrink-0" />
                         <span>Architecture Blocks</span>
                       </button>
                       <button
                         onClick={() => setBlueprintMode('code')}
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors ${blueprintMode === 'code' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors rounded ${blueprintMode === 'code' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
                         title="Pure pseudocode representation"
                       >
-                        <Icon icon="flat-color-icons:document" width={13} height={13} className="shrink-0" />
+                        <Icon icon="flat-color-icons:document" width={15} height={15} className="shrink-0" />
                         <span>Pseudocode</span>
                       </button>
                       <button
                         onClick={() => setBlueprintMode('deep')}
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors ${blueprintMode === 'deep' ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors rounded ${blueprintMode === 'deep' ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white'}`}
                         title="4-Layer Deep Explanation: WHAT, WHY, HOW, VERIFY"
                       >
-                        <Icon icon="flat-color-icons:radar-plot" width={13} height={13} className="shrink-0" />
+                        <Icon icon="flat-color-icons:radar-plot" width={15} height={15} className="shrink-0" />
                         <span>Deep Explanation</span>
                       </button>
                     </div>
@@ -2075,18 +2075,18 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                     <button
                       onClick={handleCopyNative}
                       title="Copy Blueprint"
-                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
                     >
-                      {copiedNative ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedNative ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                     <button
                       onClick={() =>
                         handleDownload(nativeTranslation.translatedCode, `${activeFile.name}_blueprint.txt`)
                       }
                       title="Download Blueprint"
-                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors"
                     >
-                      <Download className="w-3.5 h-3.5" />
+                      <Download className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -2100,9 +2100,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                         ref={nativeLineNumbersRef}
                         className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
                         style={{
-                          minWidth: '50px',
+                          minWidth: '52px',
                           fontFamily: VSCODE_MONO_FONT,
-                          fontSize: '14px',
+                          fontSize: '15px',
                           lineHeight: '26px',
                           paddingTop: '14px',
                           paddingBottom: '14px',
@@ -2167,22 +2167,22 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                               <BlueprintIcon
                                 name={bLine.icon}
                                 withContainer
-                                className="w-3.5 h-3.5"
+                                className="w-4 h-4"
                               />
                               <span
-                                className={`px-1.5 py-0.2 rounded text-[10px] font-semibold uppercase tracking-wider shrink-0 border ${bLine.colorScheme.badgeBg} ${bLine.colorScheme.badgeText} ${bLine.colorScheme.border}`}
+                                className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shrink-0 border ${bLine.colorScheme.badgeBg} ${bLine.colorScheme.badgeText} ${bLine.colorScheme.border}`}
                               >
                                 {bLine.badge}
                               </span>
                               <span className="text-slate-500 text-xs shrink-0 select-none">──&gt;</span>
                               <span
-                                className={`text-[13px] font-medium truncate ${
-                                  isCurrent ? 'text-white font-semibold' : 'text-slate-200 group-hover:text-white'
+                                className={`text-sm font-semibold truncate ${
+                                  isCurrent ? 'text-white font-bold' : 'text-slate-200 group-hover:text-white'
                                 }`}
                               >
                                 {bLine.title}
                               </span>
-                              <span className="text-slate-400 text-[11.5px] truncate hidden md:inline group-hover:text-slate-300">
+                              <span className="text-slate-400 text-xs truncate hidden md:inline group-hover:text-slate-300">
                                 — {bLine.detail}
                               </span>
                             </div>
@@ -2208,7 +2208,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                             <h3 className="text-sm font-bold text-white tracking-tight">
                               {group.groupTitle}
                             </h3>
-                            <span className="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono ml-auto">
+                            <span className="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-mono font-semibold ml-auto">
                               {group.lines.length} components
                             </span>
                           </div>
@@ -2265,9 +2265,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                         ref={nativeLineNumbersRef}
                         className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
                         style={{
-                          minWidth: '50px',
+                          minWidth: '52px',
                           fontFamily: VSCODE_MONO_FONT,
-                          fontSize: '14px',
+                          fontSize: '15px',
                           lineHeight: '26px',
                           paddingTop: '14px',
                           paddingBottom: '14px',
@@ -2343,7 +2343,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                 <span>Terminal</span>
                 {terminalOutput && (
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${terminalOutput.success ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}
+                    className={`text-xs px-2 py-0.5 rounded font-mono font-semibold ${terminalOutput.success ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}
                   >
                     exit {terminalOutput.exitCode ?? 0}
                   </span>
@@ -2394,27 +2394,27 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           </div>
 
           {/* Console Content */}
-          <div className="flex-1 overflow-auto bg-[#0a0d12] p-3 font-mono text-xs text-slate-200">
+          <div className="flex-1 overflow-auto bg-[#0a0d12] p-3.5 font-mono text-sm text-slate-200">
             {/* 1. Terminal stdout/stderr view */}
             {consoleTab === 'terminal' && (
               <div>
                 {loadingAction === 'execute' ? (
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <span className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="flex items-center gap-2.5 text-slate-300 text-sm">
+                    <span className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
                     <span>Executing {progLang} program in sandbox...</span>
                   </div>
                 ) : terminalOutput ? (
                   <div>
-                    <div className="text-[11px] text-slate-500 mb-2 border-b border-[#21262d] pb-1 flex items-center justify-between font-sans">
+                    <div className="text-xs text-slate-400 mb-2 border-b border-[#21262d] pb-1.5 flex items-center justify-between font-sans">
                       <span>Engine: {terminalOutput.engine || 'native'} ({terminalOutput.language})</span>
                       <span>Time: {terminalOutput.timeMs}ms</span>
                     </div>
-                    <pre className="whitespace-pre-wrap leading-relaxed select-text font-mono text-[#e6edf3]">
+                    <pre className="whitespace-pre-wrap leading-relaxed select-text font-mono text-sm text-[#e6edf3]">
                       {terminalOutput.output}
                     </pre>
                   </div>
                 ) : (
-                  <div className="text-slate-500 py-6 text-center font-sans">
+                  <div className="text-slate-400 py-6 text-center font-sans text-sm">
                     Click <span className="text-emerald-400 font-bold">Run</span> (or press Ctrl+Enter) to execute your program. Output will appear here.
                   </div>
                 )}

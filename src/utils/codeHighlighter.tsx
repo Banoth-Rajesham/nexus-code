@@ -230,7 +230,7 @@ export const VSCODE_MONO_FONT = 'Consolas, "Cascadia Code", "Fira Code", "Courie
 
 export const CODE_EDITOR_SHARED_STYLE: React.CSSProperties = {
   fontFamily: VSCODE_MONO_FONT,
-  fontSize: '14.5px',
+  fontSize: '15px',
   lineHeight: '26px',
   letterSpacing: '0px',
   wordSpacing: '0px',
