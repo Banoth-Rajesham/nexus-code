@@ -63,6 +63,12 @@ import { Icon } from '@iconify/react';
 import { FileIcon, LanguageIcon } from '../components/FileIcon';
 import { generateDeepExplanation } from '../utils/deepExplanationAnalyzer';
 import { DeepExplanationView } from '../components/DeepExplanationView';
+import {
+  parsePythonWithTreeSitter,
+  parsePythonFallback,
+  PythonAnalysisResult,
+  TAG_STYLES,
+} from '../utils/pythonTreeSitterEngine';
 
 interface WorkspacePageProps {
   onNavigate: (view: string) => void;
@@ -351,6 +357,49 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const deepExplanationData = useMemo(() => {
     return generateDeepExplanation(deferredCode, progLang, explanation || undefined);
   }, [deferredCode, progLang, explanation]);
+
+  // ─── STAGE 1: Offline Tree-Sitter Engine (<100ms, WebAssembly) ───
+  const [pythonAnalysis, setPythonAnalysis] = useState<PythonAnalysisResult>(() => {
+    return parsePythonFallback(code);
+  });
+
+  // Debounced 300ms tree-sitter parser: retains old rows while parsing (no flicker)
+  useEffect(() => {
+    if (progLang !== 'python') return;
+    if (!code.trim()) {
+      setPythonAnalysis({
+        rows: [],
+        summary: {
+          title: 'Empty File',
+          description: 'Type or paste code on the left to see explanations here.',
+          stats: { lines: 0, statements: 0, functions: 0, loops: 0, conditionals: 0, classes: 0, imports: [] },
+        },
+        treeSitterAvailable: true,
+      });
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await parsePythonWithTreeSitter(code);
+        setPythonAnalysis(res);
+      } catch (err) {
+        console.warn('[Workspace] Tree-sitter parse error:', err);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [code, progLang]);
+
+  // Bidirectional auto-scroll synchronization between editor line and explanation row
+  useEffect(() => {
+    const line = highlightedLine || activeCursorLine;
+    if (!line) return;
+    const el = document.getElementById(`stmt-row-${line}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [activeCursorLine, highlightedLine]);
 
   // Jump cursor to target line and highlight it
   const jumpToLine = (targetLineNum: number) => {
@@ -2148,6 +2197,8 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                     <span className="text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono font-semibold shrink-0 whitespace-nowrap">
                       {blueprintMode === 'deep'
                         ? '4 Layers'
+                        : progLang === 'python'
+                        ? `${pythonAnalysis.rows.length} statements`
                         : `${visualBlueprint.totalCodeLines} lines`}
                     </span>
                   </div>
@@ -2218,103 +2269,252 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
                       </p>
                     </div>
                   ) : blueprintMode === 'aligned' ? (
-                    <>
-                      {/* Line Numbers aligned with Left Editor */}
-                      <div
-                        ref={nativeLineNumbersRef}
-                        className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
-                        style={{
-                          minWidth: '52px',
-                          width: '52px',
-                          fontFamily: VSCODE_MONO_FONT,
-                          fontSize: '15px',
-                          lineHeight: '26px',
-                          paddingTop: '14px',
-                          paddingBottom: '14px',
-                          boxSizing: 'border-box',
-                        }}
-                      >
-                        {Array.from({ length: Math.max(visualBlueprint.lines.length, 25) }).map(
-                          (_, i) => (
-                            <div
-                              key={i}
-                              style={{ height: '26px', lineHeight: '26px' }}
-                              className={`cursor-default ${
-                                (highlightedLine === i + 1 || activeCursorLine === i + 1)
-                                  ? 'text-[#ffffff] font-bold'
-                                  : ''
-                              }`}
-                            >
-                              {i + 1}
-                            </div>
-                          )
-                        )}
-                      </div>
-
-                      {/* Line-by-Line Visual Explanations with exact 26px height alignment */}
+                    progLang === 'python' ? (
+                      /* ─── STAGE 1: PYTHON TREE-SITTER EXPLANATIONS & SUMMARY CARD ─── */
                       <div
                         ref={nativeViewerRef}
-                        onScroll={handleNativeScroll}
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          left: '52px',
-                          overflow: 'auto',
-                          paddingTop: '14px',
-                          paddingBottom: '14px',
-                          boxSizing: 'border-box',
-                          fontFamily: VSCODE_MONO_FONT,
-                        }}
-                        className="no-scrollbar"
+                        className="flex-1 p-3 overflow-y-auto space-y-2 select-text"
+                        style={{ fontFamily: VSCODE_MONO_FONT }}
                       >
-                        {visualBlueprint.lines.map((bLine, i) => {
-                          const isCurrent = (highlightedLine === bLine.lineNumber || activeCursorLine === bLine.lineNumber);
-                          if (!bLine.hasArrow) {
+                        {/* ─── Top Summary Card: What this program does ─── */}
+                        <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3.5 shadow-sm mb-3.5 transition-all">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Icon icon="flat-color-icons:rules" width={18} height={18} className="shrink-0" />
+                              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                                What this program does
+                              </span>
+                            </div>
+                            <span className="text-xs font-semibold text-slate-300 bg-[#21262d] px-2.5 py-0.5 rounded border border-[#30363d] shrink-0 truncate max-w-[220px]">
+                              {pythonAnalysis.summary.title}
+                            </span>
+                          </div>
+                          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-normal">
+                            {pythonAnalysis.summary.description}
+                          </p>
+
+                          {/* Domain & Structure Stats */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2 border-t border-[#30363d]/60 text-[11px] font-mono">
+                            <span className="bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded font-semibold">
+                              {pythonAnalysis.summary.stats.statements} statements
+                            </span>
+                            {pythonAnalysis.summary.stats.functions > 0 && (
+                              <span className="bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded font-semibold">
+                                {pythonAnalysis.summary.stats.functions} functions
+                              </span>
+                            )}
+                            {pythonAnalysis.summary.stats.loops > 0 && (
+                              <span className="bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded font-semibold">
+                                {pythonAnalysis.summary.stats.loops} loops
+                              </span>
+                            )}
+                            {pythonAnalysis.summary.stats.conditionals > 0 && (
+                              <span className="bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded font-semibold">
+                                {pythonAnalysis.summary.stats.conditionals} conditions
+                              </span>
+                            )}
+                            {pythonAnalysis.summary.stats.classes > 0 && (
+                              <span className="bg-pink-500/10 text-pink-300 border border-pink-500/20 px-2 py-0.5 rounded font-semibold">
+                                {pythonAnalysis.summary.stats.classes} classes
+                              </span>
+                            )}
+                            {pythonAnalysis.summary.stats.imports.length > 0 && (
+                              <span className="bg-sky-500/10 text-sky-300 border border-sky-500/20 px-2 py-0.5 rounded font-semibold">
+                                {pythonAnalysis.summary.stats.imports.join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* ─── Statement Rows: [line number] [code] [TAG] [plain sentence] ─── */}
+                        <div className="space-y-1.5 pb-4">
+                          {pythonAnalysis.rows.map((row, rIdx) => {
+                            const isCurrent =
+                              (highlightedLine !== null && highlightedLine >= row.startLine && highlightedLine <= row.endLine) ||
+                              (activeCursorLine !== null && activeCursorLine >= row.startLine && activeCursorLine <= row.endLine);
+
+                            const style = TAG_STYLES[row.tag] || TAG_STYLES.ACTION;
+                            const lineBadgeText = row.startLine === row.endLine ? `L${row.startLine}` : `L${row.startLine}-${row.endLine}`;
+
                             return (
+                              <div
+                                key={rIdx}
+                                id={`stmt-row-${row.startLine}`}
+                                onClick={() => jumpToLine(row.startLine)}
+                                onMouseEnter={() => setHighlightedLine(row.startLine)}
+                                onMouseLeave={() => setHighlightedLine(null)}
+                                style={{
+                                  marginLeft: `${row.depth * 16}px`,
+                                }}
+                                className={`group relative flex flex-col p-2.5 rounded-md border transition-all cursor-pointer ${
+                                  row.depth > 0 ? 'border-l-2 pl-3' : ''
+                                } ${
+                                  isCurrent
+                                    ? 'bg-[#1e293b] border-blue-500 shadow-md ring-1 ring-blue-500/40'
+                                    : 'bg-[#161b22]/70 border-[#30363d]/60 hover:bg-[#1a202c] hover:border-slate-500'
+                                }`}
+                              >
+                                {/* Guide line accent for indented blocks */}
+                                {row.depth > 0 && (
+                                  <div
+                                    className="absolute left-0 top-0 bottom-0 w-[2px] rounded-l"
+                                    style={{ backgroundColor: style.accent, opacity: isCurrent ? 1 : 0.45 }}
+                                  />
+                                )}
+
+                                <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+                                  {/* Line Number Badge */}
+                                  <span
+                                    className={`text-[11px] font-mono px-1.5 py-0.5 rounded shrink-0 transition-colors ${
+                                      isCurrent
+                                        ? 'bg-blue-600 text-white font-bold'
+                                        : 'bg-[#21262d] text-slate-400 border border-[#30363d]'
+                                    }`}
+                                    title={`Line ${lineBadgeText} -> Click to jump in editor`}
+                                  >
+                                    {lineBadgeText}
+                                  </span>
+
+                                  {/* Monospace Code Pill */}
+                                  <code className="text-xs font-mono text-emerald-300 bg-[#0d1117] px-2 py-0.5 rounded border border-[#30363d]/80 shrink-0 truncate max-w-[200px] sm:max-w-[240px]">
+                                    {row.rawCode.split('\n')[0].trim()}
+                                  </code>
+
+                                  {/* Tag Pill with Color Coding */}
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider shrink-0 border ${style.bg} ${style.text} ${style.border}`}
+                                  >
+                                    {row.tag}
+                                  </span>
+
+                                  {/* Connector Arrow */}
+                                  <span className="text-slate-500 text-xs shrink-0 select-none hidden sm:inline">──&gt;</span>
+
+                                  {/* Plain Sentence (Wraps cleanly, max ~14 words, no text cutoff) */}
+                                  <span
+                                    className={`text-xs sm:text-sm font-medium leading-snug whitespace-normal break-words flex-1 min-w-0 ${
+                                      row.tag === 'COMMENT'
+                                        ? 'text-slate-400 italic'
+                                        : isCurrent
+                                        ? 'text-white font-bold'
+                                        : 'text-slate-200 group-hover:text-white'
+                                    }`}
+                                  >
+                                    {row.explanation}
+                                  </span>
+                                </div>
+
+                                {/* Syntax Error Fix Hint if issue detected */}
+                                {row.hasError && row.errorFixHint && (
+                                  <div className="mt-1.5 flex items-center gap-1.5 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-1">
+                                    <Icon icon="flat-color-icons:high-priority" width={14} height={14} className="shrink-0" />
+                                    <span>Fix Hint: {row.errorFixHint}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Line Numbers aligned with Left Editor (Other Languages) */}
+                        <div
+                          ref={nativeLineNumbersRef}
+                          className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
+                          style={{
+                            minWidth: '52px',
+                            width: '52px',
+                            fontFamily: VSCODE_MONO_FONT,
+                            fontSize: '15px',
+                            lineHeight: '26px',
+                            paddingTop: '14px',
+                            paddingBottom: '14px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {Array.from({ length: Math.max(visualBlueprint.lines.length, 25) }).map(
+                            (_, i) => (
                               <div
                                 key={i}
                                 style={{ height: '26px', lineHeight: '26px' }}
-                                className="w-full select-none"
-                              />
-                            );
-                          }
-                          return (
-                            <div
-                              key={i}
-                              onClick={() => jumpToLine(bLine.lineNumber)}
-                              style={{ height: '26px', lineHeight: '26px' }}
-                              className={`group flex items-center gap-2 px-2.5 w-full cursor-pointer transition-all rounded-[3px] border ${
-                                isCurrent
-                                  ? 'bg-[#1e293b] border-blue-500/60 shadow-xs'
-                                  : 'border-transparent hover:bg-[#252b36]'
-                              }`}
-                            >
-                              <BlueprintIcon
-                                name={bLine.icon}
-                                withContainer
-                                className="w-4 h-4"
-                              />
-                              <span
-                                className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shrink-0 border ${bLine.colorScheme.badgeBg} ${bLine.colorScheme.badgeText} ${bLine.colorScheme.border}`}
-                              >
-                                {bLine.badge}
-                              </span>
-                              <span className="text-slate-500 text-xs shrink-0 select-none">──&gt;</span>
-                              <span
-                                className={`text-sm font-semibold truncate ${
-                                  isCurrent ? 'text-white font-bold' : 'text-slate-200 group-hover:text-white'
+                                className={`cursor-default ${
+                                  (highlightedLine === i + 1 || activeCursorLine === i + 1)
+                                    ? 'text-[#ffffff] font-bold'
+                                    : ''
                                 }`}
                               >
-                                {bLine.title}
-                              </span>
-                              <span className="text-slate-400 text-xs truncate hidden md:inline group-hover:text-slate-300">
-                                — {bLine.detail}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
+                                {i + 1}
+                              </div>
+                            )
+                          )}
+                        </div>
+
+                        {/* Line-by-Line Visual Explanations with exact 26px height alignment */}
+                        <div
+                          ref={nativeViewerRef}
+                          onScroll={handleNativeScroll}
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            left: '52px',
+                            overflow: 'auto',
+                            paddingTop: '14px',
+                            paddingBottom: '14px',
+                            boxSizing: 'border-box',
+                            fontFamily: VSCODE_MONO_FONT,
+                          }}
+                          className="no-scrollbar"
+                        >
+                          {visualBlueprint.lines.map((bLine, i) => {
+                            const isCurrent = (highlightedLine === bLine.lineNumber || activeCursorLine === bLine.lineNumber);
+                            if (!bLine.hasArrow) {
+                              return (
+                                <div
+                                  key={i}
+                                  style={{ height: '26px', lineHeight: '26px' }}
+                                  className="w-full select-none"
+                                />
+                              );
+                            }
+                            return (
+                              <div
+                                key={i}
+                                onClick={() => jumpToLine(bLine.lineNumber)}
+                                style={{ height: '26px', lineHeight: '26px' }}
+                                className={`group flex items-center gap-2 px-2.5 w-full cursor-pointer transition-all rounded-[3px] border ${
+                                  isCurrent
+                                    ? 'bg-[#1e293b] border-blue-500/60 shadow-xs'
+                                    : 'border-transparent hover:bg-[#252b36]'
+                                }`}
+                              >
+                                <BlueprintIcon
+                                  name={bLine.icon}
+                                  withContainer
+                                  className="w-4 h-4"
+                                />
+                                <span
+                                  className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shrink-0 border ${bLine.colorScheme.badgeBg} ${bLine.colorScheme.badgeText} ${bLine.colorScheme.border}`}
+                                >
+                                  {bLine.badge}
+                                </span>
+                                <span className="text-slate-500 text-xs shrink-0 select-none">──&gt;</span>
+                                <span
+                                  className={`text-sm font-semibold truncate ${
+                                    isCurrent ? 'text-white font-bold' : 'text-slate-200 group-hover:text-white'
+                                  }`}
+                                >
+                                  {bLine.title}
+                                </span>
+                                <span className="text-slate-400 text-xs truncate hidden md:inline group-hover:text-slate-300">
+                                  — {bLine.detail}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )
                   ) : blueprintMode === 'blocks' ? (
                     /* ─── ARCHITECTURE BLOCKS VIEW (Grouped semantic cards like Excalidraw) ─── */
                     <div className="flex-1 p-4 overflow-y-auto space-y-6">
