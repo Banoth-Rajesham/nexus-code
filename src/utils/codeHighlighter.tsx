@@ -268,6 +268,8 @@ export interface HighlightedCodeBlockProps {
   colorBlindMode?: boolean;
   showWhitespaceDots?: boolean;
   isDarkTheme?: boolean;
+  isStepMode?: boolean;
+  stepCurrentLine?: number | null;
   onLineHover?: (lineNum: number | null) => void;
   onFixIndent?: (lineNum: number) => void;
 }
@@ -284,6 +286,8 @@ export const HighlightedCodeBlock: React.FC<HighlightedCodeBlockProps> = React.m
   colorBlindMode = false,
   showWhitespaceDots = false,
   isDarkTheme = true,
+  isStepMode = false,
+  stepCurrentLine = null,
   onLineHover,
 }) => {
   const lines = code.split('\n');
@@ -300,10 +304,36 @@ export const HighlightedCodeBlock: React.FC<HighlightedCodeBlockProps> = React.m
       {lines.map((line, idx) => {
         const lineNum = idx + 1;
         const isHovered = highlightedLine === lineNum;
+        const isStepLine = isStepMode && stepCurrentLine === lineNum;
         const isCursorLine = activeCursorLine === lineNum;
         const lineInfo = indentAnalysis?.lines[idx];
         const hasError = lineInfo?.hasError || false;
         const hasBands = rainbowEnabled && lineInfo && lineInfo.bands.length > 0;
+
+        // Line highlight background & borders: step highlight has priority (amber),
+        // cursor line uses faint underline in step mode so they never compete
+        let lineBg: string | undefined = undefined;
+        let lineBorderTop = '1px solid transparent';
+        let lineBorderBottom = '1px solid transparent';
+
+        if (isStepLine) {
+          lineBg = 'rgba(245, 158, 11, 0.22)';
+          lineBorderTop = '1px solid rgba(245, 158, 11, 0.50)';
+          lineBorderBottom = '1px solid rgba(245, 158, 11, 0.50)';
+        } else if (isHovered) {
+          lineBg = 'rgba(255, 255, 255, 0.08)';
+          lineBorderTop = '1px solid rgba(255, 255, 255, 0.18)';
+          lineBorderBottom = '1px solid rgba(255, 255, 255, 0.18)';
+        } else if (isCursorLine) {
+          if (isStepMode) {
+            // Only faint underline when step mode is active
+            lineBorderBottom = '1px solid rgba(255, 255, 255, 0.10)';
+          } else {
+            lineBg = 'rgba(255, 255, 255, 0.04)';
+            lineBorderTop = '1px solid rgba(255, 255, 255, 0.12)';
+            lineBorderBottom = '1px solid rgba(255, 255, 255, 0.12)';
+          }
+        }
 
         return (
           <div
@@ -320,9 +350,9 @@ export const HighlightedCodeBlock: React.FC<HighlightedCodeBlockProps> = React.m
               margin: 0,
               whiteSpace: 'pre',
               boxSizing: 'border-box',
-              backgroundColor: isHovered || isCursorLine ? 'rgba(255, 255, 255, 0.04)' : undefined,
-              borderTop: isHovered ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid transparent',
-              borderBottom: isHovered ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid transparent',
+              backgroundColor: lineBg,
+              borderTop: lineBorderTop,
+              borderBottom: lineBorderBottom,
             }}
           >
             {/* ─── RAINBOW INDENTATION BANDS & GUIDE LINES ─── */}

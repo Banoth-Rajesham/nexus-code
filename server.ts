@@ -883,7 +883,19 @@ function executeCodeInProcess(
 // 5. Safe Sandboxed Code Execution Endpoint
 app.post('/api/v1/execute', optionalAuth, async (req, res) => {
   try {
-        const { code, files, activeFileName, programmingLanguage = 'python', input = '' } = req.body;
+    // SECURITY GUARD: Never execute untrusted student code on Node server in production
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({
+        success: false,
+        output: '[Security Notice: Server-side subprocess execution is disabled in production to protect host security. Code is executed safely in the browser sandbox via Pyodide.]',
+        exitCode: 1,
+        executionTimeMs: 0,
+        language: req.body?.programmingLanguage || 'python',
+        engine: 'disabled_in_production'
+      });
+    }
+
+    const { code, files, activeFileName, programmingLanguage = 'python', input = '' } = req.body;
 
     if (!code && (!files || Object.keys(files).length === 0)) {
       return res.status(400).json({ error: 'No code or files provided to execute.' });

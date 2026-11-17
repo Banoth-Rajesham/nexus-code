@@ -83,6 +83,20 @@ import {
   CodeIndentAnalysis,
 } from '../utils/indentAnalyzer';
 import { WORKSPACE_PRESETS } from '../utils/workspacePresets';
+import { StepControls } from '../components/StepControls';
+import { StepInspector } from '../components/StepInspector';
+import { InputPromptModal } from '../components/InputPromptModal';
+import {
+  runPythonInWorker,
+  tracePythonInWorker,
+  terminateCurrentWorker,
+  isPygameCode,
+  TraceStep,
+  WorkerErrorInfo,
+} from '../utils/pyodideRunner';
+import { FlowchartView, getFlowchartSvg } from '../components/FlowchartView';
+import { buildFlowchartFromPython } from '../utils/flowchart/pythonToFlowGraph';
+import { generateMermaidText } from '../utils/flowchart/mermaidGenerator';
 
 interface WorkspacePageProps {
   onNavigate: (view: string) => void;
@@ -303,6 +317,32 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   }, [settingsOpen]);
 
   const [stdinInput, setStdinInput] = useState('');
+
+  // ─── STAGE 1: STEP-BY-STEP PYTHON EXECUTION STATE ───
+  const [isStepMode, setIsStepMode] = useState(false);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [stepTrace, setStepTrace] = useState<TraceStep[]>([]);
+  const [stepTotal, setStepTotal] = useState(0);
+  const [stepError, setStepError] = useState<WorkerErrorInfo | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playSpeedMs, setPlaySpeedMs] = useState(800);
+  const [pygameNotice, setPygameNotice] = useState(false);
+  const [traceOutdated, setTraceOutdated] = useState(false);
+  const [traceCodeSnapshot, setTraceCodeSnapshot] = useState<string>('');
+  const [traceLangSnapshot, setTraceLangSnapshot] = useState<string>('');
+  const [traceFileSnapshot, setTraceFileSnapshot] = useState<string>('');
+  const [inputPrompt, setInputPrompt] = useState<{
+    isOpen: boolean;
+    prompt: string;
+    line: number;
+    resolve: ((val: string) => void) | null;
+  }>({
+    isOpen: false,
+    prompt: '',
+    line: 1,
+    resolve: null,
+  });
+
   const [showFileExplorer, setShowFileExplorer] = useState<boolean>(() => {
     try {
       return localStorage.getItem('nexus_file_explorer_open') === 'true';
@@ -560,7 +600,6 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const englishEditorRef = useRef<HTMLTextAreaElement>(null);
   const englishPreRef = useRef<HTMLDivElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
-  const arrowsRailRef = useRef<HTMLDivElement>(null);
   const nativeViewerRef = useRef<HTMLDivElement>(null);
   const nativeLineNumbersRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -583,16 +622,16 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   // High-performance deferred code for background translation (zero input lag)
   const deferredCode = useDeferredValue(code);
 
-  // Visual Blueprint View Mode ('aligned' | 'blocks' | 'code' | 'deep') (persisted to localStorage)
-  const [blueprintMode, setBlueprintMode] = useState<'aligned' | 'blocks' | 'code' | 'deep'>(() => {
+  // Visual Blueprint View Mode ('aligned' | 'blocks' | 'code' | 'flowchart' | 'deep' | 'variables') (persisted to localStorage)
+  const [blueprintMode, setBlueprintMode] = useState<'aligned' | 'blocks' | 'code' | 'flowchart' | 'deep' | 'variables'>(() => {
     try {
       const saved = localStorage.getItem('nexus_blueprint_mode');
-      if (saved === 'aligned' || saved === 'blocks' || saved === 'code' || saved === 'deep') return saved;
+      if (saved === 'aligned' || saved === 'blocks' || saved === 'code' || saved === 'flowchart' || saved === 'deep' || saved === 'variables') return saved as any;
     } catch {}
     return 'aligned';
   });
 
-  const handleBlueprintModeChange = (mode: 'aligned' | 'blocks' | 'code' | 'deep') => {
+  const handleBlueprintModeChange = (mode: 'aligned' | 'blocks' | 'code' | 'flowchart' | 'deep' | 'variables') => {
     setBlueprintMode(mode);
     try {
       localStorage.setItem('nexus_blueprint_mode', mode);
@@ -641,6 +680,52 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
     return () => clearTimeout(timer);
   }, [code, progLang]);
+
+  // ─── Stale Trace Detection: mark trace outdated when code, language or file changes ───
+  useEffect(() => {
+    if (!isStepMode && !traceOutdated) return;
+    if (
+      code !== traceCodeSnapshot ||
+      progLang !== traceLangSnapshot ||
+      activeFileId !== traceFileSnapshot
+    ) {
+      setTraceOutdated(true);
+      setIsPlaying(false); // Auto-play must stop when code changes
+      setHighlightedLine(null); // Clear the step marker
+    }
+  }, [
+    code,
+    progLang,
+    activeFileId,
+    isStepMode,
+    traceOutdated,
+    traceCodeSnapshot,
+    traceLangSnapshot,
+    traceFileSnapshot,
+  ]);
+
+  // ─── STAGE 2: 400ms Debounced Flowchart Generation from Parse Tree ───
+  const [debouncedFlowchartCode, setDebouncedFlowchartCode] = useState(code);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFlowchartCode(code);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [code]);
+
+  const flowchartBundle = useMemo(() => {
+    if (blueprintMode !== 'flowchart') {
+      return {
+        charts: {},
+        functionNames: [],
+        totalNodeCount: 0,
+        capped: false,
+        empty: !code.trim(),
+      };
+    }
+    return buildFlowchartFromPython(debouncedFlowchartCode, pythonAnalysis.rows);
+  }, [debouncedFlowchartCode, pythonAnalysis.rows, blueprintMode, code]);
 
   // Bidirectional auto-scroll synchronization between editor line and explanation row
   useEffect(() => {
@@ -705,9 +790,6 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
       if (lineNumbersRef.current) {
         lineNumbersRef.current.scrollTop = scrollTop;
       }
-      if (arrowsRailRef.current) {
-        arrowsRailRef.current.scrollTop = scrollTop;
-      }
       if (blueprintMode === 'aligned') {
         if (nativeViewerRef.current) {
           nativeViewerRef.current.scrollTop = scrollTop;
@@ -730,7 +812,6 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
         englishEditorRef.current.scrollTop = scrollTop;
         if (englishPreRef.current) englishPreRef.current.scrollTop = scrollTop;
         if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = scrollTop;
-        if (arrowsRailRef.current) arrowsRailRef.current.scrollTop = scrollTop;
       }
     }
   };
@@ -1369,6 +1450,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
   // 1. RUN CODE — Real Subprocess Execution with Multi-File support & In-Browser Sandbox Fallback!
   const handleStopExecution = () => {
+    terminateCurrentWorker();
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -1378,6 +1460,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
       runTimeoutRef.current = null;
     }
     setLoadingAction(null);
+    setIsPlaying(false);
     setTerminalOutput({
       output: '[Execution Stopped by User]\nProgram execution was cancelled.',
       timeMs: 0,
@@ -1427,6 +1510,35 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     });
 
     const targetRunFile = activeFile || entryFile;
+
+    // In-browser Web Worker execution for Python (100% secure, offline & private)
+    if (progLang === 'python' && !isPygameCode(targetRunFile.content) && files.length <= 1) {
+      try {
+        const inputs = stdinInput ? stdinInput.split('\n') : [];
+        const runRes = await runPythonInWorker(
+          targetRunFile.content,
+          inputs,
+          (prompt, line, resume) => {
+            setInputPrompt({ isOpen: true, prompt, line, resolve: resume });
+          }
+        );
+        if (runTimeoutRef.current) {
+          clearTimeout(runTimeoutRef.current);
+          runTimeoutRef.current = null;
+        }
+        setTerminalOutput({
+          output: runRes.output,
+          timeMs: runRes.timeMs,
+          success: runRes.success,
+          exitCode: runRes.success ? 0 : 1,
+          language: 'python',
+          engine: runRes.engine,
+        });
+        return;
+      } catch (workerRunErr) {
+        console.warn('Worker execution fallback to server:', workerRunErr);
+      }
+    }
 
     try {
       const res = await fetch('/api/v1/execute', {
@@ -1521,6 +1633,207 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
       abortControllerRef.current = null;
     }
   };
+
+  // ─── STAGE 1: STEP-BY-STEP TRACER HANDLERS ───
+  const handleStartStep = async () => {
+    if (!code.trim()) {
+      setErrorMessage('Please enter Python code first to step through.');
+      return;
+    }
+    if (progLang !== 'python') {
+      setErrorMessage('Step-by-step execution is currently enabled for Python programs.');
+      return;
+    }
+    if (isPygameCode(code)) {
+      setPygameNotice(true);
+      return;
+    }
+
+    setErrorMessage(null);
+    setLoadingAction('step');
+    setShowConsole(true);
+    setConsoleTab('terminal');
+    setTerminalOutput(null); // Clear terminal when new Step session starts
+
+    try {
+      const inputs = stdinInput ? stdinInput.split('\n') : [];
+      const res = await tracePythonInWorker(
+        code,
+        inputs,
+        (prompt, line, resume) => {
+          setInputPrompt({ isOpen: true, prompt, line, resolve: resume });
+        }
+      );
+
+      if (!res.success && res.trace.length === 0 && res.error) {
+        setErrorMessage(`${res.error.type}: ${res.error.message} (Line ${res.error.line})`);
+        setStepError(res.error);
+        setHighlightedLine(res.error.line);
+        setTerminalOutput({
+          output: `Stopped at line ${res.error.line}: ${res.error.type}: ${res.error.message}`,
+          timeMs: res.timeMs,
+          success: false,
+          exitCode: 1,
+          language: 'python',
+          engine: 'Pyodide Web Worker Tracer',
+        });
+        return;
+      }
+
+      if (res.trace.length === 0) {
+        setErrorMessage('Program finished without executing any lines.');
+        setTerminalOutput({
+          output: 'Program finished\n(no output)',
+          timeMs: res.timeMs,
+          success: true,
+          exitCode: 0,
+          language: 'python',
+          engine: 'Pyodide Web Worker Tracer',
+        });
+        return;
+      }
+
+      // Record snapshot to detect code/lang/file changes
+      setTraceCodeSnapshot(code);
+      setTraceLangSnapshot(progLang);
+      setTraceFileSnapshot(activeFileId);
+      setTraceOutdated(false);
+
+      setIsStepMode(true);
+      setStepTrace(res.trace);
+      setStepTotal(res.totalSteps || res.trace.length);
+      setStepIndex(0);
+      setStepError(res.error || null);
+      setHighlightedLine(res.trace[0].line);
+
+      let initialOutput = res.trace[0].outputSoFar || '';
+      if (res.trace.length === 1) {
+        if (res.error) {
+          initialOutput = (initialOutput ? initialOutput + '\n' : '') + `Stopped at line ${res.error.line}`;
+        } else {
+          initialOutput = initialOutput ? `${initialOutput}\nProgram finished` : 'Program finished\n(no output)';
+        }
+      }
+
+      setTerminalOutput({
+        output: initialOutput,
+        timeMs: res.timeMs,
+        success: true,
+        exitCode: 0,
+        language: 'python',
+        engine: 'Pyodide Web Worker Tracer',
+      });
+
+      if (res.status === 'capped') {
+        setErrorMessage(res.message || 'Execution paused: Program exceeded 2,000 steps.');
+      }
+    } catch (err: any) {
+      setErrorMessage(`Step Tracer Error: ${err.message || 'Failed to start step mode'}`);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleStepNext = async () => {
+    if (traceOutdated) {
+      await handleStartStep();
+      return;
+    }
+    if (!isStepMode || stepTrace.length === 0) {
+      await handleStartStep();
+      return;
+    }
+    if (stepIndex >= stepTrace.length - 1) {
+      setIsPlaying(false);
+      return;
+    }
+    const nextIdx = stepIndex + 1;
+    setStepIndex(nextIdx);
+    const step = stepTrace[nextIdx];
+    setHighlightedLine(step.line);
+
+    let currentOut = step.outputSoFar || '';
+    if (nextIdx === stepTrace.length - 1) {
+      if (stepError) {
+        currentOut = (currentOut ? currentOut + '\n' : '') + `Stopped at line ${stepError.line}`;
+      } else {
+        currentOut = currentOut ? `${currentOut}\nProgram finished` : 'Program finished\n(no output)';
+      }
+    }
+
+    setTerminalOutput((prev) => ({
+      output: currentOut,
+      timeMs: prev?.timeMs || 0,
+      success: !(nextIdx === stepTrace.length - 1 && stepError),
+      exitCode: nextIdx === stepTrace.length - 1 && stepError ? 1 : 0,
+      language: 'python',
+      engine: 'Pyodide Web Worker Tracer',
+    }));
+  };
+
+  const handleStepBack = () => {
+    if (!isStepMode || stepTrace.length === 0) return;
+    if (stepIndex <= 0) return;
+    const prevIdx = stepIndex - 1;
+    setStepIndex(prevIdx);
+    const step = stepTrace[prevIdx];
+    setHighlightedLine(step.line);
+    setTerminalOutput((prev) => ({
+      output: step.outputSoFar || '',
+      timeMs: prev?.timeMs || 0,
+      success: true,
+      exitCode: 0,
+      language: 'python',
+      engine: 'Pyodide Web Worker Tracer',
+    }));
+  };
+
+  const handleTogglePlay = async () => {
+    if (traceOutdated) {
+      await handleStartStep();
+      setIsPlaying(true);
+      return;
+    }
+    if (stepIndex >= stepTrace.length - 1) {
+      setStepIndex(0);
+      setHighlightedLine(stepTrace[0]?.line || 1);
+      setTerminalOutput((prev) => ({
+        output: stepTrace[0]?.outputSoFar || '',
+        timeMs: prev?.timeMs || 0,
+        success: true,
+        exitCode: 0,
+        language: 'python',
+        engine: 'Pyodide Web Worker Tracer',
+      }));
+      setIsPlaying(true);
+    } else {
+      setIsPlaying((p) => !p);
+    }
+  };
+
+  const handleResetStep = () => {
+    terminateCurrentWorker();
+    setIsStepMode(false);
+    setIsPlaying(false);
+    setStepTrace([]);
+    setStepIndex(0);
+    setStepError(null);
+    setHighlightedLine(null);
+    setTraceOutdated(false);
+  };
+
+  // Auto-play interval effect for Step Mode
+  useEffect(() => {
+    if (!isPlaying) return;
+    if (stepIndex >= stepTrace.length - 1) {
+      setIsPlaying(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void handleStepNext();
+    }, playSpeedMs);
+    return () => clearTimeout(timer);
+  }, [isPlaying, stepIndex, stepTrace.length, playSpeedMs, traceOutdated]);
 
   // 2. Explain Code (Deterministic Rule-Based)
   const handleExplain = async () => {
@@ -1819,6 +2132,31 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
       };
     }
 
+    if (blueprintMode === 'flowchart') {
+      const chart = flowchartBundle.charts.Main || Object.values(flowchartBundle.charts)[0];
+      const mmd = chart ? generateMermaidText(chart, { theme: editorTheme === 'light' ? 'light' : 'dark' }) : '';
+      return {
+        text: mmd || 'flowchart TD\n  empty(["No code"])',
+        filename: `${baseName}_flowchart.mmd`,
+      };
+    }
+
+    if (blueprintMode === 'variables') {
+      const step = stepTrace[stepIndex];
+      const vars = step
+        ? Object.entries(step.locals)
+            .map(([k, v]) => `  ${k} (${v.type}): ${v.value}`)
+            .join('\n')
+        : 'No variables recorded yet.';
+      const stack = (step?.stack || [])
+        .map((s) => `  ${s.function}(${Object.entries(s.args || {}).map(([k, v]) => `${k}=${v}`).join(', ')})`)
+        .join('\n');
+      return {
+        text: `=== STEP ${stepIndex + 1} OF ${stepTotal || stepTrace.length} (Line ${step?.line || 1}) ===\n\n=== VARIABLES IN SCOPE ===\n${vars}\n\n=== CALL STACK ===\n${stack || '  Global'}\n\n=== OUTPUT SO FAR ===\n${step?.outputSoFar || '(No output yet)'}`,
+        filename: `${baseName}_step_${stepIndex + 1}_variables.txt`,
+      };
+    }
+
     return {
       text: code,
       filename: `${baseName}_explanation.txt`,
@@ -2067,7 +2405,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
             </select>
 
             {/* Run / Stop Button */}
-            {loadingAction === 'execute' ? (
+            {loadingAction === 'execute' || loadingAction === 'step' ? (
               <button
                 onClick={handleStopExecution}
                 title="Stop Execution"
@@ -2088,6 +2426,25 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 <Play className="w-3.5 h-3.5 fill-white" />
                 <span className="whitespace-nowrap">Run {activeFile.name}</span>
               </button>
+            )}
+
+            {/* Step-by-Step Execution Controls (Python) */}
+            {progLang === 'python' && (
+              <StepControls
+                isStepMode={isStepMode}
+                stepIndex={stepIndex}
+                totalSteps={stepTotal || stepTrace.length}
+                isPlaying={isPlaying}
+                playSpeedMs={playSpeedMs}
+                disabled={(!code.trim() && files.length === 0) || loadingAction !== null}
+                isTraceOutdated={traceOutdated}
+                onStartStep={handleStartStep}
+                onStepNext={handleStepNext}
+                onStepBack={handleStepBack}
+                onTogglePlay={handleTogglePlay}
+                onReset={handleResetStep}
+                onChangeSpeed={(s) => setPlaySpeedMs(s)}
+              />
             )}
           </div>
 
@@ -2824,6 +3181,18 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                           }`}
                           title={hasError ? `${lineInfo?.errorMessage} (Click to inspect / fix)` : undefined}
                         >
+                          {/* Step Mode Arrow Marker */}
+                          {isStepMode && !traceOutdated && stepTrace[stepIndex]?.line === lineNum && (
+                            <span className="text-amber-400 font-bold text-xs mr-0.5 animate-pulse" title="Current Step Line">
+                              ▶
+                            </span>
+                          )}
+                          {isStepMode && !traceOutdated && stepError && stepError.line === lineNum && stepIndex === stepTrace.length - 1 && (
+                            <span className="text-red-400 font-bold text-xs mr-0.5" title={stepError.meaning}>
+                              ✕
+                            </span>
+                          )}
+
                           {/* Small Red Marker in Gutter for Indentation Errors */}
                           {hasError && (
                             <span
@@ -2914,8 +3283,14 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                           colorBlindMode={colorBlindMode}
                           showWhitespaceDots={showWhitespaceDots}
                           isDarkTheme={editorTheme === 'dark'}
+                          isStepMode={isStepMode && !traceOutdated}
+                          stepCurrentLine={isStepMode && !traceOutdated ? stepTrace[stepIndex]?.line : null}
                         />
                       </div>
+                    )}
+
+                    {!wordWrap && (
+                      <div className="absolute top-0 right-0 bottom-0 w-6 pointer-events-none bg-gradient-to-l from-[#1e1e1e]/60 to-transparent z-20" />
                     )}
 
                     <textarea
@@ -2924,6 +3299,22 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       onChange={(e) => {
                         handleCodeChange(e.target.value);
                         handleEditorSelect();
+                      }}
+                      onMouseMove={(e) => {
+                        const target = e.currentTarget;
+                        const rect = target.getBoundingClientRect();
+                        const lineH = fontSize === '13px' ? 22 : fontSize === '17px' ? 30 : 26;
+                        const y = e.clientY - rect.top + target.scrollTop - 14;
+                        if (y >= 0) {
+                          const lNum = Math.floor(y / lineH) + 1;
+                          const totalLines = code.split('\n').length;
+                          if (lNum >= 1 && lNum <= totalLines) {
+                            setHighlightedLine(lNum);
+                          }
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        setHighlightedLine(null);
                       }}
                       onScroll={handleEnglishScroll}
                       onKeyDown={handleEditorKeyDown}
@@ -2964,60 +3355,6 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       className="selection:bg-[#264f78]/60 selection:text-transparent"
                     />
                   </div>
-
-                  {/* ─── VISUAL ARROW CONNECTOR RAIL (Exact matching code lines ONLY) ─── */}
-                  <div
-                    ref={arrowsRailRef}
-                    className="select-none bg-[#1e1e1e] border-l border-[#30363d]/50 shrink-0 overflow-hidden flex flex-col items-center z-10"
-                    style={{
-                      width: '44px',
-                      paddingTop: '14px',
-                      paddingBottom: '14px',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    {visualBlueprint.lines.map((bLine, i) => {
-                      const isCurrent = (highlightedLine === bLine.lineNumber || activeCursorLine === bLine.lineNumber);
-                      return (
-                        <div
-                          key={i}
-                          style={{ height: editorLineHeight, lineHeight: editorLineHeight }}
-                          className="flex items-center justify-center w-full"
-                        >
-                          {bLine.hasArrow ? (
-                            <button
-                              type="button"
-                              onClick={() => jumpToLine(bLine.lineNumber)}
-                              className={`flex items-center justify-center cursor-pointer transition-all ${
-                                isCurrent
-                                  ? 'scale-115'
-                                  : 'text-slate-500 hover:text-slate-200'
-                              }`}
-                              style={{
-                                color: isCurrent ? bLine.colorScheme.accent : undefined,
-                                filter: isCurrent ? `drop-shadow(0 0 6px ${bLine.colorScheme.accent})` : undefined,
-                              }}
-                              title={`Line ${bLine.lineNumber} -> Click to inspect explanation`}
-                            >
-                              <svg
-                                width="26"
-                                height="14"
-                                viewBox="0 0 26 14"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <line x1="2" y1="7" x2="22" y2="7" />
-                                <polyline points="15 2 22 7 15 12" />
-                              </svg>
-                            </button>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
               </div>
 
@@ -3050,12 +3387,15 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         ? 'Deep Explanation'
                         : 'Visual Blueprint'}
                     </span>
-                    <span className="text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono font-semibold shrink-0 whitespace-nowrap">
+                    <span
+                      title="Rows = statements explained. Steps = lines actually executed."
+                      className="text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono font-semibold shrink-0 whitespace-nowrap cursor-help"
+                    >
                       {blueprintMode === 'deep'
                         ? '4 Layers'
                         : progLang === 'python'
-                        ? `${pythonAnalysis.rows.length} statements`
-                        : `${visualBlueprint.totalCodeLines} lines`}
+                        ? `${pythonAnalysis.rows.length} rows`
+                        : `${visualBlueprint.totalCodeLines} rows`}
                     </span>
                   </div>
 
@@ -3090,6 +3430,15 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         <span className="hidden xl:inline">Pseudocode</span>
                       </button>
                       <button
+                        onClick={() => handleBlueprintModeChange('flowchart')}
+                        aria-label="Flowchart View"
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'flowchart' ? 'bg-blue-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:text-white'}`}
+                        title="Flowchart: Visual control flow diagram generated directly from parse tree"
+                      >
+                        <Icon icon="flat-color-icons:tree-structure" width={14} height={14} className="shrink-0" />
+                        <span className="hidden xl:inline">Flowchart</span>
+                      </button>
+                      <button
                         onClick={() => handleBlueprintModeChange('deep')}
                         aria-label="Deep Explanation View"
                         className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'deep' ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white'}`}
@@ -3097,6 +3446,15 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       >
                         <Icon icon="flat-color-icons:radar-plot" width={14} height={14} className="shrink-0" />
                         <span className="hidden xl:inline">Deep Explanation</span>
+                      </button>
+                      <button
+                        onClick={() => handleBlueprintModeChange('variables')}
+                        aria-label="Variables Inspector View"
+                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'variables' ? 'bg-amber-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:text-white'}`}
+                        title="Variables: Live variable scope, call stack, and loop counters"
+                      >
+                        <Icon icon="flat-color-icons:data-sheet" width={14} height={14} className="shrink-0" />
+                        <span className="hidden xl:inline">Variables</span>
                       </button>
                     </div>
 
@@ -3131,11 +3489,12 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                   ) : blueprintMode === 'aligned' ? (
                     progLang === 'python' ? (
                       /* ─── STAGE 1: PYTHON TREE-SITTER EXPLANATIONS & SUMMARY CARD ─── */
-                      <div
-                        ref={nativeViewerRef}
-                        className="flex-1 p-3 overflow-y-auto space-y-2 select-text"
-                        style={{ fontFamily: VSCODE_MONO_FONT }}
-                      >
+                      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                        <div
+                          ref={nativeViewerRef}
+                          className="flex-1 p-3 overflow-y-auto space-y-2 select-text"
+                          style={{ fontFamily: VSCODE_MONO_FONT }}
+                        >
                         {/* ─── Top Summary Card: What this program does ─── */}
                         <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3.5 shadow-sm mb-3.5 transition-all">
                           <div className="flex items-center justify-between gap-2 mb-2">
@@ -3340,6 +3699,23 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                           })}
                         </div>
                       </div>
+
+                        {/* Docked Step Inspector in Line Blueprint View */}
+                        {isStepMode && (
+                          <div className="shrink-0 max-h-60 overflow-y-auto">
+                            <StepInspector
+                              currentStep={stepTrace[stepIndex] || null}
+                              prevStep={stepIndex > 0 ? stepTrace[stepIndex - 1] : null}
+                              stepIndex={stepIndex}
+                              totalSteps={stepTotal || stepTrace.length}
+                              error={stepError}
+                              isErrorStep={stepIndex === stepTrace.length - 1 && !!stepError}
+                              isTraceOutdated={traceOutdated}
+                              onJumpToLine={jumpToLine}
+                            />
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <>
                         {/* Line Numbers aligned with Left Editor (Other Languages) */}
@@ -3507,6 +3883,30 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       onJumpToLine={jumpToLine}
                       highlightedLine={highlightedLine || activeCursorLine}
                     />
+                  ) : blueprintMode === 'flowchart' ? (
+                    /* ─── STAGE 2: CONTROL FLOW DIAGRAM (MERMAID) ─── */
+                    <FlowchartView
+                      bundle={flowchartBundle}
+                      theme={editorTheme === 'light' ? 'light' : 'dark'}
+                      activeLine={activeCursorLine || highlightedLine}
+                      stepCurrentLine={isStepMode ? stepTrace[stepIndex]?.line : null}
+                      visitedLines={isStepMode ? stepTrace.slice(0, stepIndex + 1).map((s) => s.line) : []}
+                      onJumpToLine={jumpToLine}
+                    />
+                  ) : blueprintMode === 'variables' ? (
+                    /* ─── LIVE VARIABLES & STEP INSPECTION VIEW ─── */
+                    <div className="flex-1 overflow-y-auto">
+                      <StepInspector
+                        currentStep={stepTrace[stepIndex] || null}
+                        prevStep={stepIndex > 0 ? stepTrace[stepIndex - 1] : null}
+                        stepIndex={stepIndex}
+                        totalSteps={stepTotal || stepTrace.length}
+                        error={stepError}
+                        isErrorStep={stepIndex === stepTrace.length - 1 && !!stepError}
+                        isTraceOutdated={traceOutdated}
+                        onJumpToLine={jumpToLine}
+                      />
+                    </div>
                   ) : (
                     /* ─── PSEUDOCODE / CODE VIEW ─── */
                     <>
@@ -4138,6 +4538,45 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white text-xs font-semibold px-3.5 py-2 rounded-md shadow-2xl flex items-center gap-2 animate-bounce">
           <Check className="w-4 h-4" />
           <span>Project saved successfully</span>
+        </div>
+      )}
+
+      {/* ─── MODAL: PROGRAM INPUT PROMPT (input() in Python) ─── */}
+      {inputPrompt.isOpen && (
+        <InputPromptModal
+          promptText={inputPrompt.prompt}
+          line={inputPrompt.line}
+          onSubmit={(val) => {
+            if (inputPrompt.resolve) inputPrompt.resolve(val);
+            setInputPrompt({ isOpen: false, prompt: '', line: 1, resolve: null });
+          }}
+          onCancel={() => {
+            terminateCurrentWorker();
+            setLoadingAction(null);
+            setInputPrompt({ isOpen: false, prompt: '', line: 1, resolve: null });
+          }}
+        />
+      )}
+
+      {/* ─── TOAST: PYGAME NOTIFICATION ─── */}
+      {pygameNotice && (
+        <div className="fixed top-14 right-6 z-50 bg-[#161b22] border border-amber-500/50 rounded-lg p-4 shadow-2xl max-w-sm text-slate-200 animate-fadeIn">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+              <Icon icon="flat-color-icons:high-priority" width={18} height={18} className="shrink-0" />
+              <span>Pygame Graphics Notice</span>
+            </div>
+            <button
+              onClick={() => setPygameNotice(false)}
+              aria-label="Dismiss Pygame notice"
+              className="text-slate-400 hover:text-white p-1 rounded hover:bg-[#21262d] transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+            Step-by-step execution is not supported for Pygame graphics programs. Please use the standard <strong className="text-emerald-400">Run</strong> button to execute graphical animations.
+          </p>
         </div>
       )}
     </div>
