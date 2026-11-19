@@ -41,6 +41,11 @@
     --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
   }
 
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
   body {
     background-color: var(--color-page-bg);
     color: var(--ds-app-color-base-default-fg-body);
@@ -80,3 +85,101 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 100, 100, 0.5);
 }
+
+/* ─── 3D view animations ─────────────────────────────────────────────────────
+   Uses the individual `translate` / `scale` properties so they compose with the
+   inline 3D `transform` instead of replacing it. */
+@keyframes v3d-pop {
+  0% { translate: 0 0 0; }
+  35% { translate: 0 0 22px; }
+  100% { translate: 0 0 0; }
+}
+.v3d-pop { animation: v3d-pop 520ms cubic-bezier(.2,.8,.2,1); }
+
+@keyframes v3d-bounce {
+  0% { scale: 1; }
+  40% { scale: 1.18; }
+  100% { scale: 1; }
+}
+.v3d-bounce { display: inline-block; animation: v3d-bounce 420ms ease-out; }
+
+@keyframes v3d-flow { to { stroke-dashoffset: -28; } }
+.v3d-flow { animation: v3d-flow 1.8s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v3d-pop, .v3d-bounce, .v3d-flow { animation: none; }
+}
+
+/* ─── Workspace theme tokens ────────────────────────────────────────────────
+   Semantic colour classes used by workspace components. Dark values are the
+   default; adding `ws-light` to the workspace root switches them to light. */
+:root {
+  --ws-surface: #161b22;
+  --ws-sunken: #0d1117;
+  --ws-elevated: #21262d;
+  --ws-elevated-2: #30363d;
+  --ws-accent-soft: #111a2b;
+  --ws-border: #30363d;
+  --ws-hover: #21262d;
+  --ws-hover-border: #64748b;
+  --ws-strong: #ffffff;
+  --ws-body: #e2e8f0;
+  --ws-text-2: #cbd5e1;
+  --ws-muted: #94a3b8;
+  --ws-faint: #64748b;
+  --ws-amber: #fcd34d; --ws-amber-soft: #fde68a;
+  --ws-emerald: #6ee7b7; --ws-emerald-soft: #a7f3d0;
+  --ws-rose: #fda4af; --ws-rose-soft: #fecdd3;
+  --ws-red: #f87171; --ws-red-soft: #fecaca;
+  --ws-sky: #7dd3fc; --ws-sky-soft: #bae6fd;
+  --ws-blue: #93c5fd; --ws-blue-soft: #dbeafe;
+  --ws-indigo: #a5b4fc; --ws-indigo-soft: #c7d2fe;
+}
+.ws-light {
+  --ws-surface: #ffffff;
+  --ws-sunken: #f8fafc;
+  --ws-elevated: #f1f5f9;
+  --ws-elevated-2: #e2e8f0;
+  --ws-accent-soft: #eff6ff;
+  --ws-border: #e2e8f0;
+  --ws-hover: #f1f5f9;
+  --ws-hover-border: #94a3b8;
+  --ws-strong: #0f172a;
+  --ws-body: #334155;
+  --ws-text-2: #475569;
+  --ws-muted: #64748b;
+  --ws-faint: #94a3b8;
+  --ws-amber: #b45309; --ws-amber-soft: #92400e;
+  --ws-emerald: #047857; --ws-emerald-soft: #065f46;
+  --ws-rose: #be123c; --ws-rose-soft: #9f1239;
+  --ws-red: #b91c1c; --ws-red-soft: #991b1b;
+  --ws-sky: #0369a1; --ws-sky-soft: #075985;
+  --ws-blue: #1d4ed8; --ws-blue-soft: #1e40af;
+  --ws-indigo: #4338ca; --ws-indigo-soft: #3730a3;
+}
+.ws-bg-surface { background-color: var(--ws-surface); }
+.ws-bg-sunken { background-color: var(--ws-sunken); }
+.ws-bg-elevated { background-color: var(--ws-elevated); }
+.ws-bg-elevated2 { background-color: var(--ws-elevated-2); }
+.ws-bg-accent-soft { background-color: var(--ws-accent-soft); }
+.ws-border { border-color: var(--ws-border); }
+.ws-divide > :not(:last-child) { border-color: var(--ws-border); }
+.ws-hover-bg:hover { background-color: var(--ws-hover); }
+.ws-hover-accent:hover { background-color: var(--ws-accent-soft); }
+.ws-hover-border:hover { border-color: var(--ws-hover-border); }
+.ws-text-strong { color: var(--ws-strong); }
+.ws-text-body { color: var(--ws-body); }
+.ws-text-2 { color: var(--ws-text-2); }
+.ws-text-muted { color: var(--ws-muted); }
+.ws-text-faint { color: var(--ws-faint); }
+.ws-hover-strong:hover, .group:hover .ws-group-hover-strong { color: var(--ws-strong); }
+.ws-tx-amber { color: var(--ws-amber); } .ws-tx-amber-soft { color: var(--ws-amber-soft); }
+.ws-tx-emerald { color: var(--ws-emerald); } .ws-tx-emerald-soft { color: var(--ws-emerald-soft); }
+.ws-tx-rose { color: var(--ws-rose); } .ws-tx-rose-soft { color: var(--ws-rose-soft); }
+.ws-tx-red { color: var(--ws-red); } .ws-tx-red-soft { color: var(--ws-red-soft); }
+.ws-tx-sky { color: var(--ws-sky); } .ws-tx-sky-soft { color: var(--ws-sky-soft); }
+.ws-tx-blue { color: var(--ws-blue); } .ws-tx-blue-soft { color: var(--ws-blue-soft); }
+.ws-tx-indigo { color: var(--ws-indigo); } .ws-tx-indigo-soft { color: var(--ws-indigo-soft); }
+.ws-hover-tx-sky:hover { color: var(--ws-sky-soft); }
+/* Light theme: the dark slab gradients used in a few panels become plain surfaces */
+.ws-light .ws-light-shadow { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }

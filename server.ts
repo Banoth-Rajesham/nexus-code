@@ -1,4 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
+import compression from 'compression';
+import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -6,16 +8,91 @@ import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { spawn } from 'child_process';
 import os from 'os';
+import { promisify } from 'util';
 import { analyzeAnyCodeDynamically } from './src/utils/universalCodeAnalyzer';
 import { analyzeCodeRuleBased } from './src/utils/ruleBasedAnalyzer';
 import { debugCodeDeterministically, convertCodeDeterministically, askCodeDeterministically } from './src/utils/deterministicTools';
 
 dotenv.config();
 
+// `--production` works on every OS (Windows shells can't set NODE_ENV inline in npm scripts)
+if (process.argv.includes('--production')) process.env.NODE_ENV = 'production';
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+app.disable('x-powered-by');
+// Behind a hosting proxy (Render, Railway, Nginx…) req.ip must come from X-Forwarded-For,
+// otherwise every visitor shares one rate-limit bucket. Set TRUST_PROXY=0 when not behind a proxy.
+app.set('trust proxy', process.env.TRUST_PROXY !== undefined ? Number(process.env.TRUST_PROXY) || false : IS_PRODUCTION ? 1 : false);
+
+if (IS_PRODUCTION) {
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          defaultSrc: ["'self'"],
+          // 'unsafe-eval' + 'wasm-unsafe-eval': the in-browser Python runtime and the JS sandbox compile code at runtime
+          scriptSrc: ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'blob:'],
+          workerSrc: ["'self'", 'blob:'],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+          // Iconify icon API and its official fallback hosts
+          connectSrc: ["'self'", 'https://api.iconify.design', 'https://api2.iconify.design', 'https://api.simplesvg.com', 'https://api.unisvg.com'],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'self'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          upgradeInsecureRequests: process.env.FORCE_HTTPS === '1' ? [] : null,
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+    })
+  );
+}
+app.use(compression());
+// Dev server binds to loopback only so nothing on the LAN can reach it. Override with HOST=0.0.0.0 if needed.
+const HOST = process.env.HOST || (IS_PRODUCTION ? '0.0.0.0' : '127.0.0.1');
 
 app.use(express.json({ limit: '2mb' }));
+
+// Simple in-memory fixed-window rate limiter (per IP + bucket name)
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(name: string, max: number, windowMs: number) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const key = `${name}:${req.ip || req.socket.remoteAddress || 'unknown'}`;
+    const now = Date.now();
+    const bucket = rateBuckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    if (bucket.count >= max) {
+      res.setHeader('Retry-After', Math.ceil((bucket.resetAt - now) / 1000).toString());
+      return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' });
+    }
+    bucket.count++;
+    next();
+  };
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateBuckets) if (bucket.resetAt <= now) rateBuckets.delete(key);
+}, 60_000).unref();
+
+const authLimiter = rateLimit('auth', 10, 15 * 60 * 1000);
+const resetLimiter = rateLimit('reset', 5, 15 * 60 * 1000);
+const submitLimiter = rateLimit('submit', 20, 60 * 60 * 1000);
+
+function asTrimmedString(value: unknown, maxLength: number): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > maxLength) return null;
+  return trimmed;
+}
 
 // Initialize Google GenAI
 const ai = new GoogleGenAI({
@@ -46,6 +123,9 @@ interface User {
   dailyUsageCount: number;
   lastUsageDate: string;
   createdAt: string;
+  resetCodeHash?: string;
+  resetCodeExpiresAt?: number;
+  resetAttempts?: number;
 }
 
 interface Session {
@@ -73,14 +153,42 @@ interface DatabaseSchema {
   feedback: Array<{ id: string; name: string; email: string; message: string; date: string }>;
 }
 
+// The DB is loaded from disk once and kept in memory. Every request mutates the
+// same object, so concurrent requests can no longer overwrite each other's changes.
+let dbCache: DatabaseSchema | null = null;
+
+function pruneExpiredSessions(db: DatabaseSchema): boolean {
+  const now = Date.now();
+  const before = db.sessions.length;
+  db.sessions = db.sessions.filter((s) => s.expiresAt > now);
+  return db.sessions.length !== before;
+}
+
 function loadDb(): DatabaseSchema {
+  if (dbCache) return dbCache;
+  dbCache = readDbFromDisk();
+  if (pruneExpiredSessions(dbCache)) saveDb(dbCache);
+  return dbCache;
+}
+
+function readDbFromDisk(): DatabaseSchema {
   try {
     if (fs.existsSync(DB_FILE)) {
       const data = fs.readFileSync(DB_FILE, 'utf-8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      return {
+        users: parsed.users || [],
+        sessions: parsed.sessions || [],
+        projects: parsed.projects || [],
+        feedback: parsed.feedback || [],
+      };
     }
   } catch (err) {
     console.error('Error reading DB:', err);
+    // Don't overwrite a file we failed to parse; keep a copy for recovery.
+    if (fs.existsSync(DB_FILE)) {
+      try { fs.copyFileSync(DB_FILE, `${DB_FILE}.corrupt-${Date.now()}`); } catch {}
+    }
   }
 
   // Initial seed with demo user
@@ -91,7 +199,7 @@ function loadDb(): DatabaseSchema {
       {
         id: 'usr_demo_01',
         name: 'Aditi Sharma',
-        email: 'student@bhashacode.com',
+        email: 'student@nexuscode.dev',
         passwordHash: demoHash,
         salt,
         defaultLanguage: 'telugu',
@@ -126,21 +234,47 @@ function loadDb(): DatabaseSchema {
     ],
     feedback: [],
   };
-  fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2), 'utf-8');
+  saveDb(initialDb);
   return initialDb;
 }
 
 function saveDb(data: DatabaseSchema) {
+  // Write to a temp file then rename, so a crash mid-write can't leave a half-written DB.
+  const tmpFile = `${DB_FILE}.tmp`;
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tmpFile, DB_FILE);
   } catch (err) {
     console.error('Error saving DB:', err);
   }
 }
 
 // Authentication Helpers
-function hashPassword(password: string, salt: string): string {
-  return crypto.scryptSync(password, salt, 64).toString('hex');
+const scryptAsync = promisify(crypto.scrypt) as (password: string, salt: string, keylen: number) => Promise<Buffer>;
+
+// Async so hashing never blocks the event loop for other requests.
+async function hashPassword(password: string, salt: string): Promise<string> {
+  return (await scryptAsync(password, salt, 64)).toString('hex');
+}
+
+// Constant-time comparison so response timing doesn't leak how many characters matched.
+function safeEqualHex(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'hex');
+  const bufB = Buffer.from(b, 'hex');
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
+
+async function verifyPassword(password: string, user: User): Promise<boolean> {
+  return safeEqualHex(await hashPassword(password, user.salt), user.passwordHash);
+}
+
+function sha256(value: string): string {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+
+function publicUser(user: User) {
+  const { passwordHash, salt, resetCodeHash, resetCodeExpiresAt, resetAttempts, ...rest } = user;
+  return rest;
 }
 
 function authenticate(req: Request, res: Response, next: NextFunction) {
@@ -201,6 +335,23 @@ function checkAndIncrementQuota(user: User): boolean {
   return true;
 }
 
+// Supported language native display map
+const LANGUAGE_NAMES: Record<string, { english: string; native: string; script: string }> = {
+  telugu: { english: 'Telugu', native: 'తెలుగు', script: 'Telugu' },
+  hindi: { english: 'Hindi', native: 'हिन्दी', script: 'Devanagari' },
+  tamil: { english: 'Tamil', native: 'தமிழ்', script: 'Tamil' },
+  kannada: { english: 'Kannada', native: 'ಕನ್ನಡ', script: 'Kannada' },
+  marathi: { english: 'Marathi', native: 'मराठी', script: 'Devanagari' },
+  bengali: { english: 'Bengali', native: 'বাংলা', script: 'Bengali' },
+  gujarati: { english: 'Gujarati', native: 'ગુજરાતી', script: 'Gujarati' },
+  english: { english: 'English', native: 'English', script: 'Latin' },
+};
+
+function getLangInfo(nativeLanguage: unknown) {
+  const key = typeof nativeLanguage === 'string' ? nativeLanguage.toLowerCase() : '';
+  return LANGUAGE_NAMES[key] || LANGUAGE_NAMES.english;
+}
+
 // API Routes
 
 // Health check
@@ -214,9 +365,11 @@ app.get('/api/v1/health', (req, res) => {
 });
 
 // Auth: Signup
-app.post('/api/v1/auth/signup', (req, res) => {
-  const { name, email, password, defaultLanguage } = req.body;
-  if (!name || !email || !password) {
+app.post('/api/v1/auth/signup', authLimiter, async (req, res) => {
+  const name = asTrimmedString(req.body?.name, 100);
+  const email = asTrimmedString(req.body?.email, 254)?.toLowerCase() ?? null;
+  const { password, defaultLanguage } = req.body ?? {};
+  if (!name || !email || typeof password !== 'string' || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required.' });
   }
 
@@ -225,24 +378,28 @@ app.post('/api/v1/auth/signup', (req, res) => {
     return res.status(400).json({ error: 'Please provide a valid email address.' });
   }
 
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+  if (password.length < 8 || password.length > 256) {
+    return res.status(400).json({ error: 'Password must be between 8 and 256 characters long.' });
   }
 
   const db = loadDb();
-  if (db.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
+  if (db.users.some((u) => u.email.toLowerCase() === email)) {
     return res.status(400).json({ error: 'An account with this email already exists.' });
   }
 
   const salt = crypto.randomBytes(16).toString('hex');
-  const passwordHash = hashPassword(password, salt);
+  const passwordHash = await hashPassword(password, salt);
+  // Re-check after the await in case a parallel signup registered the same email.
+  if (db.users.some((u) => u.email.toLowerCase() === email)) {
+    return res.status(400).json({ error: 'An account with this email already exists.' });
+  }
   const newUser: User = {
     id: `usr_${crypto.randomBytes(8).toString('hex')}`,
-    name: name.trim(),
-    email: email.toLowerCase().trim(),
+    name,
+    email,
     passwordHash,
     salt,
-    defaultLanguage: defaultLanguage || 'telugu',
+    defaultLanguage: typeof defaultLanguage === 'string' && LANGUAGE_NAMES[defaultLanguage] ? defaultLanguage : 'telugu',
     plan: 'free',
     dailyUsageCount: 0,
     lastUsageDate: new Date().toISOString().split('T')[0],
@@ -261,34 +418,30 @@ app.post('/api/v1/auth/signup', (req, res) => {
 
   saveDb(db);
 
-  const { passwordHash: _, salt: __, ...userPublic } = newUser;
   res.status(201).json({
     message: 'Account created successfully!',
     token,
-    user: userPublic,
+    user: publicUser(newUser),
   });
 });
 
 // Auth: Login
-app.post('/api/v1/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
+app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
+  const email = asTrimmedString(req.body?.email, 254)?.toLowerCase() ?? null;
+  const password = req.body?.password;
+  if (!email || typeof password !== 'string' || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
 
   const db = loadDb();
-  const user = db.users.find((u) => u.email.toLowerCase() === email.toLowerCase().trim());
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid email or password.' });
-  }
-
-  const hashed = hashPassword(password, user.salt);
-  if (hashed !== user.passwordHash) {
+  const user = db.users.find((u) => u.email.toLowerCase() === email);
+  if (!user || !(await verifyPassword(password, user))) {
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
   // Create session
   const token = crypto.randomBytes(32).toString('hex');
+  pruneExpiredSessions(db);
   db.sessions.push({
     token,
     userId: user.id,
@@ -297,11 +450,10 @@ app.post('/api/v1/auth/login', (req, res) => {
 
   saveDb(db);
 
-  const { passwordHash: _, salt: __, ...userPublic } = user;
   res.json({
     message: 'Welcome back!',
     token,
-    user: userPublic,
+    user: publicUser(user),
   });
 });
 
@@ -312,9 +464,8 @@ app.get('/api/v1/auth/me', authenticate, (req, res) => {
   const quotaLimit = user.plan === 'pro' ? 200 : 20;
   const currentUsage = user.lastUsageDate === today ? user.dailyUsageCount : 0;
 
-  const { passwordHash, salt, ...userPublic } = user;
   res.json({
-    user: userPublic,
+    user: publicUser(user),
     quota: {
       used: currentUsage,
       limit: quotaLimit,
@@ -327,18 +478,18 @@ app.get('/api/v1/auth/me', authenticate, (req, res) => {
 // Auth: Update Settings
 app.patch('/api/v1/auth/settings', authenticate, (req, res) => {
   const user = (req as any).user as User;
-  const { name, defaultLanguage } = req.body;
+  const name = asTrimmedString(req.body?.name, 100);
+  const { defaultLanguage } = req.body ?? {};
 
   const db = loadDb();
   const dbUser = db.users.find((u) => u.id === user.id);
   if (!dbUser) return res.status(404).json({ error: 'User not found' });
 
-  if (name && typeof name === 'string') dbUser.name = name.trim();
-  if (defaultLanguage && typeof defaultLanguage === 'string') dbUser.defaultLanguage = defaultLanguage;
+  if (name) dbUser.name = name;
+  if (typeof defaultLanguage === 'string' && LANGUAGE_NAMES[defaultLanguage]) dbUser.defaultLanguage = defaultLanguage;
 
   saveDb(db);
-  const { passwordHash, salt, ...userPublic } = dbUser;
-  res.json({ message: 'Settings updated successfully', user: userPublic });
+  res.json({ message: 'Settings updated successfully', user: publicUser(dbUser) });
 });
 
 // Auth: Logout
@@ -350,35 +501,77 @@ app.post('/api/v1/auth/logout', authenticate, (req, res) => {
   res.json({ message: 'Logged out successfully.' });
 });
 
-// Auth: Password Reset Request
-app.post('/api/v1/auth/reset-password', (req, res) => {
-  const { email, newPassword } = req.body;
+// Auth: Password Reset - step 1, request a one-time code.
+// The response is identical whether or not the account exists, so this can't be used to discover emails.
+const RESET_CODE_TTL_MS = 15 * 60 * 1000;
+const RESET_MAX_ATTEMPTS = 5;
+const GENERIC_RESET_MESSAGE = 'If an account exists for that email, a 6-digit reset code has been sent. It expires in 15 minutes.';
+
+app.post('/api/v1/auth/reset-password', resetLimiter, (req, res) => {
+  const email = asTrimmedString(req.body?.email, 254)?.toLowerCase() ?? null;
   if (!email) {
     return res.status(400).json({ error: 'Email address is required.' });
   }
 
   const db = loadDb();
-  const user = db.users.find((u) => u.email.toLowerCase() === email.toLowerCase().trim());
-  if (!user) {
-    return res.status(404).json({ error: 'No account found with this email address.' });
-  }
-
-  if (newPassword) {
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
-    }
-    user.salt = crypto.randomBytes(16).toString('hex');
-    user.passwordHash = hashPassword(newPassword, user.salt);
-    // Invalidate old sessions
-    db.sessions = db.sessions.filter((s) => s.userId !== user.id);
+  const user = db.users.find((u) => u.email.toLowerCase() === email);
+  if (user) {
+    const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+    user.resetCodeHash = sha256(`${user.id}:${code}`);
+    user.resetCodeExpiresAt = Date.now() + RESET_CODE_TTL_MS;
+    user.resetAttempts = 0;
     saveDb(db);
-    return res.json({ message: 'Password has been successfully reset. Please log in with your new password.' });
+    // No email provider is configured yet, so the code is delivered via the server log.
+    // Replace this with a real email send before going live.
+    console.log(`[Password Reset] Code for ${user.email}: ${code} (valid 15 minutes)`);
   }
 
-  res.json({
-    message: 'Reset instructions acknowledged. For demo verification, you can supply your new password to reset directly.',
-    canResetDirectly: true,
-  });
+  res.json({ message: GENERIC_RESET_MESSAGE });
+});
+
+// Auth: Password Reset - step 2, confirm the code and set the new password.
+app.post('/api/v1/auth/reset-password/confirm', resetLimiter, async (req, res) => {
+  const email = asTrimmedString(req.body?.email, 254)?.toLowerCase() ?? null;
+  const code = asTrimmedString(req.body?.code, 12);
+  const newPassword = req.body?.newPassword;
+  if (!email || !code || typeof newPassword !== 'string') {
+    return res.status(400).json({ error: 'Email, reset code, and new password are required.' });
+  }
+  if (newPassword.length < 8 || newPassword.length > 256) {
+    return res.status(400).json({ error: 'Password must be between 8 and 256 characters long.' });
+  }
+
+  const invalid = () => res.status(400).json({ error: 'Invalid or expired reset code. Please request a new one.' });
+
+  const db = loadDb();
+  const user = db.users.find((u) => u.email.toLowerCase() === email);
+  if (!user || !user.resetCodeHash || !user.resetCodeExpiresAt || user.resetCodeExpiresAt < Date.now()) {
+    return invalid();
+  }
+
+  if (!safeEqualHex(sha256(`${user.id}:${code}`), user.resetCodeHash)) {
+    user.resetAttempts = (user.resetAttempts || 0) + 1;
+    if (user.resetAttempts >= RESET_MAX_ATTEMPTS) {
+      // Too many wrong guesses: burn the code.
+      delete user.resetCodeHash;
+      delete user.resetCodeExpiresAt;
+      delete user.resetAttempts;
+    }
+    saveDb(db);
+    return invalid();
+  }
+
+  const salt = crypto.randomBytes(16).toString('hex');
+  const passwordHash = await hashPassword(newPassword, salt);
+  user.salt = salt;
+  user.passwordHash = passwordHash;
+  delete user.resetCodeHash;
+  delete user.resetCodeExpiresAt;
+  delete user.resetAttempts;
+  // Invalidate old sessions
+  db.sessions = db.sessions.filter((s) => s.userId !== user.id);
+  saveDb(db);
+  res.json({ message: 'Password has been successfully reset. Please log in with your new password.' });
 });
 
 // Auth: Delete Account
@@ -393,18 +586,6 @@ app.delete('/api/v1/auth/account', authenticate, (req, res) => {
   saveDb(db);
   res.json({ message: 'Account and all associated projects deleted permanently.' });
 });
-
-// Supported language native display map
-const LANGUAGE_NAMES: Record<string, { english: string; native: string; script: string }> = {
-  telugu: { english: 'Telugu', native: 'తెలుగు', script: 'Telugu' },
-  hindi: { english: 'Hindi', native: 'हिन्दी', script: 'Devanagari' },
-  tamil: { english: 'Tamil', native: 'தமிழ்', script: 'Tamil' },
-  kannada: { english: 'Kannada', native: 'ಕನ್ನಡ', script: 'Kannada' },
-  marathi: { english: 'Marathi', native: 'मराठी', script: 'Devanagari' },
-  bengali: { english: 'Bengali', native: 'বাংলা', script: 'Bengali' },
-  gujarati: { english: 'Gujarati', native: 'ગુજરાતી', script: 'Gujarati' },
-  english: { english: 'English', native: 'English', script: 'Latin' },
-};
 
 // 1. Explain Code Endpoint (100% Deterministic Rule-Based Parsing, No LLMs)
 app.post('/api/v1/explain', optionalAuth, async (req, res) => {
@@ -450,7 +631,7 @@ app.post('/api/v1/debug', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'Please provide code to debug.' });
     }
 
-    const langInfo = LANGUAGE_NAMES[nativeLanguage.toLowerCase()] || { english: 'English', native: 'English', script: 'Latin' };
+    const langInfo = getLangInfo(nativeLanguage);
 
     const prompt = `You are BhashaCode's expert AI debugging tutor. Analyze the following ${programmingLanguage} code for compiler errors, syntax bugs, logic bugs, boundary issues, or edge case failures.
 ${errorLog ? `The user reported this runtime/compiler error: ${errorLog}` : ''}
@@ -519,7 +700,7 @@ app.post('/api/v1/convert', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'Please provide code to convert.' });
     }
 
-    const langInfo = LANGUAGE_NAMES[nativeLanguage.toLowerCase()] || { english: 'English', native: 'English', script: 'Latin' };
+    const langInfo = getLangInfo(nativeLanguage);
 
     const prompt = `You are BhashaCode's code conversion specialist.
 Convert the given ${sourceLanguage} code into ${mode === 'native_pseudocode' ? `intuitive algorithmic pseudocode written in ${langInfo.english} (${langInfo.native}) with clear step labels` : targetLanguage}.
@@ -583,7 +764,7 @@ app.post('/api/v1/ask', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'Please enter a question to ask.' });
     }
 
-    const langInfo = LANGUAGE_NAMES[nativeLanguage.toLowerCase()] || { english: 'English', native: 'English', script: 'Latin' };
+    const langInfo = getLangInfo(nativeLanguage);
 
     const prompt = `You are BhashaCode's friendly AI computer science mentor.
 The student is viewing this ${programmingLanguage} code:
@@ -689,26 +870,41 @@ function executeCodeInProcess(
     let entryFile = '';
     const fileMap: Record<string, string> = opts.files || {};
 
+    // Resolve a workspace-relative path and refuse anything that escapes the temp project folder.
+    const resolveInside = (relPath: string): string | null => {
+      if (typeof relPath !== 'string' || !relPath || path.isAbsolute(relPath)) return null;
+      const target = path.resolve(projectDir, relPath);
+      return target.startsWith(projectDir + path.sep) ? target : null;
+    };
+
     if (opts.files && Object.keys(opts.files).length > 0) {
       for (const [relPath, content] of Object.entries(opts.files)) {
-        const safeRel = path.normalize(relPath).replace(/^(\.\.(\/|\\|$))+/, '');
-        const targetPath = path.join(projectDir, safeRel);
+        const targetPath = resolveInside(relPath);
+        if (!targetPath || typeof content !== 'string') {
+          try { fs.rmSync(projectDir, { recursive: true, force: true }); } catch {}
+          return resolve({
+            success: false,
+            output: `Execution Setup Error: Invalid file path '${String(relPath).slice(0, 100)}'. Files must stay inside the workspace.`,
+            exitCode: 1,
+            executionTimeMs: Date.now() - startTime,
+            language: effectiveLang,
+            engine: isPython ? 'python' : 'node',
+          });
+        }
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
         fs.writeFileSync(targetPath, content, 'utf-8');
       }
 
-      if (opts.activeFileName && opts.files[opts.activeFileName]) {
-        entryFile = path.join(projectDir, opts.activeFileName);
-      } else if (opts.files['main.py']) {
-        entryFile = path.join(projectDir, 'main.py');
-      } else if (opts.files['index.js'] || opts.files['main.js']) {
-        entryFile = path.join(projectDir, opts.files['index.js'] ? 'index.js' : 'main.js');
-      } else if (opts.files['index.ts'] || opts.files['main.ts']) {
-        entryFile = path.join(projectDir, opts.files['index.ts'] ? 'index.ts' : 'main.ts');
-      } else {
-        const firstKey = Object.keys(opts.files)[0];
-        entryFile = path.join(projectDir, firstKey);
-      }
+      const pickEntry = (name: string) => (typeof opts.files![name] === 'string' ? resolveInside(name) : null);
+      entryFile =
+        (opts.activeFileName ? pickEntry(opts.activeFileName) : null) ||
+        pickEntry('main.py') ||
+        pickEntry('index.js') ||
+        pickEntry('main.js') ||
+        pickEntry('index.ts') ||
+        pickEntry('main.ts') ||
+        pickEntry(Object.keys(opts.files)[0]) ||
+        '';
     } else {
       const ext = isPython ? '.py' : isTs ? '.ts' : '.js';
       const defaultName = isPython ? 'main.py' : isTs ? 'index.ts' : 'index.js';
@@ -881,13 +1077,24 @@ function executeCodeInProcess(
 }
 
 // 5. Safe Sandboxed Code Execution Endpoint
+// Server-side execution runs real processes on this machine with no sandbox, so it is only
+// allowed in development AND only for requests that come from this same computer.
+function isLocalRequest(req: Request): boolean {
+  const addr = req.socket.remoteAddress || '';
+  const isLoopback = addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+  // Host header check blocks DNS-rebinding attacks from malicious web pages.
+  const host = (req.headers.host || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  return isLoopback && isLocalHost;
+}
+
 app.post('/api/v1/execute', optionalAuth, async (req, res) => {
   try {
-    // SECURITY GUARD: Never execute untrusted student code on Node server in production
-    if (process.env.NODE_ENV === 'production') {
+    // SECURITY GUARD: Never execute untrusted code on the server in production or for remote clients
+    if (IS_PRODUCTION || process.env.DISABLE_SERVER_EXEC === '1' || !isLocalRequest(req)) {
       return res.status(403).json({
         success: false,
-        output: '[Security Notice: Server-side subprocess execution is disabled in production to protect host security. Code is executed safely in the browser sandbox via Pyodide.]',
+        output: '[Security Notice: Server-side subprocess execution is only available to local development requests. Code runs in the browser sandbox instead.]',
         exitCode: 1,
         executionTimeMs: 0,
         language: req.body?.programmingLanguage || 'python',
@@ -1004,18 +1211,25 @@ app.delete('/api/v1/projects/:id', authenticate, (req, res) => {
 });
 
 // 7. Feedback Endpoint
-app.post('/api/v1/feedback', (req, res) => {
-  const { name, email, message } = req.body;
+const MAX_FEEDBACK_ENTRIES = 5000;
+
+app.post('/api/v1/feedback', submitLimiter, (req, res) => {
+  const name = asTrimmedString(req.body?.name, 100);
+  const email = asTrimmedString(req.body?.email, 254);
+  const message = asTrimmedString(req.body?.message, 5000);
   if (!name || !email || !message) {
-    return res.status(400).json({ error: 'Please fill out all fields.' });
+    return res.status(400).json({ error: 'Please fill out all fields (message up to 5000 characters).' });
   }
 
   const db = loadDb();
+  if (db.feedback.length >= MAX_FEEDBACK_ENTRIES) {
+    return res.status(503).json({ error: 'Feedback inbox is full right now. Please try again later.' });
+  }
   db.feedback.push({
-    id: `fb_${Date.now()}`,
-    name: name.trim(),
-    email: email.trim(),
-    message: message.trim(),
+    id: `fb_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    name,
+    email,
+    message,
     date: new Date().toISOString(),
   });
   saveDb(db);
@@ -1024,21 +1238,27 @@ app.post('/api/v1/feedback', (req, res) => {
 });
 
 // 8. Report Wrong Explanation Endpoint (saves to data/reports/wrong_explanations.jsonl)
-app.post('/api/v1/kb/report', (req, res) => {
+const MAX_REPORT_FILE_BYTES = 10 * 1024 * 1024;
+const clip = (value: unknown, max: number) => (typeof value === 'string' ? value.slice(0, max) : '');
+
+app.post('/api/v1/kb/report', submitLimiter, (req, res) => {
   try {
-    const { line, rawCode, explanation, note, language } = req.body;
+    const { line, rawCode, explanation, note, language } = req.body ?? {};
     const report = {
-      id: `rep_${Date.now()}`,
+      id: `rep_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
       timestamp: new Date().toISOString(),
-      line: line || null,
-      rawCode: rawCode || '',
-      explanation: explanation || '',
-      note: note || '',
-      language: language || 'python',
+      line: typeof line === 'number' && Number.isFinite(line) ? line : null,
+      rawCode: clip(rawCode, 2000),
+      explanation: clip(explanation, 4000),
+      note: clip(note, 2000),
+      language: clip(language, 40) || 'python',
     };
     const repDir = path.resolve('data/reports');
     if (!fs.existsSync(repDir)) fs.mkdirSync(repDir, { recursive: true });
     const repFile = path.join(repDir, 'wrong_explanations.jsonl');
+    if (fs.existsSync(repFile) && fs.statSync(repFile).size > MAX_REPORT_FILE_BYTES) {
+      return res.status(503).json({ error: 'Report log is full right now. Please try again later.' });
+    }
     fs.appendFileSync(repFile, JSON.stringify(report) + '\n', 'utf-8');
     res.json({ success: true, message: 'Report recorded successfully.', reportId: report.id });
   } catch (err: any) {
@@ -1077,14 +1297,32 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve('dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.use(
+      express.static(distPath, {
+        index: false,
+        setHeaders(res, filePath) {
+          const f = filePath.replace(/\\/g, '/');
+          if (f.includes('/assets/')) {
+            // Vite file names contain a content hash, so they never change
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          } else if (/\/(pyodide|tree-sitter|workers|data\/kb)\//.test(f)) {
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+          } else {
+            res.setHeader('Cache-Control', 'no-cache');
+          }
+        },
+      })
+    );
+    // Unknown API routes must answer with JSON, not the web page
+    app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
+    app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`BhashaCode server running at http://0.0.0.0:${PORT}`);
+  app.listen(Number(PORT), HOST, () => {
+    console.log(`Server running (${IS_PRODUCTION ? 'production' : 'development'}) at http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   });
 }
 

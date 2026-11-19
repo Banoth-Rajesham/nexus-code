@@ -11,6 +11,8 @@ export const AuthModal: React.FC = () => {
   const [password, setPassword] = useState('');
   const [defaultLanguage, setDefaultLanguage] = useState('english');
   const [newPassword, setNewPassword] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetStep, setResetStep] = useState<'request' | 'confirm'>('request');
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,7 +22,18 @@ export const AuthModal: React.FC = () => {
     setTab(authModalTab);
     setError(null);
     setSuccessMsg(null);
+    setResetStep('request');
+    setResetCode('');
+    setNewPassword('');
   }, [authModalTab, isAuthModalOpen]);
+
+  const goToTab = (next: 'login' | 'signup' | 'forgot') => {
+    setTab(next);
+    setError(null);
+    setSuccessMsg(null);
+    setResetStep('request');
+    setResetCode('');
+  };
 
   if (!isAuthModalOpen) return null;
 
@@ -41,16 +54,37 @@ export const AuthModal: React.FC = () => {
         if (!res.success) {
           setError(res.error || 'Failed to sign up.');
         }
-      } else if (tab === 'forgot') {
+      } else if (tab === 'forgot' && resetStep === 'request') {
+        // Step 1: ask the server to issue a one-time reset code
         const res = await fetch('/api/v1/auth/reset-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, newPassword }),
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setSuccessMsg(data.message || 'If an account exists for that email, a reset code has been sent.');
+          setResetStep('confirm');
+        } else {
+          setError(data.error || 'Could not request a reset code.');
+        }
+      } else if (tab === 'forgot') {
+        // Step 2: confirm the code and set the new password
+        if (newPassword.length < 8) {
+          setError('Password must be at least 8 characters long.');
+          return;
+        }
+        const res = await fetch('/api/v1/auth/reset-password/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code: resetCode, newPassword }),
         });
         const data = await res.json();
         if (res.ok) {
           setSuccessMsg(data.message || 'Password reset successfully. You can now sign in.');
-          setTimeout(() => setTab('login'), 2000);
+          setNewPassword('');
+          setResetCode('');
+          setTimeout(() => goToTab('login'), 2000);
         } else {
           setError(data.error || 'Password reset failed.');
         }
@@ -97,8 +131,9 @@ export const AuthModal: React.FC = () => {
           </h3>
           <p className="text-xs text-[#616161] mt-1.5">
             {tab === 'login' && 'Continue your visual code exploration with NexusCode.'}
-            {tab === 'signup' && 'No credit card required. Free 20 AI visual blueprints daily.'}
-            {tab === 'forgot' && 'Enter your account email and choose a new password.'}
+            {tab === 'signup' && 'Free forever. No credit card required.'}
+            {tab === 'forgot' && resetStep === 'request' && 'Enter your account email and we will send you a 6-digit reset code.'}
+            {tab === 'forgot' && resetStep === 'confirm' && 'Enter the reset code you received and choose a new password.'}
           </p>
         </div>
 
@@ -187,6 +222,7 @@ export const AuthModal: React.FC = () => {
                 required
                 placeholder="you@domain.com"
                 value={email}
+                readOnly={tab === 'forgot' && resetStep === 'confirm'}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 text-xs rounded-[2px] border border-[#E1DFDD] focus:border-[#0067B8] outline-hidden bg-[#F5F6F8]/50 text-[#242424]"
               />
@@ -200,7 +236,7 @@ export const AuthModal: React.FC = () => {
                 {tab === 'login' && (
                   <button
                     type="button"
-                    onClick={() => { setTab('forgot'); setError(null); }}
+                    onClick={() => goToTab('forgot')}
                     className="text-[11px] font-semibold text-[#0067B8] hover:underline"
                   >
                     Forgot password?
@@ -221,7 +257,27 @@ export const AuthModal: React.FC = () => {
             </div>
           )}
 
-          {tab === 'forgot' && (
+          {tab === 'forgot' && resetStep === 'confirm' && (
+            <div>
+              <label className="block text-xs font-semibold text-[#242424] mb-1">Reset Code</label>
+              <div className="relative">
+                <KeyRound className="w-4 h-4 text-[#747474] absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  maxLength={6}
+                  placeholder="6-digit code"
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-[2px] border border-[#E1DFDD] focus:border-[#0067B8] outline-hidden bg-[#F5F6F8]/50 text-[#242424] tracking-widest"
+                />
+              </div>
+            </div>
+          )}
+
+          {tab === 'forgot' && resetStep === 'confirm' && (
             <div>
               <label className="block text-xs font-semibold text-[#242424] mb-1">New Password</label>
               <div className="relative">
@@ -229,7 +285,9 @@ export const AuthModal: React.FC = () => {
                 <input
                   type="password"
                   required
-                  placeholder="New password (min 6 chars)"
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="New password (min 8 chars)"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-xs rounded-[2px] border border-[#E1DFDD] focus:border-[#0067B8] outline-hidden bg-[#F5F6F8]/50 text-[#242424]"
@@ -272,19 +330,36 @@ export const AuthModal: React.FC = () => {
                 <span>
                   {tab === 'login' && 'Sign in'}
                   {tab === 'signup' && 'Create free account'}
-                  {tab === 'forgot' && 'Reset my password'}
+                  {tab === 'forgot' && resetStep === 'request' && 'Send reset code'}
+                  {tab === 'forgot' && resetStep === 'confirm' && 'Reset my password'}
                 </span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
+          {tab === 'signup' && (
+            <p className="text-[11px] text-slate-600 text-center leading-relaxed">
+              By creating an account you agree to the{' '}
+              <a href="/terms" target="_blank" rel="noopener" className="text-[#0067B8] hover:underline">Terms of Service</a> and{' '}
+              <a href="/privacy" target="_blank" rel="noopener" className="text-[#0067B8] hover:underline">Privacy Policy</a>.
+            </p>
+          )}
         </form>
 
         {tab === 'forgot' && (
-          <div className="mt-4 text-center">
+          <div className="mt-4 text-center space-x-4">
+            {resetStep === 'confirm' && (
+              <button
+                type="button"
+                onClick={() => { setResetStep('request'); setResetCode(''); setError(null); setSuccessMsg(null); }}
+                className="text-xs font-semibold text-[#0067B8] hover:underline"
+              >
+                Send a new code
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => { setTab('login'); setError(null); }}
+              onClick={() => goToTab('login')}
               className="text-xs font-semibold text-[#616161] hover:text-[#242424]"
             >
               Back to Sign in

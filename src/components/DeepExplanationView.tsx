@@ -11,6 +11,7 @@ interface DeepExplanationViewProps {
   analysis: DeepExplanationAnalysis;
   onJumpToLine: (line: number) => void;
   highlightedLine?: number | null;
+  isLight?: boolean;
 }
 
 type LayerTab = 'all' | 'what' | 'why' | 'how' | 'verify';
@@ -19,6 +20,7 @@ export const DeepExplanationView: React.FC<DeepExplanationViewProps> = ({
   analysis,
   onJumpToLine,
   highlightedLine,
+  isLight = false,
 }) => {
   const [activeTab, setActiveTab] = useState<LayerTab>('all');
   const [selectedComponentId, setSelectedComponentId] = useState<string>('all');
@@ -32,9 +34,13 @@ export const DeepExplanationView: React.FC<DeepExplanationViewProps> = ({
       : what.components.find((c) => c.id === selectedComponentId);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full bg-[#0d1117] text-slate-200 overflow-hidden font-sans">
+    <div className={`flex-1 flex flex-col min-h-0 h-full overflow-hidden font-sans transition-colors ${
+      isLight ? 'bg-white text-slate-800' : 'bg-[#0d1117] text-slate-200'
+    }`}>
       {/* ─── LAYER NAVIGATION TABS (WHAT · WHY · HOW · VERIFY) ─────────── */}
-      <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d] gap-2 shrink-0 overflow-x-auto no-scrollbar">
+      <div className={`flex items-center justify-between px-3 py-2 border-b gap-2 shrink-0 overflow-x-auto no-scrollbar transition-colors ${
+        isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#161b22] border-[#30363d] text-slate-200'
+      }`}>
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setActiveTab('all')}

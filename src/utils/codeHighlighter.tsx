@@ -8,23 +8,43 @@ import {
 } from './indentAnalyzer';
 
 // ============================================================================
-// VS CODE DARK+ SYNTAX THEME PALETTE
+// ALGOMASTER / LEETCODE MODERN DARK SYNTAX THEME PALETTE (Vibrant, High-Contrast)
 // ============================================================================
 export const VSCODE_COLORS = {
-  keyword: '#C586C0',      // def, return, for, in, if, else, while (purple)
-  control: '#C586C0',      // import, from, class, pass, break (purple)
-  storageType: '#569CD6',  // int, str, bool, void, const, let, var, True, False, None (blue)
-  functionName: '#DCDCAA', // count_number, సంఖ్య_లెక్కించు, binary_search (yellow)
-  builtin: '#4EC9B0',      // print, len, range, console, fmt (teal/cyan)
-  string: '#CE9178',       // "...", '...' (orange/peach)
-  number: '#B5CEA8',       // 0, 1, 2, 100, 3.14 (light green)
-  comment: '#6A9955',      // # ..., // ... (green italic)
-  variable: '#9CDCFE',     // arr, target, num, count, లిస్ట్, లక్ష్యం (light sky blue)
-  operator: '#D4D4D4',     // =, ==, +=, +, -, *, /, :, <, > (light gray)
-  bracket1: '#FFD700',     // ( ) [ ] { } level 1 (gold)
-  bracket2: '#DA70D6',     // level 2 (orchid)
-  bracket3: '#179FFF',     // level 3 (blue)
-  defaultText: '#D4D4D4',  // standard code text
+  keyword: '#38bdf8',      // def, return, for, in, if, else, while, class (vibrant sky blue)
+  control: '#38bdf8',      // import, from, class, pass, break (vibrant sky blue)
+  storageType: '#2dd4bf',  // int, str, bool, void, const, let, var, True, False, None (cyan/teal)
+  functionName: '#facc15', // count_number, binary_search, moveZeroes (warm gold)
+  builtin: '#2dd4bf',      // print, len, range, console, fmt (cyan/teal)
+  string: '#fb923c',       // "...", '...' (vibrant orange)
+  number: '#4ade80',       // 0, 1, 2, 100, 3.14 (vibrant mint green)
+  comment: '#94a3b8',      // # ..., // ... (soft slate)
+  variable: '#f8fafc',     // arr, target, num, count, nums (pure crisp white / slate-50)
+  operator: '#cbd5e1',     // =, ==, +=, +, -, *, /, :, <, > (crisp light slate)
+  bracket1: '#e879f9',     // { } level 1 (orchid / magenta)
+  bracket2: '#facc15',     // ( ) level 2 (gold)
+  bracket3: '#38bdf8',     // [ ] level 3 (sky blue)
+  defaultText: '#f8fafc',  // standard code text
+};
+
+// ============================================================================
+// VS CODE LIGHT+ / GITHUB LIGHT SYNTAX THEME PALETTE (Bold, Rich, High Contrast)
+// ============================================================================
+export const VSCODE_LIGHT_COLORS = {
+  keyword: '#0000FF',      // def, return, for, in, if, else, while (classic blue)
+  control: '#AF00DB',      // import, from, class, pass, break (rich purple)
+  storageType: '#0000FF',  // int, str, bool, void, const, let, var, True, False, None (blue)
+  functionName: '#795E26', // count_number, binary_search (warm brown/gold)
+  builtin: '#005CC5',      // print, len, range, console, fmt (rich dark blue)
+  string: '#A31515',       // "...", '...' (rich dark red)
+  number: '#098658',       // 0, 1, 2, 100, 3.14 (deep emerald green)
+  comment: '#008000',      // # ..., // ... (dark forest green)
+  variable: '#001080',     // arr, target, num, count (deep navy)
+  operator: '#0F172A',     // =, ==, +=, +, -, *, /, :, <, > (dark charcoal)
+  bracket1: '#0431FA',     // ( ) [ ] { } level 1 (rich blue)
+  bracket2: '#319331',     // level 2 (rich green)
+  bracket3: '#7B3814',     // level 3 (rich brown)
+  defaultText: '#0F172A',  // standard code text (slate-900)
 };
 
 // Keywords across standard languages & translated Bhasha equivalents
@@ -70,10 +90,11 @@ interface HighlightToken {
 }
 
 /**
- * Tokenize a single line of code into VS Code colored segments
+ * Tokenize a single line of code into VS Code colored segments with dark/light theme support
  */
-export function tokenizeLine(line: string): HighlightToken[] {
-  if (!line) return [{ text: '', color: VSCODE_COLORS.defaultText }];
+export function tokenizeLine(line: string, isDarkTheme: boolean = true): HighlightToken[] {
+  const palette = isDarkTheme ? VSCODE_COLORS : VSCODE_LIGHT_COLORS;
+  if (!line) return [{ text: '', color: palette.defaultText }];
 
   const tokens: HighlightToken[] = [];
   let i = 0;
@@ -86,7 +107,7 @@ export function tokenizeLine(line: string): HighlightToken[] {
     if (char === '#' || (char === '/' && line[i + 1] === '/')) {
       tokens.push({
         text: line.slice(i),
-        color: VSCODE_COLORS.comment,
+        color: palette.comment,
         isComment: true,
       });
       break;
@@ -111,7 +132,7 @@ export function tokenizeLine(line: string): HighlightToken[] {
       if (i < line.length) i++; // skip close quote
       tokens.push({
         text: line.slice(start, i),
-        color: VSCODE_COLORS.string,
+        color: palette.string,
       });
       continue;
     }
@@ -124,14 +145,14 @@ export function tokenizeLine(line: string): HighlightToken[] {
       }
       tokens.push({
         text: line.slice(start, i),
-        color: VSCODE_COLORS.number,
+        color: palette.number,
       });
       continue;
     }
 
     // 4. Brackets: () [] {}
     if (char === '(' || char === '[' || char === '{') {
-      const colors = [VSCODE_COLORS.bracket1, VSCODE_COLORS.bracket2, VSCODE_COLORS.bracket3];
+      const colors = [palette.bracket1, palette.bracket2, palette.bracket3];
       tokens.push({ text: char, color: colors[bracketDepth % colors.length] });
       bracketDepth++;
       i++;
@@ -139,7 +160,7 @@ export function tokenizeLine(line: string): HighlightToken[] {
     }
     if (char === ')' || char === ']' || char === '}') {
       bracketDepth = Math.max(0, bracketDepth - 1);
-      const colors = [VSCODE_COLORS.bracket1, VSCODE_COLORS.bracket2, VSCODE_COLORS.bracket3];
+      const colors = [palette.bracket1, palette.bracket2, palette.bracket3];
       tokens.push({ text: char, color: colors[bracketDepth % colors.length] });
       i++;
       continue;
@@ -153,7 +174,7 @@ export function tokenizeLine(line: string): HighlightToken[] {
       }
       tokens.push({
         text: line.slice(start, i),
-        color: VSCODE_COLORS.operator,
+        color: palette.operator,
       });
       continue;
     }
@@ -166,7 +187,7 @@ export function tokenizeLine(line: string): HighlightToken[] {
       }
       tokens.push({
         text: line.slice(start, i),
-        color: VSCODE_COLORS.defaultText,
+        color: palette.defaultText,
       });
       continue;
     }
@@ -189,22 +210,22 @@ export function tokenizeLine(line: string): HighlightToken[] {
       const isDefName = /\b(def|function|func|class|నిర్వచించు|తరగతి|ఫంక్షన్)\s*$/u.test(beforeText);
 
       if (KEYWORDS.has(word)) {
-        tokens.push({ text: word, color: VSCODE_COLORS.keyword });
+        tokens.push({ text: word, color: palette.keyword });
       } else if (STORAGE_TYPES.has(word)) {
-        tokens.push({ text: word, color: VSCODE_COLORS.storageType });
+        tokens.push({ text: word, color: palette.storageType });
       } else if (BUILTINS.has(word)) {
-        tokens.push({ text: word, color: VSCODE_COLORS.builtin });
+        tokens.push({ text: word, color: palette.builtin });
       } else if (isDefName || isFunctionCall) {
-        tokens.push({ text: word, color: VSCODE_COLORS.functionName });
+        tokens.push({ text: word, color: palette.functionName });
       } else {
         // Standard variable / parameter
-        tokens.push({ text: word, color: VSCODE_COLORS.variable });
+        tokens.push({ text: word, color: palette.variable });
       }
       continue;
     }
 
     // Fallback single char
-    tokens.push({ text: char, color: VSCODE_COLORS.defaultText });
+    tokens.push({ text: char, color: palette.defaultText });
     i++;
   }
 
@@ -214,8 +235,8 @@ export function tokenizeLine(line: string): HighlightToken[] {
 /**
  * React Component to render syntax-colored line
  */
-export const HighlightedLine: React.FC<{ line: string }> = React.memo(({ line }) => {
-  const tokens = tokenizeLine(line);
+export const HighlightedLine: React.FC<{ line: string; isDarkTheme?: boolean }> = React.memo(({ line, isDarkTheme = true }) => {
+  const tokens = tokenizeLine(line, isDarkTheme);
   return (
     <span>
       {tokens.map((t, idx) => (
@@ -223,6 +244,7 @@ export const HighlightedLine: React.FC<{ line: string }> = React.memo(({ line })
           key={idx}
           style={{
             color: t.color,
+            fontWeight: !isDarkTheme && (t.color === VSCODE_LIGHT_COLORS.keyword || t.color === VSCODE_LIGHT_COLORS.builtin || t.color === VSCODE_LIGHT_COLORS.storageType) ? 600 : undefined,
           }}
         >
           {t.text}
@@ -232,8 +254,8 @@ export const HighlightedLine: React.FC<{ line: string }> = React.memo(({ line })
   );
 });
 
-// Shared VS Code font stack and pixel-perfect editor styles
-export const VSCODE_MONO_FONT = 'Consolas, "Cascadia Code", "Fira Code", "Courier New", monospace';
+// Shared JetBrains Mono / Fira Code font stack matching AlgoMaster reference
+export const VSCODE_MONO_FONT = "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace";
 
 export const CODE_EDITOR_SHARED_STYLE: React.CSSProperties = {
   fontFamily: VSCODE_MONO_FONT,
@@ -317,21 +339,21 @@ export const HighlightedCodeBlock: React.FC<HighlightedCodeBlockProps> = React.m
         let lineBorderBottom = '1px solid transparent';
 
         if (isStepLine) {
-          lineBg = 'rgba(245, 158, 11, 0.22)';
-          lineBorderTop = '1px solid rgba(245, 158, 11, 0.50)';
-          lineBorderBottom = '1px solid rgba(245, 158, 11, 0.50)';
+          lineBg = isDarkTheme ? 'rgba(245, 158, 11, 0.22)' : 'rgba(245, 158, 11, 0.16)';
+          lineBorderTop = isDarkTheme ? '1px solid rgba(245, 158, 11, 0.50)' : '1px solid rgba(245, 158, 11, 0.45)';
+          lineBorderBottom = isDarkTheme ? '1px solid rgba(245, 158, 11, 0.50)' : '1px solid rgba(245, 158, 11, 0.45)';
         } else if (isHovered) {
-          lineBg = 'rgba(255, 255, 255, 0.08)';
-          lineBorderTop = '1px solid rgba(255, 255, 255, 0.18)';
-          lineBorderBottom = '1px solid rgba(255, 255, 255, 0.18)';
+          lineBg = isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)';
+          lineBorderTop = isDarkTheme ? '1px solid rgba(255, 255, 255, 0.18)' : '1px solid rgba(0, 0, 0, 0.08)';
+          lineBorderBottom = isDarkTheme ? '1px solid rgba(255, 255, 255, 0.18)' : '1px solid rgba(0, 0, 0, 0.08)';
         } else if (isCursorLine) {
           if (isStepMode) {
             // Only faint underline when step mode is active
-            lineBorderBottom = '1px solid rgba(255, 255, 255, 0.10)';
+            lineBorderBottom = isDarkTheme ? '1px solid rgba(255, 255, 255, 0.10)' : '1px solid rgba(0, 0, 0, 0.10)';
           } else {
-            lineBg = 'rgba(255, 255, 255, 0.04)';
-            lineBorderTop = '1px solid rgba(255, 255, 255, 0.12)';
-            lineBorderBottom = '1px solid rgba(255, 255, 255, 0.12)';
+            lineBg = isDarkTheme ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)';
+            lineBorderTop = isDarkTheme ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.06)';
+            lineBorderBottom = isDarkTheme ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.06)';
           }
         }
 
@@ -436,7 +458,7 @@ export const HighlightedCodeBlock: React.FC<HighlightedCodeBlockProps> = React.m
                 textDecorationThickness: colorBlindMode && hasError ? '2px' : undefined,
               }}
             >
-              <HighlightedLine line={line} />
+              <HighlightedLine line={line} isDarkTheme={isDarkTheme} />
             </span>
             {line === '' && '\u00A0'}
           </div>

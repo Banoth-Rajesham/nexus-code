@@ -3,6 +3,12 @@
  * Runs Python code and step-by-step trace safely 100% inside browser Web Worker
  */
 
+export type VizValue =
+  | { k: 'prim'; t: string; r: string }
+  | { k: 'str'; items: VizValue[] }
+  | { k: 'list'; t: string; items: VizValue[] }
+  | { k: 'dict'; t: string; items: [string, VizValue][] };
+
 export interface TraceStep {
   step: number;
   line: number;
@@ -16,6 +22,8 @@ export interface TraceStep {
       isMeta?: boolean;
       isInstance?: boolean;
       attrs?: Record<string, { name: string; type: string; value: string }>;
+      /** Structured copy of the value for the 3D data view (lists, dicts, strings, grids) */
+      viz?: VizValue;
     }
   >;
   outputSoFar: string;
@@ -53,6 +61,8 @@ export interface RunResult {
 
 let activeWorker: Worker | null = null;
 let currentTimeoutId: any = null;
+let isWorkerBusy = false;
+let isWorkerReady = false;
 
 export function terminateCurrentWorker() {
   if (currentTimeoutId) {
@@ -64,16 +74,30 @@ export function terminateCurrentWorker() {
       activeWorker.terminate();
     } catch {}
     activeWorker = null;
+    isWorkerBusy = false;
+    isWorkerReady = false;
   }
 }
 
-function getOrCreateWorker(): Worker {
+export function getOrCreateWorker(): Worker {
   if (!activeWorker) {
     activeWorker = new Worker('/workers/pythonWorker.js');
-    // Pre-warm Pyodide
+    // Pre-warm Pyodide in background immediately
     activeWorker.postMessage({ id: 'warmup', type: 'INIT' });
+    activeWorker.addEventListener('message', (e) => {
+      if (e.data?.type === 'INIT_SUCCESS') {
+        isWorkerReady = true;
+      }
+    });
   }
   return activeWorker;
+}
+
+// Automatically start pre-warming Pyodide in the browser background
+if (typeof window !== 'undefined') {
+  try {
+    getOrCreateWorker();
+  } catch {}
 }
 
 /** Check if code imports Pygame (Pygame graphics not supported in Step mode) */
@@ -86,11 +110,15 @@ export function runPythonInWorker(
   code: string,
   inputs: string[] = [],
   onNeedInput?: (prompt: string, line: number, resume: (val: string) => void) => void,
-  timeoutMs: number = 10000
+  timeoutMs: number = 25000
 ): Promise<RunResult> {
   return new Promise((resolve) => {
-    terminateCurrentWorker();
+    // Only terminate worker if a previous execution was left hanging / busy
+    if (isWorkerBusy) {
+      terminateCurrentWorker();
+    }
     const worker = getOrCreateWorker();
+    isWorkerBusy = true;
     const reqId = `run_${Date.now()}_${Math.random()}`;
 
     let inputAccumulator = [...inputs];
@@ -99,7 +127,7 @@ export function runPythonInWorker(
       terminateCurrentWorker();
       resolve({
         success: false,
-        output: '[Execution Timed Out]: Python program exceeded the 10-second safety limit (potential infinite loop). Execution aborted.',
+        output: '[Execution Timed Out]: Python program exceeded the safety limit (potential infinite loop). Execution aborted.',
         timeMs: timeoutMs,
         engine: 'Pyodide Web Worker (Safety Timeout)',
       });
@@ -135,6 +163,7 @@ export function runPythonInWorker(
       }
 
       if (data.type === 'RUN_COMPLETE') {
+        isWorkerBusy = false;
         if (currentTimeoutId) clearTimeout(currentTimeoutId);
         worker.removeEventListener('message', handleMessage);
         resolve({
@@ -147,6 +176,7 @@ export function runPythonInWorker(
       }
 
       if (data.type === 'WORKER_ERROR') {
+        isWorkerBusy = false;
         if (currentTimeoutId) clearTimeout(currentTimeoutId);
         worker.removeEventListener('message', handleMessage);
         resolve({
@@ -174,11 +204,15 @@ export function tracePythonInWorker(
   code: string,
   inputs: string[] = [],
   onNeedInput?: (prompt: string, line: number, resume: (val: string) => void) => void,
-  timeoutMs: number = 10000
+  timeoutMs: number = 25000
 ): Promise<TraceResult> {
   return new Promise((resolve) => {
-    terminateCurrentWorker();
+    // Only terminate worker if previous trace is stuck
+    if (isWorkerBusy) {
+      terminateCurrentWorker();
+    }
     const worker = getOrCreateWorker();
+    isWorkerBusy = true;
     const reqId = `trace_${Date.now()}_${Math.random()}`;
 
     let inputAccumulator = [...inputs];
@@ -189,7 +223,7 @@ export function tracePythonInWorker(
         success: false,
         trace: [],
         totalSteps: 0,
-        output: '[Step Tracer Timed Out]: Program exceeded the 10-second limit during execution. Aborted.',
+        output: '[Step Tracer Timed Out]: Program exceeded the safety limit during execution. Aborted.',
         timeMs: timeoutMs,
         engine: 'Pyodide Web Worker (Safety Timeout)',
       });
@@ -223,6 +257,7 @@ export function tracePythonInWorker(
       }
 
       if (data.type === 'TRACE_COMPLETE') {
+        isWorkerBusy = false;
         if (currentTimeoutId) clearTimeout(currentTimeoutId);
         worker.removeEventListener('message', handleMessage);
         resolve({
@@ -239,6 +274,7 @@ export function tracePythonInWorker(
       }
 
       if (data.type === 'WORKER_ERROR') {
+        isWorkerBusy = false;
         if (currentTimeoutId) clearTimeout(currentTimeoutId);
         worker.removeEventListener('message', handleMessage);
         resolve({

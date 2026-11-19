@@ -71,9 +71,9 @@ export const StepControls: React.FC<StepControlsProps> = ({
         disabled={disabled}
         title="Step-by-step Execution with Variables & Call Stack (F10)"
         aria-label="Step-by-step execution"
-        className="flex items-center gap-1.5 px-3 py-1 bg-amber-600/90 hover:bg-amber-600 focus:outline-hidden focus:ring-1 focus:ring-amber-400 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded transition-all shadow-xs active:scale-95 shrink-0"
+        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#f59e0b] hover:bg-[#d97706] focus:outline-hidden focus:ring-2 focus:ring-amber-400 disabled:opacity-50 text-black font-bold text-xs sm:text-sm rounded-lg transition-all shadow-sm shadow-amber-500/20 active:scale-95 shrink-0"
       >
-        <Footprints className="w-3.5 h-3.5 fill-white text-white" />
+        <Footprints className="w-3.5 h-3.5 fill-black text-black" />
         <span className="whitespace-nowrap">Step</span>
       </button>
     );
@@ -89,13 +89,13 @@ export const StepControls: React.FC<StepControlsProps> = ({
   const currentSpeedLabel = speedOptions.find((s) => s.value === playSpeedMs)?.label || `${playSpeedMs / 1000}s`;
 
   return (
-    <div className="flex items-center gap-1 bg-[#161b22] border border-[#30363d] rounded p-0.5 text-xs shrink-0 animate-fadeIn">
+    <div className="flex items-center gap-1 ws-bg-surface border ws-border rounded p-0.5 text-xs shrink-0 animate-fadeIn">
       {/* 1. Reset Button */}
       <button
         onClick={onReset}
         title="Exit / Reset Step Mode"
         aria-label="Exit / Reset Step Mode"
-        className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] rounded transition-colors focus:ring-1 focus:ring-slate-400"
+        className="p-1 ws-text-muted ws-hover-strong ws-hover-bg rounded transition-colors focus:ring-1 focus:ring-slate-400"
       >
         <RotateCcw className="w-3.5 h-3.5" />
       </button>
@@ -106,7 +106,7 @@ export const StepControls: React.FC<StepControlsProps> = ({
         disabled={stepIndex <= 0}
         title="Step Back to Previous Line"
         aria-label="Step Back"
-        className="p-1 text-slate-300 hover:text-white hover:bg-[#21262d] disabled:opacity-30 disabled:hover:bg-transparent rounded transition-colors focus:ring-1 focus:ring-slate-400"
+        className="p-1 ws-text-2 ws-hover-strong ws-hover-bg disabled:opacity-30 disabled:hover:bg-transparent rounded transition-colors focus:ring-1 focus:ring-slate-400"
       >
         <SkipBack className="w-3.5 h-3.5" />
       </button>
@@ -117,11 +117,11 @@ export const StepControls: React.FC<StepControlsProps> = ({
         disabled={stepIndex >= totalSteps - 1}
         title="Next Step (F10)"
         aria-label="Next Step"
-        className="flex items-center gap-1 px-2 py-0.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-30 disabled:hover:bg-amber-600 text-white font-bold rounded transition-colors focus:ring-1 focus:ring-amber-300 shadow-xs"
+        className="flex items-center gap-1.5 px-2.5 py-1 bg-[#f59e0b] hover:bg-[#d97706] disabled:opacity-30 disabled:hover:bg-[#f59e0b] text-black font-bold rounded transition-colors focus:ring-1 focus:ring-amber-300 shadow-xs"
       >
-        <SkipForward className="w-3.5 h-3.5" />
+        <SkipForward className="w-3.5 h-3.5 fill-black" />
         <span className="hidden sm:inline">Next</span>
-        <kbd className="hidden md:inline text-[9px] px-1 py-0.2 rounded bg-amber-700/80 text-amber-200 font-mono">F10</kbd>
+        <kbd className="hidden md:inline text-[9px] px-1 py-0.2 rounded bg-amber-700/30 text-amber-950 font-mono font-bold">F10</kbd>
       </button>
 
       {/* 4. Auto-Play / Pause Button */}
@@ -130,7 +130,7 @@ export const StepControls: React.FC<StepControlsProps> = ({
         title={isPlaying ? 'Pause Auto-play' : 'Auto-play through Steps'}
         aria-label={isPlaying ? 'Pause Auto-play' : 'Auto-play'}
         className={`p-1 rounded transition-colors focus:ring-1 focus:ring-amber-400 ${
-          isPlaying ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-300 hover:text-white hover:bg-[#21262d]'
+          isPlaying ? 'bg-amber-500 text-slate-950 font-bold' : 'ws-text-2 ws-hover-strong ws-hover-bg'
         }`}
       >
         {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
@@ -142,14 +142,14 @@ export const StepControls: React.FC<StepControlsProps> = ({
           onClick={() => setSpeedMenuOpen((o) => !o)}
           title={`Auto-play Speed: ${currentSpeedLabel}`}
           aria-label="Change auto-play speed"
-          className="flex items-center gap-1 px-1.5 py-0.5 text-slate-400 hover:text-slate-200 hover:bg-[#21262d] rounded transition-colors focus:ring-1 focus:ring-slate-400 text-[11px]"
+          className="flex items-center gap-1 px-1.5 py-0.5 ws-text-muted ws-hover-strong ws-hover-bg rounded transition-colors focus:ring-1 focus:ring-slate-400 text-[11px]"
         >
-          <Clock className="w-3 h-3 text-slate-400" />
+          <Clock className="w-3 h-3 ws-text-muted" />
           <span className="hidden lg:inline">{playSpeedMs / 1000}s</span>
         </button>
 
         {speedMenuOpen && (
-          <div className="absolute top-full mt-1 left-0 z-50 bg-[#161b22] border border-[#30363d] rounded-md shadow-xl py-1 w-32 animate-fadeIn text-[11px]">
+          <div className="absolute top-full mt-1 left-0 z-50 ws-bg-surface border ws-border rounded-md shadow-xl py-1 w-32 animate-fadeIn text-[11px]">
             {speedOptions.map((opt) => (
               <button
                 key={opt.value}
@@ -159,8 +159,8 @@ export const StepControls: React.FC<StepControlsProps> = ({
                 }}
                 className={`w-full text-left px-2.5 py-1 transition-colors flex items-center justify-between ${
                   playSpeedMs === opt.value
-                    ? 'bg-amber-600/20 text-amber-300 font-bold'
-                    : 'text-slate-300 hover:bg-[#21262d]'
+                    ? 'bg-amber-600/20 ws-tx-amber font-bold'
+                    : 'ws-text-2 ws-hover-bg'
                 }`}
               >
                 <span>{opt.label}</span>
@@ -174,7 +174,7 @@ export const StepControls: React.FC<StepControlsProps> = ({
       {/* 6. Step Count Badge */}
       <span
         title="Rows = statements explained. Steps = lines actually executed."
-        className="px-1.5 py-0.5 text-[11px] text-amber-300 font-mono font-bold bg-amber-950/40 rounded border border-amber-600/30 whitespace-nowrap cursor-help"
+        className="px-1.5 py-0.5 text-[11px] ws-tx-amber font-mono font-bold bg-amber-950/40 rounded border border-amber-600/30 whitespace-nowrap cursor-help"
       >
         {isTraceOutdated
           ? 'Code changed'

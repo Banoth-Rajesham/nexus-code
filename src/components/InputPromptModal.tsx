@@ -29,22 +29,22 @@ export const InputPromptModal: React.FC<InputPromptModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
-      <div className="bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl w-full max-w-md p-5 text-slate-200">
-        <div className="flex items-center justify-between border-b border-[#21262d] pb-3 mb-4">
+      <div className="ws-bg-surface border ws-border rounded-xl shadow-2xl w-full max-w-md p-5 ws-text-body">
+        <div className="flex items-center justify-between border-b ws-border pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <div className="p-1.5 rounded-lg bg-blue-500/10 ws-tx-blue border border-blue-500/20">
               <Terminal className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-white">Program Input Required</h3>
-              <p className="text-[11px] text-slate-400">Triggered by input() at Line {line}</p>
+              <h3 className="font-bold text-sm ws-text-strong">Program Input Required</h3>
+              <p className="text-[11px] ws-text-muted">Triggered by input() at Line {line}</p>
             </div>
           </div>
           <button
             onClick={onCancel}
             title="Cancel execution"
             aria-label="Cancel input"
-            className="text-slate-400 hover:text-white p-1 rounded hover:bg-[#21262d] transition-colors"
+            className="ws-text-muted ws-hover-strong p-1 rounded ws-hover-bg transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -52,7 +52,7 @@ export const InputPromptModal: React.FC<InputPromptModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-mono text-amber-300 mb-1.5">
+            <label className="block text-xs font-mono ws-tx-amber mb-1.5">
               {promptText ? promptText : 'Please enter input:'}
             </label>
             <input
@@ -61,7 +61,7 @@ export const InputPromptModal: React.FC<InputPromptModalProps> = ({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="Type your input and press Enter..."
-              className="w-full bg-[#0d1117] border border-[#30363d] focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-lg px-3 py-2 text-sm text-white font-mono outline-hidden transition-all placeholder:text-slate-600"
+              className="w-full ws-bg-sunken border ws-border focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-lg px-3 py-2 text-sm ws-text-strong font-mono outline-hidden transition-all placeholder:text-slate-600"
             />
           </div>
 
@@ -69,7 +69,7 @@ export const InputPromptModal: React.FC<InputPromptModalProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[#21262d] transition-colors"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium ws-text-muted ws-hover-strong ws-hover-bg transition-colors"
             >
               Cancel
             </button>

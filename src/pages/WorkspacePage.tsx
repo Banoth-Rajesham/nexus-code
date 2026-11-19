@@ -47,6 +47,9 @@ import {
   Sun,
   Moon,
   Info,
+  GraduationCap,
+  Target,
+  Box as Box3DIcon,
 } from 'lucide-react';
 import {
   SUPPORTED_NATIVE_LANGUAGES,
@@ -74,6 +77,7 @@ import {
   PythonAnalysisResult,
   StatementExplanationRow,
   TAG_STYLES,
+  TAG_STYLES_LIGHT,
 } from '../utils/pythonTreeSitterEngine';
 import {
   analyzeIndentation,
@@ -86,6 +90,35 @@ import { WORKSPACE_PRESETS } from '../utils/workspacePresets';
 import { StepControls } from '../components/StepControls';
 import { StepInspector } from '../components/StepInspector';
 import { InputPromptModal } from '../components/InputPromptModal';
+import { stripTypeScript, runJsInWorker } from '../utils/jsSandbox';
+import {
+  ExperienceLevel,
+  LEVEL_FEATURES,
+  loadExperienceLevel,
+  saveExperienceLevel,
+  isTourCompleted,
+  markTourCompleted,
+} from '../utils/experienceLevel';
+import { explainRunError, applyQuickFix } from '../utils/friendlyErrors';
+import {
+  LESSONS,
+  Lesson,
+  LessonResult,
+  checkLesson,
+  generateQuiz,
+  loadCompletedLessons,
+  saveCompletedLessons,
+} from '../utils/learningPath';
+import { LevelSwitcher } from '../components/workspace/LevelSwitcher';
+import { GuidedTour } from '../components/workspace/GuidedTour';
+import { StepNarrator } from '../components/workspace/StepNarrator';
+import { FriendlyErrorCard } from '../components/workspace/FriendlyErrorCard';
+import { LessonsPanel, ActiveLessonBanner } from '../components/workspace/LessonsPanel';
+import { QuizModal } from '../components/workspace/QuizModal';
+import { MobileCodeKeys } from '../components/workspace/MobileCodeKeys';
+import { EmptyEditorState } from '../components/workspace/EmptyEditorState';
+import { WorkspaceStatusBar } from '../components/workspace/WorkspaceStatusBar';
+import { Code3DView } from '../components/visual3d/Code3DView';
 import {
   runPythonInWorker,
   tracePythonInWorker,
@@ -97,6 +130,7 @@ import {
 import { FlowchartView, getFlowchartSvg } from '../components/FlowchartView';
 import { buildFlowchartFromPython } from '../utils/flowchart/pythonToFlowGraph';
 import { generateMermaidText } from '../utils/flowchart/mermaidGenerator';
+import ThemeSwitcher, { Theme } from '../components/ui/theme-switcher';
 
 interface WorkspacePageProps {
   onNavigate: (view: string) => void;
@@ -132,6 +166,47 @@ const DEFAULT_PROJECT_FILES: ProjectFile[] = [
     isEntry: true,
   },
 ];
+
+// Formatted explanation helper that renders variables and numbers in AlgoMaster mint green tags
+export const FormattedExplanation: React.FC<{
+  text: string;
+  isLight?: boolean;
+}> = ({ text, isLight = false }) => {
+  if (!text) return null;
+
+  // Match quoted terms "...", '...', backticked `...`, numbers, or common identifiers
+  const regex = /("[^"]+"|'[^']+'|`[^`]+`|\b\d+(\.\d+)?\b)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const raw = match[0];
+    const clean = raw.replace(/^["'`]|["'`]$/g, '');
+    parts.push(
+      <span
+        key={match.index}
+        className={`inline-block mx-0.5 px-1.5 py-0.2 rounded font-mono text-xs font-semibold border ${
+          isLight
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+            : 'bg-[#132d21] text-[#34d399] border-[#166534]/60'
+        }`}
+      >
+        {clean}
+      </span>
+    );
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return <>{parts}</>;
+};
 
 export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initialProject }) => {
   const { user, token, quota, refreshUser, openAuthModal } = useAuth();
@@ -394,6 +469,16 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     } catch {}
   };
 
+  const [themeMode, setThemeMode] = useState<Theme>(() => {
+    try {
+      const s = localStorage.getItem('nexus_workspace_theme_mode');
+      if (s === 'system' || s === 'light' || s === 'dark') return s as Theme;
+      const old = localStorage.getItem('nexus_editor_theme');
+      if (old === 'light' || old === 'dark') return old as Theme;
+    } catch {}
+    return 'dark';
+  });
+
   const [editorTheme, setEditorTheme] = useState<'dark' | 'light'>(() => {
     try {
       const s = localStorage.getItem('nexus_editor_theme');
@@ -402,11 +487,42 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     return 'dark';
   });
 
+  useEffect(() => {
+    if (themeMode !== 'system') {
+      setEditorTheme(themeMode);
+      try {
+        localStorage.setItem('nexus_editor_theme', themeMode);
+        localStorage.setItem('nexus_workspace_theme_mode', themeMode);
+      } catch {}
+      return;
+    }
+
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const updateSystemTheme = () => {
+      const sysTheme = mq.matches ? 'dark' : 'light';
+      setEditorTheme(sysTheme);
+      try {
+        localStorage.setItem('nexus_editor_theme', sysTheme);
+        localStorage.setItem('nexus_workspace_theme_mode', 'system');
+      } catch {}
+    };
+
+    updateSystemTheme();
+    mq.addEventListener('change', updateSystemTheme);
+    return () => mq.removeEventListener('change', updateSystemTheme);
+  }, [themeMode]);
+
   const handleThemeChange = (theme: 'dark' | 'light') => {
+    setThemeMode(theme);
     setEditorTheme(theme);
     try {
       localStorage.setItem('nexus_editor_theme', theme);
+      localStorage.setItem('nexus_workspace_theme_mode', theme);
     } catch {}
+  };
+
+  const handleThemeModeChange = (mode: Theme) => {
+    setThemeMode(mode);
   };
 
   const [wordWrap, setWordWrap] = useState<boolean>(() => {
@@ -623,15 +739,15 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
   const deferredCode = useDeferredValue(code);
 
   // Visual Blueprint View Mode ('aligned' | 'blocks' | 'code' | 'flowchart' | 'deep' | 'variables') (persisted to localStorage)
-  const [blueprintMode, setBlueprintMode] = useState<'aligned' | 'blocks' | 'code' | 'flowchart' | 'deep' | 'variables'>(() => {
+  const [blueprintMode, setBlueprintMode] = useState<'aligned' | 'blocks' | 'code' | 'flowchart' | 'deep' | 'variables' | '3d'>(() => {
     try {
       const saved = localStorage.getItem('nexus_blueprint_mode');
-      if (saved === 'aligned' || saved === 'blocks' || saved === 'code' || saved === 'flowchart' || saved === 'deep' || saved === 'variables') return saved as any;
+      if (saved === 'aligned' || saved === 'blocks' || saved === 'code' || saved === 'flowchart' || saved === 'deep' || saved === 'variables' || saved === '3d') return saved as any;
     } catch {}
     return 'aligned';
   });
 
-  const handleBlueprintModeChange = (mode: 'aligned' | 'blocks' | 'code' | 'flowchart' | 'deep' | 'variables') => {
+  const handleBlueprintModeChange = (mode: 'aligned' | 'blocks' | 'code' | 'flowchart' | 'deep' | 'variables' | '3d') => {
     setBlueprintMode(mode);
     try {
       localStorage.setItem('nexus_blueprint_mode', mode);
@@ -1487,21 +1603,21 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    // 10-second safety timeout guard (infinite loop protection)
+    // 25-second safety timeout guard (infinite loop protection & WASM cold start)
     runTimeoutRef.current = setTimeout(() => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
         setLoadingAction(null);
         setTerminalOutput({
-          output: '[Execution Timed Out]: Program exceeded the 10-second safety limit (potential infinite loop or blocking I/O detected). Execution aborted.',
-          timeMs: 10000,
+          output: '[Execution Timed Out]: Program exceeded the 25-second safety limit (potential infinite loop or blocking I/O detected). Execution aborted.',
+          timeMs: 25000,
           success: false,
           exitCode: 124,
           language: progLang,
         });
       }
-    }, 10000);
+    }, 25000);
 
     // Build multi-file project payload
     const filePayload: Record<string, string> = {};
@@ -1510,6 +1626,25 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     });
 
     const targetRunFile = activeFile || entryFile;
+
+    // Isolated in-browser JS/TS execution (Web Worker with a hard timeout)
+    const runInBrowserJs = async () => {
+      const source = progLang === 'typescript' ? stripTypeScript(targetRunFile.content) : targetRunFile.content;
+      const result = await runJsInWorker(source, 5000, abortController.signal);
+      if (result.aborted) return;
+      if (runTimeoutRef.current) {
+        clearTimeout(runTimeoutRef.current);
+        runTimeoutRef.current = null;
+      }
+      setTerminalOutput({
+        output: result.output,
+        timeMs: result.timeMs,
+        success: result.success,
+        exitCode: result.success ? 0 : result.timedOut ? 124 : 1,
+        language: progLang,
+        engine: 'In-Browser JavaScript Sandbox',
+      });
+    };
 
     // In-browser Web Worker execution for Python (100% secure, offline & private)
     if (progLang === 'python' && !isPygameCode(targetRunFile.content) && files.length <= 1) {
@@ -1534,6 +1669,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           language: 'python',
           engine: runRes.engine,
         });
+        // This path returns before the shared `finally` below, so clear the running state here
+        setLoadingAction(null);
+        abortControllerRef.current = null;
         return;
       } catch (workerRunErr) {
         console.warn('Worker execution fallback to server:', workerRunErr);
@@ -1553,6 +1691,12 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           input: stdinInput,
         }),
       });
+
+      // Server-side execution disabled (production / non-local request): run JS in the browser instead
+      if (res.status === 403 && (progLang === 'javascript' || progLang === 'typescript')) {
+        await runInBrowserJs();
+        return;
+      }
 
       if (runTimeoutRef.current) {
         clearTimeout(runTimeoutRef.current);
@@ -1578,45 +1722,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
         return; // Handled by stop / timeout
       }
 
-      // Backend unreachable -> in-browser client sandbox fallback!
+      // Backend unreachable -> in-browser Web Worker sandbox fallback
       if (progLang === 'javascript' || progLang === 'typescript') {
-        const logs: string[] = [];
-        const startTime = performance.now();
-        try {
-          const customConsole = {
-            log: (...args: any[]) => logs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')),
-            error: (...args: any[]) => logs.push('[ERROR] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')),
-            warn: (...args: any[]) => logs.push('[WARN] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')),
-            info: (...args: any[]) => logs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')),
-          };
-          const executable = progLang === 'typescript' ? targetRunFile.content.replace(/:\s*[a-zA-Z0-9_<>\[\]]+/g, '') : targetRunFile.content;
-          const fn = new Function('console', executable);
-          fn(customConsole);
-          const timeMs = Math.round(performance.now() - startTime);
-          setTerminalOutput({
-            output: logs.length > 0 ? logs.join('\n') : '(Program finished with no output)',
-            timeMs,
-            success: true,
-            exitCode: 0,
-            language: progLang,
-            engine: 'In-Browser JavaScript Sandbox',
-          });
-        } catch (evalErr: any) {
-          const timeMs = Math.round(performance.now() - startTime);
-          let lineInfo = '';
-          if (evalErr.stack) {
-            const match = evalErr.stack.match(/<anonymous>:(\d+):(\d+)/);
-            if (match) lineInfo = ` (Line ${match[1]})`;
-          }
-          setTerminalOutput({
-            output: `${logs.join('\n')}${logs.length ? '\n' : ''}${evalErr.name || 'RuntimeError'}${lineInfo}: ${evalErr.message}`,
-            timeMs,
-            success: false,
-            exitCode: 1,
-            language: progLang,
-            engine: 'In-Browser JavaScript Sandbox',
-          });
-        }
+        await runInBrowserJs();
       } else {
         // Python & other languages client static execution verification fallback
         setTerminalOutput({
@@ -2244,22 +2352,154 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
     return () => window.removeEventListener('keydown', handleGlobalShortcuts);
   }, [files, activeFile, code, progLang, nativeLang, projectTitle, isDirty]);
 
+  // ─── EXPERIENCE LEVEL (Beginner / Intermediate / Senior) ───
+  // Levels only hide extra tools by default; Senior shows the complete workspace.
+  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>(() => loadExperienceLevel() || 'beginner');
+  const levelFeatures = LEVEL_FEATURES[experienceLevel];
+  const [tourOpen, setTourOpen] = useState<boolean>(() => !isTourCompleted());
+
+  const handleLevelChange = (level: ExperienceLevel) => {
+    setExperienceLevel(level);
+    saveExperienceLevel(level);
+  };
+
+  const closeTour = () => {
+    setTourOpen(false);
+    markTourCompleted();
+    saveExperienceLevel(experienceLevel);
+  };
+
+  // If the current view is hidden at this level, fall back to a visible one
+  useEffect(() => {
+    if (!levelFeatures.blueprintModes.includes(blueprintMode)) {
+      handleBlueprintModeChange('aligned');
+    }
+    if (!levelFeatures.showConvertTools && aiSubTab === 'convert') {
+      setAiSubTab('lineByLine');
+    }
+  }, [experienceLevel]);
+
+  // ─── LESSONS & LEARNING PROGRESS ───
+  const [lessonsOpen, setLessonsOpen] = useState(false);
+  const [completedLessons, setCompletedLessons] = useState<string[]>(() => loadCompletedLessons());
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
+  const [lessonResult, setLessonResult] = useState<LessonResult | null>(null);
+  const activeLesson = useMemo(() => LESSONS.find((l) => l.id === activeLessonId) || null, [activeLessonId]);
+
+  const handleStartLesson = (lesson: Lesson) => {
+    if (progLang !== 'python') return;
+    if (code.trim() && isDirty && activeLessonId !== lesson.id) {
+      const ok = window.confirm(`Start the lesson "${lesson.title}"? This replaces the code in ${activeFile.name}.`);
+      if (!ok) return;
+    }
+    handleCodeChange(lesson.starterCode);
+    setStdinInput((lesson.check.stdin || []).join('\n'));
+    setActiveLessonId(lesson.id);
+    setLessonResult(null);
+    setTerminalOutput(null);
+    setLessonsOpen(false);
+    requestAnimationFrame(() => {
+      const el = englishEditorRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    });
+  };
+
+  const handleExitLesson = () => {
+    setActiveLessonId(null);
+    setLessonResult(null);
+  };
+
+  // Check the active lesson every time a run finishes
+  useEffect(() => {
+    if (!activeLesson || !terminalOutput) return;
+    const result = checkLesson(activeLesson, code, terminalOutput.output || '', !!terminalOutput.success);
+    setLessonResult(result);
+    if (result.passed && !completedLessons.includes(activeLesson.id)) {
+      const next = [...completedLessons, activeLesson.id];
+      setCompletedLessons(next);
+      saveCompletedLessons(next);
+    }
+  }, [terminalOutput]);
+
+  const nextLessonAfterActive = useMemo(() => {
+    if (!activeLesson) return null;
+    const idx = LESSONS.findIndex((l) => l.id === activeLesson.id);
+    return LESSONS.slice(idx + 1).find((l) => !completedLessons.includes(l.id)) || LESSONS[idx + 1] || null;
+  }, [activeLesson, completedLessons]);
+
+  // ─── QUIZ ME ───
+  const [quizOpen, setQuizOpen] = useState(false);
+  const quizQuestions = useMemo(
+    () => (quizOpen && progLang === 'python' ? generateQuiz(pythonAnalysis.rows, 3, code) : []),
+    [quizOpen, pythonAnalysis.rows, progLang]
+  );
+
+  // ─── FRIENDLY ERRORS ───
+  const friendlyError = useMemo(() => {
+    if (!terminalOutput || terminalOutput.success) return null;
+    return explainRunError(terminalOutput.output || '', terminalOutput.language || progLang, code);
+  }, [terminalOutput]);
+
+  const handleFriendlyQuickFix = () => {
+    if (!friendlyError) return;
+    if (friendlyError.quickFix?.kind === 'indent') {
+      if (friendlyError.line && indentAnalysis.lines[friendlyError.line - 1]?.hasError) handleFixLineIndent(friendlyError.line);
+      else handleFixAllIndent();
+      return;
+    }
+    const fixed = applyQuickFix(code, friendlyError);
+    if (fixed !== null) {
+      handleCodeChange(fixed);
+      if (friendlyError.line) jumpToLine(friendlyError.line);
+    }
+  };
+
+  // First Python run downloads the in-browser engine; tell the student why it takes longer
+  const pythonEngineWarmRef = useRef(false);
+  useEffect(() => {
+    if (terminalOutput && progLang === 'python') pythonEngineWarmRef.current = true;
+  }, [terminalOutput]);
+
+  // Phones can't fit two panes side by side: show one pane at a time (switch with the tab bar)
+  useEffect(() => {
+    if (windowWidth < 768 && viewLayout === 'split') {
+      setViewLayout('english'); // not persisted, so desktop keeps its split preference
+      setMobileView('english');
+    }
+  }, [windowWidth, viewLayout]);
+
+  // Mobile code-symbol bar inserts text at the caret
+  const handleMobileInsert = (newValue: string, cursor: number) => {
+    pendingSelectionRef.current = { start: cursor, end: cursor };
+    handleCodeChange(newValue);
+  };
+
   const lineCount = code.split('\n').length;
   const currentLang = SUPPORTED_PROG_LANGUAGES.find((p) => p.key === progLang);
   const currentNative = SUPPORTED_NATIVE_LANGUAGES.find((l) => l.key === nativeLang);
   const langColor = LANG_COLORS[progLang] || '#888';
   const langIcon = LANG_ICONS[progLang] || progLang.slice(0, 2).toUpperCase();
   const editorLineHeight = fontSize === '13px' ? '22px' : fontSize === '17px' ? '30px' : '26px';
-  const editorBg = editorTheme === 'light' ? '#ffffff' : '#1e1e1e';
-  const editorTextColor = editorTheme === 'light' ? '#0f172a' : '#d4d4d4';
-  const lineNumbersBg = editorTheme === 'light' ? '#f8fafc' : '#1e1e1e';
-  const lineNumbersColor = editorTheme === 'light' ? '#64748b' : '#858585';
+  const isLight = editorTheme === 'light';
+  const editorBg = isLight ? '#ffffff' : '#121214';
+  const editorTextColor = isLight ? '#0f172a' : '#f8fafc';
+  const lineNumbersBg = isLight ? '#f8fafc' : '#121214';
+  const lineNumbersColor = isLight ? '#475569' : '#71717a';
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full bg-[#0d1117] text-white overflow-hidden select-text relative">
-      {/* ─── SLIM UNIFIED WORKSPACE TOOLBAR (Ribbons 1 & 2 Merged, max ~38px height) ─── */}
+    <div className={`flex-1 flex flex-col min-h-0 h-full overflow-hidden select-text relative transition-colors ${
+      isLight ? 'ws-light bg-[#f8fafc] text-slate-900' : 'bg-[#0d1117] text-white'
+    }`}>
+      {/* ─── SLIM UNIFIED WORKSPACE TOOLBAR (Ribbons 1 & 2 Merged, max ~42px height) ─── */}
       {!isToolbarCollapsed ? (
-        <div className="h-[38px] max-h-[38px] min-h-[38px] flex items-center justify-between px-2.5 bg-[#161b22] border-b border-[#30363d] shrink-0 gap-2 overflow-x-auto no-scrollbar select-none z-30">
+        <div className={`h-[42px] max-h-[42px] min-h-[42px] flex items-center justify-between px-3 border-b shrink-0 gap-2.5 overflow-x-auto no-scrollbar select-none z-30 transition-colors ${
+          isLight
+            ? 'bg-white border-slate-200 text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
+            : 'bg-[#121214] border-[#27272a] text-zinc-200'
+        }`}>
           {/* Left: [Nexus logo] [file tab main.py + "+"] */}
           <div className="flex items-center gap-2 shrink-0 min-w-0">
             {/* Back to Home/Overview button */}
@@ -2273,18 +2513,22 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               }}
               title="Return to Nexus Code Overview"
               aria-label="Return to Nexus Code Overview"
-              className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#21262d] hover:bg-[#30363d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 border border-[#30363d] text-slate-200 hover:text-white transition-colors shrink-0 group"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-blue-500 border transition-colors shrink-0 group ${
+                isLight
+                  ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 hover:text-slate-900'
+                  : 'bg-[#18181b] hover:bg-[#27272a] border-[#27272a] text-zinc-200 hover:text-white'
+              }`}
             >
-              <div className="w-5 h-5 rounded bg-[#0078d4] text-white flex items-center justify-center font-bold text-xs shadow-xs group-hover:scale-105 transition-transform">
+              <div className="w-5 h-5 rounded-md bg-[#2563eb] text-white flex items-center justify-center font-bold text-xs shadow-xs group-hover:scale-105 transition-transform">
                 <Code className="w-3.5 h-3.5" />
               </div>
-              <span className="font-bold text-xs tracking-tight hidden sm:inline">Nexus</span>
+              <span className="font-bold text-xs tracking-tight hidden sm:inline">NexusCode</span>
             </button>
 
-            <div className="h-4 w-px bg-[#30363d] shrink-0" />
+            <div className={`h-4 w-px shrink-0 ${isLight ? 'bg-slate-200' : 'bg-[#27272a]'}`} />
 
             {/* File Tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0 max-w-[260px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px]">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 max-w-[260px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px]">
               {openTabIds.map((tabId) => {
                 const file = files.find((f) => f.id === tabId);
                 if (!file) return null;
@@ -2300,10 +2544,14 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       setEditingTabId(file.id);
                       setTabRenameValue(file.name);
                     }}
-                    className={`group flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded cursor-pointer transition-colors border shrink-0 ${
+                    className={`group flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded-lg cursor-pointer transition-colors border shrink-0 ${
                       isActive
-                        ? 'bg-[#1e1e1e] border-blue-500 text-white font-bold'
-                        : 'bg-[#161b22] border-[#30363d]/60 text-slate-400 hover:text-slate-200 hover:bg-[#21262d]'
+                        ? isLight
+                          ? 'bg-white border-blue-600 text-blue-700 font-bold shadow-xs'
+                          : 'bg-[#1e1e24] border-zinc-700 text-white font-bold'
+                        : isLight
+                          ? 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                          : 'bg-[#18181b] border-[#27272a] text-zinc-400 hover:text-zinc-200 hover:bg-[#27272a]'
                     }`}
                   >
                     <FileIcon filename={file.name} width={14} height={14} />
@@ -2328,7 +2576,11 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       <span className="truncate max-w-[90px]" title="Double click to rename">{file.name}</span>
                     )}
                     {file.isEntry && (
-                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1 py-0.2 rounded uppercase font-sans font-bold">
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full uppercase font-sans font-bold border ${
+                        isLight
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : 'bg-[#10b981] text-black border-transparent'
+                      }`}>
                         Entry
                       </span>
                     )}
@@ -2347,7 +2599,11 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 onClick={handleAddNewTab}
                 title="New file tab (+)"
                 aria-label="Create new file tab"
-                className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors shrink-0"
+                className={`p-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded-lg transition-colors shrink-0 ${
+                  isLight
+                    ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
+                    : 'text-zinc-400 hover:text-white hover:bg-[#27272a]'
+                }`}
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -2362,19 +2618,33 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 onClick={() => setLangDropOpen((v) => !v)}
                 title="Select Programming Language"
                 aria-label="Select Programming Language"
-                className="flex items-center gap-1.5 px-2 py-1 bg-[#21262d] hover:bg-[#30363d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 border border-[#30363d] rounded text-xs font-semibold transition-colors"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 border rounded-lg text-xs font-semibold transition-colors ${
+                  isLight
+                    ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
+                    : 'bg-[#18181b] hover:bg-[#27272a] border-[#27272a] text-zinc-200'
+                }`}
               >
                 <LanguageIcon language={progLang} width={15} height={15} />
                 <span className="hidden sm:inline">{currentLang?.name || progLang}</span>
                 <ChevronDown className="w-3 h-3 opacity-60" />
               </button>
               {langDropOpen && (
-                <div className="absolute top-full left-0 mt-1 bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl z-50 w-48 py-1 overflow-hidden">
+                <div className={`absolute top-full left-0 mt-1 rounded-lg shadow-2xl z-50 w-48 py-1 overflow-hidden border ${
+                  isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-[#161b22] border-[#30363d]'
+                }`}>
                   {SUPPORTED_PROG_LANGUAGES.map((l) => (
                     <button
                       key={l.key}
                       onClick={() => handleLangChange(l.key)}
-                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-[#21262d] transition-colors ${progLang === l.key ? 'bg-[#21262d] text-white font-bold' : 'text-slate-300'}`}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${
+                        progLang === l.key
+                          ? isLight
+                            ? 'bg-blue-50 text-blue-700 font-bold'
+                            : 'bg-[#21262d] text-white font-bold'
+                          : isLight
+                          ? 'text-slate-700 hover:bg-slate-100'
+                          : 'text-slate-300 hover:bg-[#21262d]'
+                      }`}
                     >
                       <LanguageIcon language={l.key} width={16} height={16} />
                       {l.name}
@@ -2394,7 +2664,11 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               }}
               defaultValue=""
               aria-label="Load preset sample programs"
-              className="hidden xl:block bg-[#21262d] border border-[#30363d] text-slate-200 text-xs px-2 py-1 rounded outline-none cursor-pointer hover:bg-[#30363d] focus:ring-1 focus:ring-blue-500 transition-colors shrink-0 max-w-[140px] truncate"
+              className={`hidden xl:block text-xs px-2.5 py-1.5 rounded-lg outline-none cursor-pointer border transition-colors shrink-0 max-w-[140px] truncate ${
+                isLight
+                  ? 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200 focus:ring-1 focus:ring-blue-500'
+                  : 'bg-[#18181b] border-[#27272a] text-zinc-200 hover:bg-[#27272a] focus:ring-1 focus:ring-blue-500'
+              }`}
             >
               <option value="" disabled>Load preset...</option>
               {(WORKSPACE_PRESETS[progLang] || WORKSPACE_PRESETS.python || []).map((preset) => (
@@ -2404,13 +2678,14 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               ))}
             </select>
 
-            {/* Run / Stop Button */}
+            {/* Run / Stop Button (AlgoMaster 300 Mint Green Style) */}
             {loadingAction === 'execute' || loadingAction === 'step' ? (
               <button
                 onClick={handleStopExecution}
                 title="Stop Execution"
                 aria-label="Stop running program"
-                className="flex items-center gap-1.5 px-3 py-1 bg-red-600 hover:bg-red-500 focus:outline-hidden focus:ring-1 focus:ring-red-400 text-white font-bold text-xs sm:text-sm rounded transition-all shadow-xs active:scale-95 shrink-0"
+                data-tour="run"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#ef4444] hover:bg-[#dc2626] focus:outline-hidden focus:ring-2 focus:ring-red-400 text-white font-bold text-xs sm:text-sm rounded-lg transition-all shadow-sm active:scale-95 shrink-0"
               >
                 <Square className="w-3.5 h-3.5 fill-white" />
                 <span>Stop</span>
@@ -2421,15 +2696,17 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 disabled={!code.trim() && files.length === 0}
                 title={`Run ${activeFile.name} (Ctrl+Enter)`}
                 aria-label={`Run ${activeFile.name}`}
-                className="flex items-center gap-1.5 px-3 py-1 bg-[#238636] hover:bg-[#2ea043] focus:outline-hidden focus:ring-1 focus:ring-emerald-400 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded transition-all shadow-xs active:scale-95 shrink-0"
+                data-tour="run"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#10b981] hover:bg-[#059669] focus:outline-hidden focus:ring-2 focus:ring-emerald-400 disabled:opacity-50 text-black font-bold text-xs sm:text-sm rounded-lg transition-all shadow-sm shadow-emerald-500/20 active:scale-95 shrink-0"
               >
-                <Play className="w-3.5 h-3.5 fill-white" />
+                <Play className="w-3.5 h-3.5 fill-black text-black" />
                 <span className="whitespace-nowrap">Run {activeFile.name}</span>
               </button>
             )}
 
             {/* Step-by-Step Execution Controls (Python) */}
             {progLang === 'python' && (
+              <div data-tour="step" className="shrink-0">
               <StepControls
                 isStepMode={isStepMode}
                 stepIndex={stepIndex}
@@ -2445,13 +2722,45 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 onReset={handleResetStep}
                 onChangeSpeed={(s) => setPlaySpeedMs(s)}
               />
+              </div>
             )}
           </div>
 
-          {/* Right: View Switcher (Source/Dual/Blueprint) + Console + Save + Focus Mode Collapse */}
+          {/* Right: Lessons + Level + View Switcher (Source/Dual/Blueprint) + Console + Save + Focus Mode Collapse */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Lessons (learning path) */}
+            <button
+              onClick={() => setLessonsOpen(true)}
+              data-tour="lessons"
+              title="Lessons & progress"
+              aria-label="Open lessons"
+              className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold transition-colors border shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
+                activeLesson
+                  ? isLight
+                    ? 'bg-blue-50 border-blue-400 text-blue-800'
+                    : 'bg-blue-600/20 border-blue-500/60 text-blue-200'
+                  : isLight
+                    ? 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'
+                    : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span className={levelFeatures.toolbarLabels ? 'hidden md:inline' : 'hidden xl:inline'}>Lessons</span>
+              {completedLessons.length > 0 && (
+                <span className={`text-[10px] font-mono hidden md:inline ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                  {completedLessons.filter((id) => LESSONS.some((l) => l.id === id)).length}/{LESSONS.length}
+                </span>
+              )}
+            </button>
+
+            {/* Experience level */}
+            <LevelSwitcher level={experienceLevel} onChange={handleLevelChange} isLight={isLight} />
+
+            <div className={`h-4 w-px shrink-0 hidden sm:block ${isLight ? 'bg-slate-200' : 'bg-[#30363d]'}`} />
             {/* 3-Segment Switcher: Source | Dual Split | Blueprint */}
-            <div className="flex items-center bg-[#21262d] border border-[#30363d] rounded p-0.5 text-xs">
+            <div className={`flex items-center border rounded-lg p-0.5 text-xs ${
+              isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#18181b] border-[#27272a]'
+            }`}>
               <button
                 onClick={() => {
                   handleViewLayoutChange('english');
@@ -2459,9 +2768,13 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 }}
                 title="Show Source Code Only"
                 aria-label="Show Source Code Only"
-                className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'english' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+                className={`px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${
+                  viewLayout === 'english'
+                    ? isLight ? 'bg-white text-slate-900 font-bold shadow-xs' : 'bg-[#27272a] text-white font-bold shadow-xs'
+                    : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                }`}
               >
-                <FileCode className="w-3.5 h-3.5 text-blue-400" />
+                <FileCode className="w-3.5 h-3.5 text-sky-400" />
                 <span className="hidden sm:inline">Source</span>
               </button>
               <button
@@ -2470,9 +2783,13 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 }}
                 title="Dual Split View (Source + Visual Blueprint)"
                 aria-label="Dual Split View"
-                className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'split' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+                className={`px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${
+                  viewLayout === 'split'
+                    ? isLight ? 'bg-white text-slate-900 font-bold shadow-xs' : 'bg-[#27272a] text-white font-bold shadow-xs'
+                    : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                }`}
               >
-                <Columns className="w-3.5 h-3.5 text-emerald-400" />
+                <Columns className="w-3.5 h-3.5 text-[#10b981]" />
                 <span>Dual Split</span>
               </button>
               <button
@@ -2482,9 +2799,13 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 }}
                 title="Show Visual Blueprint Only"
                 aria-label="Show Visual Blueprint Only"
-                className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-colors ${viewLayout === 'native' ? 'bg-[#30363d] text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+                className={`px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${
+                  viewLayout === 'native'
+                    ? isLight ? 'bg-white text-slate-900 font-bold shadow-xs' : 'bg-[#27272a] text-white font-bold shadow-xs'
+                    : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                }`}
               >
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
                 <span className="hidden sm:inline">Blueprint</span>
               </button>
             </div>
@@ -2494,10 +2815,12 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               onClick={() => toggleConsole()}
               title="Toggle Terminal Console (Ctrl+`)"
               aria-label="Toggle Terminal Console"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-colors border shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
                 showConsole
-                  ? 'bg-blue-600 border-blue-500 text-white'
-                  : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'
+                  ? 'bg-[#2563eb] border-[#2563eb] text-white shadow-sm shadow-blue-500/20'
+                  : isLight
+                    ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
+                    : 'bg-[#18181b] border-[#27272a] text-zinc-300 hover:text-white hover:bg-[#27272a]'
               }`}
             >
               <Icon icon="flat-color-icons:command-line" width={15} height={15} className="shrink-0" />
@@ -2505,16 +2828,33 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               {loadingAction === 'execute' ? (
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" title="Running code..." />
               ) : terminalOutput ? (
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${terminalOutput.success ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${terminalOutput.success ? 'bg-[#10b981]' : 'bg-rose-400'}`} />
               ) : null}
             </button>
+
+            <div className={`h-4 w-px shrink-0 mx-0.5 ${isLight ? 'bg-slate-200' : 'bg-[#30363d]'}`} />
+
+            {/* ─── HAYDEN BLEASEL THEME SWITCHER (System 🖥️ / Light ☀️ / Dark 🌙) ─── */}
+            <ThemeSwitcher
+              value={themeMode}
+              onChange={handleThemeModeChange}
+              size="sm"
+            />
+
+            <div className={`h-4 w-px shrink-0 mx-0.5 ${isLight ? 'bg-slate-200' : 'bg-[#30363d]'}`} />
 
             {/* Save Button */}
             <button
               onClick={handleSaveProject}
               title="Save Project (Ctrl+S)"
               aria-label="Save Project"
-              className={`p-1.5 rounded transition-colors shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${saveSuccess ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'}`}
+              className={`p-1.5 rounded transition-colors shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
+                saveSuccess
+                  ? 'text-emerald-500 bg-emerald-500/10'
+                  : isLight
+                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+              }`}
             >
               {saveSuccess ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
             </button>
@@ -2524,9 +2864,23 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               onClick={() => setShowShortcutsModal(true)}
               title="Keyboard Shortcuts (?)"
               aria-label="View Keyboard Shortcuts Cheat Sheet"
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors shrink-0 font-bold text-xs"
+              className={`p-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors shrink-0 font-bold text-xs ${
+                isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+              }`}
             >
               <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Guided tour */}
+            <button
+              onClick={() => setTourOpen(true)}
+              title="Take the guided tour"
+              aria-label="Take the guided tour"
+              className={`p-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors shrink-0 ${
+                isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5" />
             </button>
 
             {/* Collapse Toolbar (Focus Mode) Button */}
@@ -2534,7 +2888,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               onClick={toggleToolbarCollapsed}
               title="Collapse Toolbar into Focus Mode (Ctrl+Shift+F)"
               aria-label="Collapse Toolbar"
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-[#21262d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors shrink-0"
+              className={`p-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors shrink-0 ${
+                isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+              }`}
             >
               <ChevronUp className="w-3.5 h-3.5" />
             </button>
@@ -2553,10 +2909,10 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
       )}
 
       {/* ─── MOBILE VIEW SWITCHER (Visible on Mobile < 768px) ── */}
-      <div className="flex md:hidden items-center bg-[#161b22] border-b border-[#30363d] px-2 py-1 gap-1 text-xs overflow-x-auto shrink-0">
+      <div className="flex md:hidden items-center bg-[#161b22] border-b border-[#30363d] px-2 py-1.5 gap-1.5 text-xs overflow-x-auto no-scrollbar shrink-0">
         <button
           onClick={() => setMobileView('files')}
-          className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'files' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+          className={`px-3.5 py-2 rounded-md font-semibold shrink-0 flex items-center gap-1.5 transition-colors ${mobileView === 'files' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
         >
           <Folder className="w-3.5 h-3.5" />
           <span>Files ({files.length})</span>
@@ -2566,7 +2922,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
             setMobileView('english');
             setViewLayout('english');
           }}
-          className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'english' && viewLayout === 'english' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+          className={`px-3.5 py-2 rounded-md font-semibold shrink-0 flex items-center gap-1.5 transition-colors ${mobileView === 'english' && viewLayout === 'english' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
         >
           <FileCode className="w-3.5 h-3.5 text-blue-400" />
           <span>Source Code</span>
@@ -2576,7 +2932,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
             setMobileView('native');
             setViewLayout('native');
           }}
-          className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'native' && viewLayout === 'native' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+          className={`px-3.5 py-2 rounded-md font-semibold shrink-0 flex items-center gap-1.5 transition-colors ${mobileView === 'native' && viewLayout === 'native' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
         >
           <LayoutDashboard className="w-3.5 h-3.5 text-emerald-400" />
           <span>Visual Blueprint</span>
@@ -2586,7 +2942,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
             setMobileView('console');
             setShowConsole(true);
           }}
-          className={`px-3 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${mobileView === 'console' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+          className={`px-3.5 py-2 rounded-md font-semibold shrink-0 flex items-center gap-1.5 transition-colors ${mobileView === 'console' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
         >
           <Terminal className="w-3.5 h-3.5" />
           <span>Console</span>
@@ -2746,7 +3102,8 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               </div>
             </div>
 
-            {/* Section B: Real Multi-File Module Imports */}
+            {/* Section B: Real Multi-File Module Imports (Intermediate & Senior, or whenever a project has several files) */}
+            {(levelFeatures.showModuleImports || files.length > 1) && (
             <div className="p-3 border-b border-[#30363d] bg-[#161b22]/40">
               <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
                 <span className="flex items-center gap-1">
@@ -2826,6 +3183,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 </div>
               )}
             </div>
+            )}
 
             {/* Section C: Nexus Tools */}
             <div className="p-3 border-b border-[#30363d]">
@@ -2868,7 +3226,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                     },
                     loading: null,
                   },
-                ].map((tool, idx) => (
+                ].filter((tool) => levelFeatures.showConvertTools || tool.loading !== 'convert').map((tool, idx) => (
                   <button
                     key={idx}
                     onClick={tool.action}
@@ -2903,6 +3261,17 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
         {/* ══ 2. CENTRAL EDITORS & TABS AREA ══ */}
         {(mobileView !== 'files' || windowWidth >= 768) && (
           <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+            {/* Active lesson goal + automatic check result */}
+            {activeLesson && (
+              <ActiveLessonBanner
+                lesson={activeLesson}
+                result={lessonResult}
+                onExit={handleExitLesson}
+                onOpenLessons={() => setLessonsOpen(true)}
+                onNext={nextLessonAfterActive ? () => handleStartLesson(nextLessonAfterActive) : null}
+              />
+            )}
+
             {/* Split Panes Container */}
             <div ref={splitContainerRef} className="flex-1 flex min-h-0 overflow-hidden relative">
               {/* ────── LEFT PANE: SOURCE CODE EDITOR ────── */}
@@ -2911,31 +3280,48 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                   width: viewLayout === 'split' ? `${splitPercent}%` : '100%',
                   display: viewLayout === 'native' ? 'none' : 'flex',
                 }}
-                className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#1e1e1e]"
+                data-tour="editor"
+                className={`flex flex-col min-w-0 min-h-0 overflow-hidden transition-colors ${
+                  isLight ? 'bg-white' : 'bg-[#1e1e1e]'
+                }`}
               >
                 {/* Left Pane Header — Single-line max 36px tall */}
-                <div className="h-[36px] min-h-[36px] max-h-[36px] box-border px-3 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between text-xs sm:text-sm shrink-0 whitespace-nowrap overflow-hidden select-none">
+                <div className={`h-[36px] min-h-[36px] max-h-[36px] box-border px-3 border-b flex items-center justify-between text-xs sm:text-sm shrink-0 whitespace-nowrap overflow-hidden select-none transition-colors ${
+                  isLight
+                    ? 'bg-slate-50 border-slate-200 text-slate-800'
+                    : 'bg-[#161b22] border-[#30363d] text-slate-100'
+                }`}>
                   <div className="flex items-center gap-2 min-w-0 shrink">
                     {!showFileExplorer && (
                       <button
                         onClick={() => toggleFileExplorer(true)}
                         title="Open Side Menu (Ctrl+B)"
                         aria-label="Open Side Menu"
-                        className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#21262d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 transition-colors shrink-0"
+                        className={`p-1 rounded transition-colors shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
+                          isLight
+                            ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
+                            : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+                        }`}
                       >
                         <PanelLeft className="w-3.5 h-3.5" />
                       </button>
                     )}
                     <FileIcon filename={activeFile.name} width={15} height={15} />
-                    <span className="font-bold text-xs sm:text-sm text-slate-100 truncate max-w-[130px] sm:max-w-[180px]">
+                    <span className={`font-bold text-xs sm:text-sm truncate max-w-[130px] sm:max-w-[180px] ${
+                      isLight ? 'text-slate-800' : 'text-slate-100'
+                    }`}>
                       {activeFile.name}
                     </span>
                     {activeFile.isEntry && (
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded font-sans uppercase font-bold shrink-0">
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-sans uppercase font-bold shrink-0 border ${
+                        isLight
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                      }`}>
                         Entry
                       </span>
                     )}
-                    <span className="text-[11px] text-slate-400 font-mono shrink-0">
+                    <span className={`text-[11px] font-mono shrink-0 ${isLight ? 'text-slate-500 font-medium' : 'text-slate-400'}`}>
                       Lines: {lineCount}
                     </span>
                   </div>
@@ -2947,7 +3333,13 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         onClick={() => setSettingsOpen((v) => !v)}
                         title="Editor Display Settings"
                         aria-label="Editor Display Settings"
-                        className={`p-1 rounded transition-colors focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${settingsOpen ? 'bg-[#30363d] text-white' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'}`}
+                        className={`p-1 rounded transition-colors focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
+                          settingsOpen
+                            ? isLight ? 'bg-slate-200 text-slate-900' : 'bg-[#30363d] text-white'
+                            : isLight
+                            ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
+                            : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+                        }`}
                       >
                         <Settings className="w-3.5 h-3.5" />
                       </button>
@@ -3118,15 +3510,19 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       onClick={handleCopyEnglish}
                       title="Copy Source Code"
                       aria-label="Copy Source Code"
-                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors"
+                      className={`p-1 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors ${
+                        isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+                      }`}
                     >
-                      {copiedEnglish ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedEnglish ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                     <button
                       onClick={() => handleDownload(code, activeFile.name)}
                       title={`Download ${activeFile.name}`}
                       aria-label={`Download ${activeFile.name}`}
-                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors"
+                      className={`p-1 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors ${
+                        isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+                      }`}
                     >
                       <Download className="w-3.5 h-3.5" />
                     </button>
@@ -3138,7 +3534,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                   {/* Line numbers column */}
                   <div
                     ref={lineNumbersRef}
-                    className="select-none text-right pr-3 pl-2 shrink-0 border-r border-[#30363d]/50 overflow-hidden relative"
+                    className={`select-none text-right pr-3 pl-2 shrink-0 border-r overflow-hidden relative ${
+                      isLight ? 'border-slate-200' : 'border-[#30363d]/50'
+                    }`}
                     style={{
                       minWidth: '56px',
                       fontFamily: VSCODE_MONO_FONT,
@@ -3174,10 +3572,12 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                           style={{ height: editorLineHeight, lineHeight: editorLineHeight }}
                           className={`cursor-pointer transition-colors relative flex items-center justify-end gap-1.5 ${
                             isCurrent
-                              ? 'text-[#ffffff] font-bold'
+                              ? isLight ? 'text-blue-600 font-bold' : 'text-[#ffffff] font-bold'
                               : hasError
-                              ? 'text-red-400 font-bold'
-                              : 'hover:text-slate-200'
+                              ? 'text-red-500 font-bold'
+                              : isLight
+                              ? 'text-slate-500 hover:text-slate-900 font-medium'
+                              : 'text-[#858585] hover:text-slate-200'
                           }`}
                           title={hasError ? `${lineInfo?.errorMessage} (Click to inspect / fix)` : undefined}
                         >
@@ -3208,6 +3608,16 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
 
                   {/* Editor Layers with Independent Scrolling */}
                   <div style={{ backgroundColor: editorBg }} className="flex-1 relative min-h-0 overflow-hidden">
+                    {/* Empty editor: offer examples and lessons instead of a blank screen */}
+                    {!code.trim() && !activeLesson && files.length <= 1 && (
+                      <EmptyEditorState
+                        presets={WORKSPACE_PRESETS[progLang] || []}
+                        onLoadPreset={handleSelectPreset}
+                        onStartLessons={progLang === 'python' ? () => setLessonsOpen(true) : null}
+                        onFocusEditor={() => englishEditorRef.current?.focus()}
+                      />
+                    )}
+
                     {/* ─── Indentation Error Tooltip Popover ─── */}
                     {hoveredErrorLine && indentAnalysis.lines[hoveredErrorLine - 1]?.hasError && (
                       <div
@@ -3356,6 +3766,11 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                     />
                   </div>
                 </div>
+
+                {/* Phone keyboards hide coding symbols — give them a dedicated row */}
+                {windowWidth < 768 && (
+                  <MobileCodeKeys textareaRef={englishEditorRef} tabSize={tabSize} onInsert={handleMobileInsert} />
+                )}
               </div>
 
               {/* Central Draggable Split Divider in Dual Split View */}
@@ -3376,22 +3791,33 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                   width: viewLayout === 'split' ? `${100 - splitPercent}%` : '100%',
                   display: viewLayout === 'english' ? 'none' : 'flex',
                 }}
-                className="flex flex-col min-w-0 min-h-0 overflow-hidden bg-[#0d1117] border-l border-[#30363d]"
+                data-tour="blueprint"
+                className={`flex flex-col min-w-0 min-h-0 overflow-hidden transition-colors ${
+                  isLight ? 'bg-white border-l border-slate-200' : 'bg-[#0d1117] border-l border-[#30363d]'
+                }`}
               >
-                {/* Right Header — Single-line max 36px tall */}
-                <div className="h-[36px] min-h-[36px] max-h-[36px] box-border px-3 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between text-xs sm:text-sm shrink-0 whitespace-nowrap overflow-hidden select-none">
+                {/* Right Header — Single-line max 42px tall */}
+                <div className={`h-[42px] min-h-[42px] max-h-[42px] box-border px-3 border-b flex items-center justify-between text-xs sm:text-sm shrink-0 whitespace-nowrap overflow-hidden select-none transition-colors ${
+                  isLight
+                    ? 'bg-slate-50 border-slate-200 text-slate-800'
+                    : 'bg-[#121214] border-[#27272a] text-zinc-100'
+                }`}>
                   <div className="flex items-center gap-2 min-w-0 shrink">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                    <span className="font-bold text-xs sm:text-sm text-emerald-400 truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[240px]">
+                    <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse shrink-0" />
+                    <span className="font-bold text-xs sm:text-sm text-emerald-700 dark:text-[#10b981] truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[240px]">
                       {blueprintMode === 'deep'
                         ? 'Deep Explanation'
+                        : blueprintMode === '3d'
+                        ? '3D View'
                         : 'Visual Blueprint'}
                     </span>
                     <span
                       title="Rows = statements explained. Steps = lines actually executed."
-                      className="text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono font-semibold shrink-0 whitespace-nowrap cursor-help"
+                      className={`text-[11px] border px-2 py-0.5 rounded-full font-mono font-semibold shrink-0 whitespace-nowrap cursor-help ${isLight ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]/30'}`}
                     >
-                      {blueprintMode === 'deep'
+                      {blueprintMode === '3d'
+                        ? 'Live'
+                        : blueprintMode === 'deep'
                         ? '4 Layers'
                         : progLang === 'python'
                         ? `${pythonAnalysis.rows.length} rows`
@@ -3401,76 +3827,134 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     {/* View Switcher: Aligned Line Blueprint | Architecture Blocks | Pseudocode | Deep Explanation */}
-                    <div className="flex bg-[#21262d] border border-[#30363d] rounded text-xs font-semibold overflow-hidden p-0.5 shrink-0">
+                    <div className={`flex border rounded-lg text-xs font-semibold overflow-hidden p-0.5 shrink-0 ${
+                      isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#18181b] border-[#27272a]'
+                    }`}>
+                      {levelFeatures.blueprintModes.includes('aligned') && (
                       <button
                         onClick={() => handleBlueprintModeChange('aligned')}
                         aria-label="Line Blueprint View"
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'aligned' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
+                          blueprintMode === 'aligned'
+                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
+                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                        }`}
                         title="Line Blueprint: Line-by-line annotations aligned with editor"
                       >
                         <Icon icon="flat-color-icons:flow-chart" width={14} height={14} className="shrink-0" />
                         <span className="hidden xl:inline">Line Blueprint</span>
                       </button>
+                      )}
+                      {levelFeatures.blueprintModes.includes('blocks') && (
                       <button
                         onClick={() => handleBlueprintModeChange('blocks')}
                         aria-label="Architecture Blocks View"
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'blocks' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
+                          blueprintMode === 'blocks'
+                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
+                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                        }`}
                         title="Architecture Blocks: Grouped architectural components"
                       >
                         <Icon icon="flat-color-icons:mind-map" width={14} height={14} className="shrink-0" />
                         <span className="hidden xl:inline">Architecture Blocks</span>
                       </button>
+                      )}
+                      {levelFeatures.blueprintModes.includes('code') && (
                       <button
                         onClick={() => handleBlueprintModeChange('code')}
                         aria-label="Pseudocode View"
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'code' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
+                          blueprintMode === 'code'
+                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
+                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                        }`}
                         title="Pseudocode: Pure pseudocode representation"
                       >
                         <Icon icon="flat-color-icons:document" width={14} height={14} className="shrink-0" />
                         <span className="hidden xl:inline">Pseudocode</span>
                       </button>
+                      )}
+                      {levelFeatures.blueprintModes.includes('flowchart') && (
                       <button
                         onClick={() => handleBlueprintModeChange('flowchart')}
                         aria-label="Flowchart View"
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'flowchart' ? 'bg-blue-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
+                          blueprintMode === 'flowchart'
+                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
+                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                        }`}
                         title="Flowchart: Visual control flow diagram generated directly from parse tree"
                       >
                         <Icon icon="flat-color-icons:tree-structure" width={14} height={14} className="shrink-0" />
                         <span className="hidden xl:inline">Flowchart</span>
                       </button>
+                      )}
+                      {levelFeatures.blueprintModes.includes('deep') && (
                       <button
                         onClick={() => handleBlueprintModeChange('deep')}
                         aria-label="Deep Explanation View"
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'deep' ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
+                          blueprintMode === 'deep'
+                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
+                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                        }`}
                         title="Deep Explanation: 4-Layer WHAT, WHY, HOW, VERIFY"
                       >
                         <Icon icon="flat-color-icons:radar-plot" width={14} height={14} className="shrink-0" />
                         <span className="hidden xl:inline">Deep Explanation</span>
                       </button>
+                      )}
+                      {levelFeatures.blueprintModes.includes('variables') && (
                       <button
                         onClick={() => handleBlueprintModeChange('variables')}
                         aria-label="Variables Inspector View"
-                        className={`px-2 py-0.5 flex items-center gap-1 transition-colors rounded ${blueprintMode === 'variables' ? 'bg-amber-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:text-white'}`}
+                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
+                          blueprintMode === 'variables'
+                            ? isLight ? 'bg-amber-600 text-white font-bold shadow-xs' : 'bg-[#f59e0b] text-black font-bold shadow-xs'
+                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                        }`}
                         title="Variables: Live variable scope, call stack, and loop counters"
                       >
                         <Icon icon="flat-color-icons:data-sheet" width={14} height={14} className="shrink-0" />
                         <span className="hidden xl:inline">Variables</span>
                       </button>
+                      )}
+                      {levelFeatures.blueprintModes.includes('3d') && (
+                      <button
+                        onClick={() => handleBlueprintModeChange('3d')}
+                        aria-label="3D View"
+                        data-tour="view-3d"
+                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
+                          blueprintMode === '3d'
+                            ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold shadow-xs'
+                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                        }`}
+                        title="3D View: watch data move and see the program's architecture in 3D"
+                      >
+                        <Box3DIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="hidden lg:inline">3D View</span>
+                      </button>
+                      )}
                     </div>
 
                     <button
                       onClick={handleCopyRightPanel}
                       title="Copy Current Explanation"
                       aria-label="Copy Current Explanation"
-                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors"
+                      className={`p-1 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors ${
+                        isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+                      }`}
                     >
-                      {copiedNative ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedNative ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                     <button
                       onClick={handleDownloadRightPanel}
                       title="Download Current Explanation"
                       aria-label="Download Current Explanation"
-                      className="p-1 text-slate-400 hover:text-white hover:bg-[#21262d] focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors"
+                      className={`p-1 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors ${
+                        isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
+                      }`}
                     >
                       <Download className="w-3.5 h-3.5" />
                     </button>
@@ -3478,11 +3962,13 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 </div>
 
                 {/* Right Body Display with Independent Scrolling & Synchronized Alignment */}
-                <div className="flex-1 flex min-h-0 overflow-hidden relative bg-[#1e1e1e]">
+                <div className={`flex-1 flex min-h-0 overflow-hidden relative transition-colors ${
+                  isLight ? 'bg-white' : 'bg-[#121214]'
+                }`}>
                   {code.trim() === '' ? (
                     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none text-slate-500">
                       <Icon icon="flat-color-icons:document" width={42} height={42} className="mb-3 opacity-60" />
-                      <p className="text-sm font-medium text-slate-400 max-w-sm leading-relaxed">
+                      <p className={`text-sm font-medium max-w-sm leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                         Type or paste code on the left to see explanations here.
                       </p>
                     </div>
@@ -3495,54 +3981,59 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                           className="flex-1 p-3 overflow-y-auto space-y-2 select-text"
                           style={{ fontFamily: VSCODE_MONO_FONT }}
                         >
-                        {/* ─── Top Summary Card: What this program does ─── */}
-                        <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3.5 shadow-sm mb-3.5 transition-all">
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <Icon icon="flat-color-icons:rules" width={18} height={18} className="shrink-0" />
-                              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                                What this program does
-                              </span>
+                        {/* ─── Top Summary Card: What this program does (AlgoMaster 300 Style) ─── */}
+                        <div className={`border rounded-xl p-4 shadow-sm mb-3.5 transition-all ${
+                          isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#18181b] border-[#27272a] text-zinc-100'
+                        }`}>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2.5">
+                            <div>
+                              <h2 className={`text-base sm:text-lg font-bold tracking-tight flex items-center gap-2 ${
+                                isLight ? 'text-slate-900' : 'text-white'
+                              }`}>
+                                <Icon icon="flat-color-icons:rules" width={20} height={20} className="shrink-0" />
+                                <span>{pythonAnalysis.summary.title || 'Code Breakdown'}</span>
+                              </h2>
                             </div>
-                            <span className="text-xs font-semibold text-slate-300 bg-[#21262d] px-2.5 py-0.5 rounded border border-[#30363d] shrink-0 truncate max-w-[220px]">
-                              {pythonAnalysis.summary.title}
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => setQuizOpen(true)}
+                                title="Test yourself: what do the lines of this program do?"
+                                className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full border transition-colors shrink-0 ${
+                                  isLight
+                                    ? 'text-sky-800 bg-sky-50 hover:bg-sky-100 border-sky-300'
+                                    : 'text-white bg-[#2563eb] hover:bg-[#1d4ed8] border-transparent shadow-xs'
+                                }`}
+                              >
+                                <Target className="w-3 h-3" /> Quiz me
+                              </button>
+                            </div>
                           </div>
-                          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-normal">
-                            {pythonAnalysis.summary.description}
-                          </p>
 
-                          {/* Domain & Structure Stats */}
-                          <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2 border-t border-[#30363d]/60 text-[11px] font-mono">
-                            <span className="bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded font-semibold">
-                              {pythonAnalysis.summary.stats.statements} statements
+                          {/* AlgoMaster 300 Badges Row */}
+                          <div className="flex flex-wrap items-center gap-2 mb-3">
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#10b981] text-black shrink-0">
+                              {pythonAnalysis.summary.stats.loops > 1 ? 'Medium' : 'Easy'}
                             </span>
-                            {pythonAnalysis.summary.stats.functions > 0 && (
-                              <span className="bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded font-semibold">
-                                {pythonAnalysis.summary.stats.functions} functions
-                              </span>
-                            )}
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#0c2438] text-[#38bdf8] border border-[#0284c7]/40 flex items-center gap-1 shrink-0">
+                              <Icon icon="lucide:tag" width={11} height={11} />
+                              <span>{pythonAnalysis.summary.stats.statements} statements</span>
+                            </span>
                             {pythonAnalysis.summary.stats.loops > 0 && (
-                              <span className="bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded font-semibold">
-                                {pythonAnalysis.summary.stats.loops} loops
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#291e14] text-[#fb923c] border border-[#ea580c]/40 flex items-center gap-1 shrink-0">
+                                <Icon icon="lucide:repeat" width={11} height={11} />
+                                <span>{pythonAnalysis.summary.stats.loops} loops</span>
                               </span>
                             )}
-                            {pythonAnalysis.summary.stats.conditionals > 0 && (
-                              <span className="bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded font-semibold">
-                                {pythonAnalysis.summary.stats.conditionals} conditions
-                              </span>
-                            )}
-                            {pythonAnalysis.summary.stats.classes > 0 && (
-                              <span className="bg-pink-500/10 text-pink-300 border border-pink-500/20 px-2 py-0.5 rounded font-semibold">
-                                {pythonAnalysis.summary.stats.classes} classes
-                              </span>
-                            )}
-                            {pythonAnalysis.summary.stats.imports.length > 0 && (
-                              <span className="bg-sky-500/10 text-sky-300 border border-sky-500/20 px-2 py-0.5 rounded font-semibold">
-                                {pythonAnalysis.summary.stats.imports.join(', ')}
+                            {pythonAnalysis.summary.stats.functions > 0 && (
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#251233] text-[#c084fc] border border-[#9333ea]/40 flex items-center gap-1 shrink-0">
+                                <span>{pythonAnalysis.summary.stats.functions} functions</span>
                               </span>
                             )}
                           </div>
+
+                          <p className={`text-xs sm:text-sm leading-relaxed font-normal ${isLight ? 'text-slate-700 font-medium' : 'text-zinc-300'}`}>
+                            <FormattedExplanation text={pythonAnalysis.summary.description} isLight={isLight} />
+                          </p>
                         </div>
 
                         {/* ─── Statement Rows: [line number] [code] [TAG] [plain sentence] ─── */}
@@ -3552,7 +4043,8 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                               (highlightedLine !== null && highlightedLine >= row.startLine && highlightedLine <= row.endLine) ||
                               (activeCursorLine !== null && activeCursorLine >= row.startLine && activeCursorLine <= row.endLine);
 
-                            const style = TAG_STYLES[row.tag] || TAG_STYLES.ACTION;
+                            const activeTagStyles = isLight ? TAG_STYLES_LIGHT : TAG_STYLES;
+                            const style = activeTagStyles[row.tag] || activeTagStyles.ACTION;
                             const lineBadgeText = row.startLine === row.endLine ? `L${row.startLine}` : `L${row.startLine}-${row.endLine}`;
                             const lineInfo = indentAnalysis?.lines[row.startLine - 1];
                             const hasIndentError = lineInfo?.hasError;
@@ -3568,12 +4060,16 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                                 style={{
                                   marginLeft: `${row.depth * 16}px`,
                                 }}
-                                className={`group relative flex flex-col p-2.5 rounded-md border transition-all cursor-pointer ${
+                                className={`group relative flex flex-col p-2.5 rounded-lg border transition-all cursor-pointer ${
                                   row.depth > 0 ? 'border-l-2 pl-3' : ''
                                 } ${
                                   isCurrent
-                                    ? 'bg-[#1e293b] border-blue-500 shadow-md ring-1 ring-blue-500/40'
-                                    : 'bg-[#161b22]/70 border-[#30363d]/60 hover:bg-[#1a202c] hover:border-slate-500'
+                                    ? isLight
+                                      ? 'bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-500/30'
+                                      : 'bg-[#18181b] border-[#10b981] shadow-md ring-1 ring-[#10b981]/50'
+                                    : isLight
+                                      ? 'bg-slate-50/90 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                                      : 'bg-[#141416] border-[#27272a] hover:bg-[#18181b] hover:border-zinc-600'
                                 }`}
                               >
                                 {/* Guide line accent for indented blocks using exact matching rainbow depth color */}
@@ -3600,10 +4096,12 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
 
                                   {/* Line Number Badge */}
                                   <span
-                                    className={`text-[11px] font-mono px-1.5 py-0.5 rounded shrink-0 transition-colors ${
+                                    className={`text-[11px] font-mono px-2 py-0.5 rounded-md shrink-0 transition-colors ${
                                       isCurrent
-                                        ? 'bg-blue-600 text-white font-bold'
-                                        : 'bg-[#21262d] text-slate-400 border border-[#30363d]'
+                                        ? 'bg-[#10b981] text-black font-bold'
+                                        : isLight
+                                          ? 'bg-slate-100 text-slate-700 font-semibold border border-slate-200'
+                                          : 'bg-[#18181b] text-zinc-400 border border-[#27272a]'
                                     }`}
                                     title={`Line ${lineBadgeText} -> Click to jump in editor`}
                                   >
@@ -3611,45 +4109,51 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                                   </span>
 
                                   {/* Monospace Code Pill */}
-                                  <code className="text-xs font-mono text-emerald-300 bg-[#0d1117] px-2 py-0.5 rounded border border-[#30363d]/80 shrink-0 truncate max-w-[200px] sm:max-w-[240px]">
+                                  <code className={`text-xs font-mono px-2 py-0.5 rounded-md border shrink-0 truncate max-w-[200px] sm:max-w-[240px] font-semibold ${
+                                    isLight
+                                      ? 'text-emerald-800 bg-emerald-50/80 border-emerald-300'
+                                      : 'text-[#38bdf8] bg-[#0c1926] border-[#0284c7]/40'
+                                  }`}>
                                     {row.rawCode.split('\n')[0].trim()}
                                   </code>
 
                                   {/* Tag Pill with Color Coding */}
                                   <span
-                                    className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider shrink-0 border ${style.bg} ${style.text} ${style.border}`}
+                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 border ${style.bg} ${style.text} ${style.border}`}
                                   >
                                     {row.tag}
                                   </span>
 
                                   {/* Connector Arrow */}
-                                  <span className="text-slate-500 text-xs shrink-0 select-none hidden sm:inline">──&gt;</span>
+                                  <span className={`text-xs shrink-0 select-none hidden sm:inline ${isLight ? 'text-slate-400 font-semibold' : 'text-slate-500'}`}>──&gt;</span>
 
                                   {/* Plain Sentence (Wraps cleanly, max ~14 words, no text cutoff) */}
                                   <span
-                                    className={`text-xs sm:text-sm font-medium leading-snug whitespace-normal break-words flex-1 min-w-0 ${
+                                    className={`text-xs sm:text-sm leading-snug whitespace-normal break-words flex-1 min-w-0 ${
                                       row.tag === 'COMMENT'
-                                        ? 'text-slate-400 italic'
+                                        ? isLight ? 'text-slate-500 italic' : 'text-slate-400 italic'
                                         : isCurrent
-                                        ? 'text-white font-bold'
-                                        : 'text-slate-200 group-hover:text-white'
+                                          ? isLight ? 'text-slate-950 font-bold' : 'text-white font-bold'
+                                          : isLight ? 'text-slate-800 font-medium group-hover:text-slate-950' : 'text-zinc-200 group-hover:text-white'
                                     }`}
                                   >
-                                    {row.explanation}
+                                    <FormattedExplanation text={row.explanation} isLight={isLight} />
                                   </span>
 
                                   {/* Source Tag & Report Wrong Explanation Flag */}
                                   <div className="flex items-center gap-1.5 shrink-0 ml-auto select-none">
+                                    {levelFeatures.showSourceBadges && (
                                     <span
                                       className={`text-[9px] font-mono px-1 py-0.2 rounded font-semibold uppercase ${
                                         row.sourceType === 'KB'
-                                          ? 'text-sky-300 bg-sky-950/60 border border-sky-800/40'
-                                          : 'text-slate-400 bg-slate-800/60 border border-slate-700/40'
+                                          ? isLight ? 'text-sky-800 bg-sky-50 border border-sky-300' : 'text-sky-300 bg-sky-950/60 border border-sky-800/40'
+                                          : isLight ? 'text-slate-600 bg-slate-100 border border-slate-200' : 'text-slate-400 bg-slate-800/60 border border-slate-700/40'
                                       }`}
                                       title={row.sourceType === 'KB' ? 'Derived from verified Knowledge Base' : 'Derived directly from code syntax'}
                                     >
                                       {row.sourceType || 'LITERAL'}
                                     </span>
+                                    )}
 
                                     <button
                                       type="button"
@@ -3721,7 +4225,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         {/* Line Numbers aligned with Left Editor (Other Languages) */}
                         <div
                           ref={nativeLineNumbersRef}
-                          className="select-none bg-[#1e1e1e] text-[#858585] text-right pr-4 pl-3 shrink-0 border-r border-[#30363d]/50 overflow-hidden"
+                          className={`select-none text-right pr-4 pl-3 shrink-0 border-r overflow-hidden ${
+                            isLight ? 'bg-[#f8fafc] text-slate-500 border-slate-200' : 'bg-[#1e1e1e] text-[#858585] border-[#30363d]/50'
+                          }`}
                           style={{
                             minWidth: '52px',
                             width: '52px',
@@ -3740,7 +4246,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                                 style={{ height: '26px', lineHeight: '26px' }}
                                 className={`cursor-default ${
                                   (highlightedLine === i + 1 || activeCursorLine === i + 1)
-                                    ? 'text-[#ffffff] font-bold'
+                                    ? isLight ? 'text-blue-600 font-bold' : 'text-[#ffffff] font-bold'
                                     : ''
                                 }`}
                               >
@@ -3784,7 +4290,11 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                                 style={{ height: '26px', lineHeight: '26px' }}
                                 className={`group flex items-center gap-2 px-2.5 w-full cursor-pointer transition-all rounded-[3px] border ${
                                   isCurrent
-                                    ? 'bg-[#1e293b] border-blue-500/60 shadow-xs'
+                                    ? isLight
+                                      ? 'bg-blue-50 border-blue-500/60 shadow-xs'
+                                      : 'bg-[#1e293b] border-blue-500/60 shadow-xs'
+                                    : isLight
+                                    ? 'border-transparent hover:bg-slate-100'
                                     : 'border-transparent hover:bg-[#252b36]'
                                 }`}
                               >
@@ -3798,15 +4308,17 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                                 >
                                   {bLine.badge}
                                 </span>
-                                <span className="text-slate-500 text-xs shrink-0 select-none">──&gt;</span>
+                                <span className={`text-xs shrink-0 select-none ${isLight ? 'text-slate-400 font-semibold' : 'text-slate-500'}`}>──&gt;</span>
                                 <span
                                   className={`text-sm font-semibold truncate ${
-                                    isCurrent ? 'text-white font-bold' : 'text-slate-200 group-hover:text-white'
+                                    isCurrent
+                                      ? isLight ? 'text-slate-900 font-bold' : 'text-white font-bold'
+                                      : isLight ? 'text-slate-800 group-hover:text-slate-950' : 'text-slate-200 group-hover:text-white'
                                   }`}
                                 >
                                   {bLine.title}
                                 </span>
-                                <span className="text-slate-400 text-xs truncate hidden md:inline group-hover:text-slate-300">
+                                <span className={`text-xs truncate hidden md:inline ${isLight ? 'text-slate-500 group-hover:text-slate-700' : 'text-slate-400 group-hover:text-slate-300'}`}>
                                   — {bLine.detail}
                                 </span>
                               </div>
@@ -3882,6 +4394,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       analysis={deepExplanationData}
                       onJumpToLine={jumpToLine}
                       highlightedLine={highlightedLine || activeCursorLine}
+                      isLight={isLight}
                     />
                   ) : blueprintMode === 'flowchart' ? (
                     /* ─── STAGE 2: CONTROL FLOW DIAGRAM (MERMAID) ─── */
@@ -3891,6 +4404,35 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       activeLine={activeCursorLine || highlightedLine}
                       stepCurrentLine={isStepMode ? stepTrace[stepIndex]?.line : null}
                       visitedLines={isStepMode ? stepTrace.slice(0, stepIndex + 1).map((s) => s.line) : []}
+                      onJumpToLine={jumpToLine}
+                    />
+                  ) : blueprintMode === '3d' ? (
+                    /* ─── 3D VIEW: DATA IN MOTION + ARCHITECTURE MAP ─── */
+                    <Code3DView
+                      theme={isLight ? 'light' : 'dark'}
+                      progLang={progLang}
+                      code={code}
+                      files={files.map((f) => ({ name: f.name, content: f.content }))}
+                      activeFileName={activeFile.name}
+                      rows={pythonAnalysis.rows}
+                      stepTrace={stepTrace}
+                      stepIndex={stepIndex}
+                      isStepMode={isStepMode}
+                      isPlaying={isPlaying}
+                      isTracing={loadingAction === 'step'}
+                      traceOutdated={traceOutdated}
+                      traceCode={traceCodeSnapshot}
+                      stepError={stepError}
+                      onStartStep={handleStartStep}
+                      onStepNext={handleStepNext}
+                      onStepBack={handleStepBack}
+                      onTogglePlay={handleTogglePlay}
+                      onSeek={(i) => {
+                        const target = stepTrace[i];
+                        if (!target) return;
+                        setStepIndex(i);
+                        setHighlightedLine(target.line);
+                      }}
                       onJumpToLine={jumpToLine}
                     />
                   ) : blueprintMode === 'variables' ? (
@@ -3954,6 +4496,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         <HighlightedCodeBlock
                           code={nativeTranslation.translatedCode}
                           highlightedLine={highlightedLine || activeCursorLine}
+                          isDarkTheme={!isLight}
                         />
                       </div>
                     </>
@@ -3965,34 +4508,61 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
         )}
       </div>
 
+      {/* ─── STEP NARRATOR: current line + explanation + variable changes, moving together ─── */}
+      {isStepMode && progLang === 'python' && stepTrace.length > 0 && (
+        <StepNarrator
+          currentStep={stepTrace[stepIndex] || null}
+          prevStep={stepIndex > 0 ? stepTrace[stepIndex - 1] : null}
+          stepIndex={stepIndex}
+          totalSteps={stepTotal || stepTrace.length}
+          code={traceCodeSnapshot || code}
+          rows={pythonAnalysis.rows}
+          error={stepError}
+          isErrorStep={stepIndex === stepTrace.length - 1 && !!stepError}
+          isOutdated={traceOutdated}
+          mode={levelFeatures.narrator}
+          onJumpToLine={jumpToLine}
+        />
+      )}
+
       {/* ─── BOTTOM CONSOLE & AI INSIGHTS DRAWER (RESIZABLE) ─────────────────────── */}
       {showConsole && (
         <div
           style={{ height: consoleMaximized ? '85vh' : `${consoleHeight}px` }}
-          className="border-t border-[#30363d] bg-[#161b22] shrink-0 flex flex-col relative z-30 transition-all duration-75"
+          className={`border-t shrink-0 flex flex-col relative z-30 transition-all duration-75 ${
+            isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-[#30363d] bg-[#161b22] text-white'
+          }`}
         >
           {/* Draggable Top Resize Handle */}
           <div
             onMouseDown={handleConsoleResizeStart}
             onTouchStart={handleConsoleResizeStart}
-            className="h-1.5 w-full bg-[#30363d] hover:bg-blue-500/80 cursor-row-resize flex items-center justify-center transition-colors group select-none"
+            className={`h-1.5 w-full cursor-row-resize flex items-center justify-center transition-colors group select-none ${
+              isLight ? 'bg-slate-200 hover:bg-blue-400' : 'bg-[#30363d] hover:bg-blue-500/80'
+            }`}
             title="Drag up or down to resize console"
           >
-            <div className="w-12 h-0.5 rounded-full bg-slate-500 group-hover:bg-white" />
+            <div className={`w-12 h-0.5 rounded-full ${isLight ? 'bg-slate-400 group-hover:bg-slate-600' : 'bg-slate-500 group-hover:bg-white'}`} />
           </div>
 
           {/* Console Header */}
-          <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] text-xs shrink-0">
+          <div className={`flex items-center justify-between px-3 py-1.5 border-b text-xs shrink-0 ${
+            isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-[#161b22] border-[#30363d]'
+          }`}>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setConsoleTab('terminal')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-colors ${consoleTab === 'terminal' ? 'bg-[#30363d] text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-colors ${
+                  consoleTab === 'terminal'
+                    ? isLight ? 'bg-slate-200 text-slate-900 font-bold' : 'bg-[#30363d] text-white'
+                    : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                }`}
               >
                 <Terminal className="w-3.5 h-3.5" />
                 <span>Terminal</span>
                 {terminalOutput && (
                   <span
-                    className={`text-xs px-2 py-0.5 rounded font-mono font-semibold ${terminalOutput.success ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}
+                    className={`text-xs px-2 py-0.5 rounded font-mono font-semibold ${terminalOutput.success ? 'bg-emerald-500/20 ws-tx-emerald' : 'bg-rose-500/20 ws-tx-rose'}`}
                   >
                     exit {terminalOutput.exitCode ?? 0}
                   </span>
@@ -4001,7 +4571,11 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
 
               <button
                 onClick={() => setConsoleTab('stdin')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-colors ${consoleTab === 'stdin' ? 'bg-[#30363d] text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-colors ${
+                  consoleTab === 'stdin'
+                    ? isLight ? 'bg-slate-200 text-slate-900 font-bold' : 'bg-[#30363d] text-white'
+                    : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                }`}
               >
                 <span>Input (stdin)</span>
                 {stdinInput && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
@@ -4009,7 +4583,11 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
 
               <button
                 onClick={() => setConsoleTab('ai')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-colors ${consoleTab === 'ai' ? 'bg-[#30363d] text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-colors ${
+                  consoleTab === 'ai'
+                    ? isLight ? 'bg-slate-200 text-slate-900 font-bold' : 'bg-[#30363d] text-white'
+                    : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
+                }`}
               >
                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                 <span>AI Insights</span>
@@ -4020,7 +4598,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               {consoleTab === 'terminal' && terminalOutput && (
                 <button
                   onClick={() => setTerminalOutput(null)}
-                  className="text-xs text-slate-400 hover:text-white transition-colors"
+                  className="text-xs ws-text-muted ws-hover-strong transition-colors"
                 >
                   Clear
                 </button>
@@ -4028,14 +4606,14 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               <button
                 onClick={() => setConsoleMaximized((v) => !v)}
                 title={consoleMaximized ? 'Restore Console' : 'Maximize Console'}
-                className="text-slate-400 hover:text-white p-1 rounded"
+                className="ws-text-muted ws-hover-strong p-1 rounded"
               >
                 {consoleMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
               <button
                 onClick={() => setShowConsole(false)}
                 title="Close Console"
-                className="text-slate-400 hover:text-white p-1 rounded"
+                className="ws-text-muted ws-hover-strong p-1 rounded"
               >
                 ✕
               </button>
@@ -4043,28 +4621,45 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
           </div>
 
           {/* Console Content */}
-          <div className="flex-1 overflow-auto bg-[#0a0d12] p-3.5 font-mono text-sm text-slate-200">
+          <div className="flex-1 overflow-auto ws-bg-sunken p-3.5 font-mono text-sm ws-text-body">
             {/* 1. Terminal stdout/stderr view */}
             {consoleTab === 'terminal' && (
               <div>
                 {loadingAction === 'execute' ? (
-                  <div className="flex items-center gap-2.5 text-slate-300 text-sm">
+                  <div className="flex items-center gap-2.5 ws-text-2 text-sm">
                     <span className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                    <span>Executing {progLang} program in sandbox...</span>
+                    <span>
+                      Executing {progLang} program in sandbox...
+                      {progLang === 'python' && !pythonEngineWarmRef.current && (
+                        <span className="block text-xs ws-text-faint mt-0.5 font-sans">
+                          First run loads the Python engine in your browser — this can take a few seconds.
+                        </span>
+                      )}
+                    </span>
                   </div>
                 ) : terminalOutput ? (
                   <div>
-                    <div className="text-xs text-slate-400 mb-2 border-b border-[#21262d] pb-1.5 flex items-center justify-between font-sans">
+                    <div className="text-xs ws-text-muted mb-2 border-b ws-border pb-1.5 flex items-center justify-between font-sans">
                       <span>Engine: {terminalOutput.engine || 'native'} ({terminalOutput.language})</span>
                       <span>Time: {terminalOutput.timeMs}ms</span>
                     </div>
-                    <pre className="whitespace-pre-wrap leading-relaxed select-text font-mono text-sm text-[#e6edf3]">
+                    {friendlyError && (
+                      <FriendlyErrorCard
+                        key={`${friendlyError.type}-${friendlyError.line}-${terminalOutput.timeMs}`}
+                        error={friendlyError}
+                        mode={levelFeatures.friendlyErrors}
+                        lineCode={friendlyError.line ? code.split('\n')[friendlyError.line - 1] : undefined}
+                        onJumpToLine={jumpToLine}
+                        onQuickFix={friendlyError.quickFix ? handleFriendlyQuickFix : undefined}
+                      />
+                    )}
+                    <pre className="whitespace-pre-wrap leading-relaxed select-text font-mono text-sm ws-text-body">
                       {terminalOutput.output}
                     </pre>
                   </div>
                 ) : (
-                  <div className="text-slate-400 py-6 text-center font-sans text-sm">
-                    Click <span className="text-emerald-400 font-bold">Run</span> (or press Ctrl+Enter) to execute your program. Output will appear here.
+                  <div className="ws-text-muted py-6 text-center font-sans text-sm">
+                    Click <span className="ws-tx-emerald font-bold">Run</span> (or press Ctrl+Enter) to execute your program. Output will appear here.
                   </div>
                 )}
               </div>
@@ -4073,15 +4668,15 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
             {/* 2. Standard Input view */}
             {consoleTab === 'stdin' && (
               <div className="font-sans">
-                <div className="text-xs text-slate-400 mb-2">
-                  Provide custom standard input for code that reads from <code className="text-blue-400">input()</code> / <code className="text-blue-400">stdin</code>:
+                <div className="text-xs ws-text-muted mb-2">
+                  Provide custom standard input for code that reads from <code className="ws-tx-blue">input()</code> / <code className="ws-tx-blue">stdin</code>:
                 </div>
                 <textarea
                   value={stdinInput}
                   onChange={(e) => setStdinInput(e.target.value)}
                   placeholder="Type standard input lines here..."
                   rows={4}
-                  className="w-full bg-[#161b22] border border-[#30363d] rounded p-2 text-xs font-mono text-white outline-none focus:border-blue-500"
+                  className="w-full ws-bg-surface border ws-border rounded p-2 text-xs font-mono ws-text-strong outline-none focus:border-blue-500"
                 />
                 <div className="mt-2 flex justify-end">
                   <button
@@ -4100,18 +4695,18 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
             {consoleTab === 'ai' && (
               <div className="font-sans">
                 {/* Sub-tabs */}
-                <div className="flex gap-2 border-b border-[#21262d] pb-2 mb-3 text-xs overflow-x-auto">
+                <div className="flex gap-2 border-b ws-border pb-2 mb-3 text-xs overflow-x-auto">
                   {[
                     { key: 'lineByLine', label: 'Line-by-Line' },
                     { key: 'simpleLogic', label: 'Simple Logic' },
                     { key: 'debug', label: 'Debug & Fix' },
                     { key: 'convert', label: 'Convert' },
                     { key: 'ask', label: 'Ask AI' },
-                  ].map((sub) => (
+                  ].filter((sub) => levelFeatures.showConvertTools || sub.key !== 'convert').map((sub) => (
                     <button
                       key={sub.key}
                       onClick={() => setAiSubTab(sub.key as any)}
-                      className={`px-2.5 py-1 rounded text-xs transition-colors shrink-0 ${aiSubTab === sub.key ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                      className={`px-2.5 py-1 rounded text-xs transition-colors shrink-0 ${aiSubTab === sub.key ? 'bg-blue-600 text-white font-bold' : 'ws-text-muted ws-hover-strong'}`}
                     >
                       {sub.label}
                     </button>
@@ -4124,23 +4719,23 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                     {explanation ? (
                       <div className="space-y-3">
                         <div className="p-3 bg-blue-950/30 border border-blue-500/30 rounded-lg">
-                          <div className="text-xs font-bold text-blue-400 mb-1">Overview:</div>
-                          <p className="text-sm text-slate-200">{explanation.overview}</p>
+                          <div className="text-xs font-bold ws-tx-blue mb-1">Overview:</div>
+                          <p className="text-sm ws-text-body">{explanation.overview}</p>
                         </div>
                         <div className="space-y-2">
                           {explanation.lineByLine.map((line, idx) => (
-                            <div key={idx} className="p-2 bg-[#161b22] border border-[#30363d] rounded text-xs">
-                              <div className="font-mono text-blue-300 font-bold mb-1 flex items-center justify-between">
+                            <div key={idx} className="p-2 ws-bg-surface border ws-border rounded text-xs">
+                              <div className="font-mono ws-tx-blue font-bold mb-1 flex items-center justify-between">
                                 <span>Line {line.lineNumber}: {line.codeSnippet}</span>
-                                <span className="text-[10px] text-slate-500 uppercase">{line.category}</span>
+                                <span className="text-[10px] ws-text-faint uppercase">{line.category}</span>
                               </div>
-                              <div className="text-slate-300">{line.explanation || line.simpleMeaning}</div>
+                              <div className="ws-text-2">{line.explanation || line.simpleMeaning}</div>
                             </div>
                           ))}
                         </div>
                       </div>
                     ) : (
-                      <div className="text-center py-6 text-slate-400">
+                      <div className="text-center py-6 ws-text-muted">
                         Click "Explain Code" in the sidebar to generate a line-by-line explanation in {currentNative?.native}.
                       </div>
                     )}
@@ -4152,17 +4747,17 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                   <div>
                     {explanation?.simpleLogicSummary ? (
                       <div className="space-y-3">
-                        <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
-                          <div className="font-bold text-amber-400 text-xs mb-1">Logic Summary:</div>
-                          <p className="text-sm text-slate-200">{explanation.simpleLogicSummary}</p>
+                        <div className="p-3 ws-bg-surface border ws-border rounded-lg">
+                          <div className="font-bold ws-tx-amber text-xs mb-1">Logic Summary:</div>
+                          <p className="text-sm ws-text-body">{explanation.simpleLogicSummary}</p>
                         </div>
                         {explanation.executionFlow && explanation.executionFlow.length > 0 && (
-                          <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
-                            <div className="font-bold text-blue-400 text-xs mb-2">Execution Flow:</div>
+                          <div className="p-3 ws-bg-surface border ws-border rounded-lg">
+                            <div className="font-bold ws-tx-blue text-xs mb-2">Execution Flow:</div>
                             <div className="space-y-1.5">
                               {explanation.executionFlow.map((step, i) => (
-                                <div key={i} className="text-xs text-slate-300 flex items-start gap-2">
-                                  <span className="w-5 h-5 rounded-full bg-blue-600/30 text-blue-300 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                                <div key={i} className="text-xs ws-text-2 flex items-start gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-blue-600/30 ws-tx-blue flex items-center justify-center text-[10px] shrink-0 font-bold">
                                     {i + 1}
                                   </span>
                                   <span>{step}</span>
@@ -4173,7 +4768,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         )}
                       </div>
                     ) : (
-                      <div className="text-center py-6 text-slate-400">
+                      <div className="text-center py-6 ws-text-muted">
                         Click "Simple Logic" in the sidebar to generate an intuitive plain-language summary.
                       </div>
                     )}
@@ -4189,24 +4784,24 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                           <div className="font-bold text-xs mb-1">
                             {debugResult.hasErrors ? '⚠️ Issues Detected:' : '✅ Code Looks Good:'}
                           </div>
-                          <p className="text-sm text-slate-200">{debugResult.summary}</p>
+                          <p className="text-sm ws-text-body">{debugResult.summary}</p>
                         </div>
 
                         {debugResult.lineDiffs && debugResult.lineDiffs.length > 0 && (
                           <div className="space-y-1.5">
                             {debugResult.lineDiffs.map((diff, i) => (
-                              <div key={i} className="p-2 bg-[#161b22] border border-[#30363d] rounded text-xs">
-                                <div className="text-rose-400 font-bold mb-0.5">Line {diff.lineNumber}: {diff.issue}</div>
-                                <div className="text-emerald-300 font-mono text-[11px]">Fix: {diff.correction}</div>
+                              <div key={i} className="p-2 ws-bg-surface border ws-border rounded text-xs">
+                                <div className="ws-tx-rose font-bold mb-0.5">Line {diff.lineNumber}: {diff.issue}</div>
+                                <div className="ws-tx-emerald font-mono text-[11px]">Fix: {diff.correction}</div>
                               </div>
                             ))}
                           </div>
                         )}
 
                         {debugResult.correctedCode && (
-                          <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
+                          <div className="p-3 ws-bg-surface border ws-border rounded-lg">
                             <div className="flex items-center justify-between mb-1.5">
-                              <span className="font-bold text-emerald-400 text-xs">Suggested Working Fix:</span>
+                              <span className="font-bold ws-tx-emerald text-xs">Suggested Working Fix:</span>
                               <button
                                 onClick={() => handleCodeChange(debugResult.correctedCode)}
                                 className="text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 rounded font-bold transition-colors"
@@ -4214,12 +4809,12 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                                 Apply Fix to Editor
                               </button>
                             </div>
-                            <pre className="font-mono text-xs text-emerald-300 whitespace-pre-wrap">{debugResult.correctedCode}</pre>
+                            <pre className="font-mono text-xs ws-tx-emerald whitespace-pre-wrap">{debugResult.correctedCode}</pre>
                           </div>
                         )}
                       </div>
                     ) : (
-                      <div className="text-center py-6 text-slate-400">
+                      <div className="text-center py-6 ws-text-muted">
                         Click "Debug & Fix" in the sidebar to inspect code for syntax or boundary bugs.
                       </div>
                     )}
@@ -4233,7 +4828,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       <select
                         value={convertTargetLang}
                         onChange={(e) => setConvertTargetLang(e.target.value)}
-                        className="bg-[#161b22] border border-[#30363d] rounded px-2.5 py-1 text-xs text-white outline-none cursor-pointer"
+                        className="ws-bg-surface border ws-border rounded px-2.5 py-1 text-xs ws-text-strong outline-none cursor-pointer"
                       >
                         <option value="javascript">JavaScript</option>
                         <option value="python">Python</option>
@@ -4242,7 +4837,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       <select
                         value={convertMode}
                         onChange={(e) => setConvertMode(e.target.value as any)}
-                        className="bg-[#161b22] border border-[#30363d] rounded px-2.5 py-1 text-xs text-white outline-none cursor-pointer"
+                        className="ws-bg-surface border ws-border rounded px-2.5 py-1 text-xs ws-text-strong outline-none cursor-pointer"
                       >
                         <option value="programming_language">Convert to Target Language</option>
                         <option value="native_pseudocode">Convert to Native Pseudocode</option>
@@ -4256,9 +4851,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       </button>
                     </div>
                     {conversionResult && (
-                      <div className="p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
-                        <div className="text-xs text-slate-300 mb-2">{conversionResult.explanation}</div>
-                        <pre className="font-mono text-xs text-indigo-300 whitespace-pre-wrap">{conversionResult.convertedCode}</pre>
+                      <div className="p-3 ws-bg-surface border ws-border rounded-lg">
+                        <div className="text-xs ws-text-2 mb-2">{conversionResult.explanation}</div>
+                        <pre className="font-mono text-xs ws-tx-indigo whitespace-pre-wrap">{conversionResult.convertedCode}</pre>
                       </div>
                     )}
                   </div>
@@ -4271,7 +4866,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       {chatMessages.map((msg, i) => (
                         <div
                           key={i}
-                          className={`p-2.5 rounded-lg text-xs leading-relaxed whitespace-pre-wrap ${msg.sender === 'user' ? 'bg-blue-600/30 border border-blue-500/40 ml-8 text-white' : 'bg-[#161b22] border border-[#30363d] mr-8 text-slate-200'}`}
+                          className={`p-2.5 rounded-lg text-xs leading-relaxed whitespace-pre-wrap ${msg.sender === 'user' ? 'bg-blue-600/30 border border-blue-500/40 ml-8 ws-text-strong' : 'ws-bg-surface border ws-border mr-8 ws-text-body'}`}
                         >
                           {msg.text}
                         </div>
@@ -4284,7 +4879,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         value={questionInput}
                         onChange={(e) => setQuestionInput(e.target.value)}
                         placeholder="Ask anything about this code (e.g. time complexity, line 2)..."
-                        className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-3 py-1 text-xs text-white outline-none focus:border-blue-500 font-sans"
+                        className="flex-1 ws-bg-surface border ws-border rounded px-3 py-1 text-xs ws-text-strong outline-none focus:border-blue-500 font-sans"
                       />
                       <button
                         type="submit"
@@ -4301,6 +4896,36 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
           </div>
         </div>
       )}
+
+      {/* ─── STATUS BAR ─── */}
+      <WorkspaceStatusBar
+        level={experienceLevel}
+        onLevelClick={() => {
+          const order: ExperienceLevel[] = ['beginner', 'intermediate', 'senior'];
+          handleLevelChange(order[(order.indexOf(experienceLevel) + 1) % order.length]);
+        }}
+        languageName={currentLang?.name || progLang}
+        cursorLine={activeCursorLine}
+        lineCount={lineCount}
+        statements={progLang === 'python' ? pythonAnalysis.rows.length : null}
+        indentErrors={indentAnalysis.totalErrors}
+        runState={
+          loadingAction === 'execute' || loadingAction === 'step'
+            ? 'running'
+            : terminalOutput
+              ? terminalOutput.success
+                ? 'success'
+                : 'error'
+              : 'idle'
+        }
+        runTimeMs={terminalOutput?.timeMs ?? null}
+        engine={terminalOutput?.engine || null}
+        isStepMode={isStepMode}
+        stepLabel={isStepMode ? `Step ${stepIndex + 1}/${stepTotal || stepTrace.length}` : null}
+        lessonTitle={activeLesson ? (lessonResult?.passed ? `${activeLesson.title} ✓` : activeLesson.title) : null}
+        isDirty={isDirty}
+        isLight={isLight}
+      />
 
       {/* ─── MODAL 1: EXIT CONFIRMATION MODAL (Save Changes Prompt) ─── */}
       {showExitConfirm && (
@@ -4351,33 +4976,34 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
       {/* ─── MODAL 2: FREE PROJECT LIMIT GUARD (15/15 PROJECTS) ─── */}
       {showLimitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
-          <div className="bg-[#161b22] border border-amber-500/40 rounded-lg shadow-2xl max-w-md w-full p-5 space-y-4">
+          <div className="ws-bg-surface border border-amber-500/40 rounded-lg shadow-2xl max-w-md w-full p-5 space-y-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-10 h-10 rounded-full bg-amber-500/20 ws-tx-amber flex items-center justify-center shrink-0 mt-0.5">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Free Project Limit Reached (15 / 15)</h3>
-                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                  Free tier workspaces can store up to 15 saved projects. Upgrade to Nexus Pro for unlimited cloud-synced projects, team collaboration, and higher quotas.
+                <h3 className="text-base font-bold ws-text-strong">Guest limit reached (15 / 15 projects)</h3>
+                <p className="text-xs ws-text-2 mt-1 leading-relaxed">
+                  Without an account, up to 15 projects can be saved in this browser. Create a free account to save unlimited
+                  projects and open them on any device.
                 </p>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#30363d]">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t ws-border">
               <button
                 onClick={() => setShowLimitModal(false)}
-                className="px-3 py-1.5 rounded text-xs font-semibold text-slate-300 hover:text-white hover:bg-[#21262d] transition-colors"
+                className="px-3 py-1.5 rounded text-xs font-semibold ws-text-2 ws-hover-strong ws-hover-bg transition-colors"
               >
                 Dismiss
               </button>
               <button
                 onClick={() => {
                   setShowLimitModal(false);
-                  onNavigate('pricing');
+                  openAuthModal('signup');
                 }}
-                className="px-4 py-1.5 rounded text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold transition-all shadow-md"
+                className="px-4 py-1.5 rounded text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-md"
               >
-                Upgrade to Pro
+                Create free account
               </button>
             </div>
           </div>
@@ -4579,6 +5205,31 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
           </p>
         </div>
       )}
+
+      {/* ─── LEARNING: lessons drawer, quiz, guided tour ─── */}
+      <LessonsPanel
+        open={lessonsOpen}
+        onClose={() => setLessonsOpen(false)}
+        completed={completedLessons}
+        activeLessonId={activeLessonId}
+        level={experienceLevel}
+        isPython={progLang === 'python'}
+        onStartLesson={handleStartLesson}
+        onOpenQuiz={() => {
+          setLessonsOpen(false);
+          setQuizOpen(true);
+        }}
+      />
+      <QuizModal
+        open={quizOpen}
+        questions={quizQuestions}
+        onClose={() => setQuizOpen(false)}
+        onJumpToLine={(line) => {
+          setQuizOpen(false);
+          jumpToLine(line);
+        }}
+      />
+      <GuidedTour open={tourOpen} level={experienceLevel} onChooseLevel={handleLevelChange} onClose={closeTour} />
     </div>
   );
 };

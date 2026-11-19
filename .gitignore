@@ -6,3 +6,13 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Runtime data (contains user accounts, password hashes and session tokens)
+data/db.json
+data/db.json.tmp
+data/db.json.corrupt-*
+data/reports/
+
+# Tool artifacts and stale duplicate copy of the project
+.aistudio/
+nexus-code-main/

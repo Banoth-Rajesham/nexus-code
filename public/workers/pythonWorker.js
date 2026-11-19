@@ -155,6 +155,27 @@ def run_trace(code_str, input_list=[]):
         except:
             return "unknown", "<unprintable>"
 
+    def to_viz(v, depth=0):
+        # Structured, size-limited copy of a value for the 3D data view
+        try:
+            if v is None or isinstance(v, bool):
+                return {"k": "prim", "t": type(v).__name__, "r": repr(v)}
+            if isinstance(v, (int, float)):
+                return {"k": "prim", "t": type(v).__name__, "r": repr(v)[:24]}
+            if isinstance(v, str):
+                if depth == 0 and 0 < len(v) <= 40:
+                    return {"k": "str", "items": [{"k": "prim", "t": "str", "r": c} for c in v]}
+                return {"k": "prim", "t": "str", "r": repr(v)[:24]}
+            if depth < 2 and isinstance(v, (list, tuple)) and len(v) <= 64:
+                return {"k": "list", "t": type(v).__name__, "items": [to_viz(x, depth + 1) for x in v]}
+            if depth < 2 and isinstance(v, (set, frozenset)) and len(v) <= 64:
+                return {"k": "list", "t": type(v).__name__, "items": [to_viz(x, depth + 1) for x in sorted(v, key=repr)]}
+            if depth < 1 and isinstance(v, dict) and len(v) <= 32:
+                return {"k": "dict", "t": "dict", "items": [[repr(dk)[:20], to_viz(dv, depth + 1)] for dk, dv in v.items()]}
+            return {"k": "prim", "t": type(v).__name__, "r": repr(v)[:24]}
+        except:
+            return {"k": "prim", "t": "unknown", "r": "?"}
+
     def serialize_var(k, v):
         try:
             # 1. Module
@@ -221,7 +242,8 @@ def run_trace(code_str, input_list=[]):
                 "type": t,
                 "value": r,
                 "isMeta": False,
-                "isInstance": False
+                "isInstance": False,
+                "viz": to_viz(v)
             }
         except:
             return {
@@ -357,6 +379,8 @@ def run_trace(code_str, input_list=[]):
             if tb.tb_frame.f_code.co_filename == '<user_code>':
                 err_line = tb.tb_lineno
             tb = tb.tb_next
+        if isinstance(exc, SyntaxError) and getattr(exc, 'lineno', None):
+            err_line = exc.lineno
         error_info = {
             "type": type(exc).__name__,
             "message": str(exc),
@@ -394,17 +418,17 @@ def run_code_simple(code_str, input_list=[]):
             output_chunks.append(str(val) + "\\n")
             return str(val)
         else:
-            frame = sys._getframe(1)
+            frame = _sys._getframe(1)
             line = frame.f_lineno if frame.f_code.co_filename == '<user_code>' else 1
             raise NeedInputException(str(prompt), line)
 
     custom_stdout = CustomStdout()
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    old_input = sys.modules['builtins'].input
-    sys.stdout = custom_stdout
-    sys.stderr = custom_stdout
-    sys.modules['builtins'].input = custom_input
+    old_stdout = _sys.stdout
+    old_stderr = _sys.stderr
+    old_input = _sys.modules['builtins'].input
+    _sys.stdout = custom_stdout
+    _sys.stderr = custom_stdout
+    _sys.modules['builtins'].input = custom_input
 
     error_info = None
     try:
@@ -423,21 +447,23 @@ def run_code_simple(code_str, input_list=[]):
             "outputSoFar": "".join(output_chunks)
         }
     except Exception as exc:
-        tb = sys.exc_info()[2]
+        tb = _sys.exc_info()[2]
         err_line = 1
         while tb:
             if tb.tb_frame.f_code.co_filename == '<user_code>':
                 err_line = tb.tb_lineno
             tb = tb.tb_next
+        if isinstance(exc, SyntaxError) and getattr(exc, 'lineno', None):
+            err_line = exc.lineno
         error_info = {
             "type": type(exc).__name__,
             "message": str(exc),
             "line": err_line
         }
     finally:
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
-        sys.modules['builtins'].input = old_input
+        _sys.stdout = old_stdout
+        _sys.stderr = old_stderr
+        _sys.modules['builtins'].input = old_input
 
     return {
         "status": "error" if error_info else "ok",

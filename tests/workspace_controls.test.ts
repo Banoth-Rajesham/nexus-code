@@ -200,5 +200,9 @@ assert(timeoutResult.output.includes('10-second safety limit'), 'Timeout outputs
 
 console.log('\n----------------------------------------------------------------------');
 console.log(`Total: ${totalTests} | Passed: ${passCount} | Failed: ${totalTests - passCount}`);
+if (passCount !== totalTests) {
+  console.log('Overall Result: WORKSPACE CONTROLS TESTS FAILED');
+  process.exit(1);
+}
 console.log('Overall Result: ALL WORKSPACE CONTROLS LOGIC TESTS PASSED');
 console.log('----------------------------------------------------------------------\n');

@@ -334,5 +334,6 @@ assert(
 );
 
 console.log(`\n================================================================`);
-console.log(`FINAL RESULT: ${passCount} / ${totalTests} TESTS PASSED (100%)`);
+console.log(`FINAL RESULT: ${passCount} / ${totalTests} TESTS PASSED (${Math.round((passCount / totalTests) * 100)}%)`);
 console.log(`================================================================\n`);
+if (passCount !== totalTests) process.exit(1);
