@@ -73,6 +73,53 @@ import ast as _ast
 import json as _json
 import types as _types
 import inspect as _inspect
+import importlib.abc as _importlib_abc
+import importlib.util as _importlib_util
+
+class _AutoMock(_types.ModuleType):
+    """Universal Mock Module for uninstalled packages in browser environment."""
+    def __init__(self, name):
+        super().__init__(name)
+        self.__name__ = name
+        self.__all__ = []
+
+    def __getattr__(self, attr):
+        if attr.startswith('__') and attr.endswith('__'):
+            raise AttributeError(attr)
+        sub = _AutoMock(f"{self.__name__}.{attr}")
+        setattr(self, attr, sub)
+        return sub
+
+    def __call__(self, *args, **kwargs):
+        return _AutoMock(f"{self.__name__}()")
+
+    def __getitem__(self, item):
+        return _AutoMock(f"{self.__name__}[{item}]")
+
+    def __iter__(self):
+        return iter([])
+
+    def __repr__(self):
+        return f"<module '{self.__name__}' (auto-mocked)>"
+
+class _AutoMockLoader(_importlib_abc.Loader):
+    def __init__(self, fullname):
+        self.fullname = fullname
+
+    def create_module(self, spec):
+        return _AutoMock(self.fullname)
+
+    def exec_module(self, module):
+        pass
+
+class _AutoMockFinder(_importlib_abc.MetaPathFinder):
+    def find_spec(self, fullname, path, target=None):
+        if fullname in _sys.modules:
+            return None
+        return _importlib_util.spec_from_loader(fullname, _AutoMockLoader(fullname))
+
+if not any(isinstance(f, _AutoMockFinder) for f in _sys.meta_path):
+    _sys.meta_path.append(_AutoMockFinder())
 
 class StepLimitExceeded(Exception):
     pass

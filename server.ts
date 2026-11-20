@@ -54,8 +54,8 @@ if (IS_PRODUCTION) {
   );
 }
 app.use(compression());
-// Dev server binds to loopback only so nothing on the LAN can reach it. Override with HOST=0.0.0.0 if needed.
-const HOST = process.env.HOST || (IS_PRODUCTION ? '0.0.0.0' : '127.0.0.1');
+// Bind to 0.0.0.0 so the app is accessible on localhost and across your local network (e.g. Mac mini, mobile).
+const HOST = process.env.HOST || '0.0.0.0';
 
 app.use(express.json({ limit: '2mb' }));
 
@@ -1322,7 +1322,16 @@ async function startServer() {
   }
 
   app.listen(Number(PORT), HOST, () => {
-    console.log(`Server running (${IS_PRODUCTION ? 'production' : 'development'}) at http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+    console.log(`\n  🚀 NexusCode server running (${IS_PRODUCTION ? 'production' : 'development'}):`);
+    console.log(`  ➜ Local:   http://localhost:${PORT}`);
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name] || []) {
+        if (net.family === 'IPv4' && !net.internal) {
+          console.log(`  ➜ Network: http://${net.address}:${PORT} (open this on your Mac mini)\n`);
+        }
+      }
+    }
   });
 }
 

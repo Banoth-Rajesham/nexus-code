@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, Network, Play, Pause, SkipBack, SkipForward, Loader2, Footprints, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Activity, Network, Play, Pause, SkipBack, SkipForward, Loader2, Footprints, AlertTriangle, RefreshCw, Sparkles, Box } from 'lucide-react';
 import { DataWorld } from './DataWorld';
 import { ArchitectureWorld } from './ArchitectureWorld';
+import { RealisticThreeWorld } from './RealisticThreeWorld';
 import { buildDataScene, detectPointers } from '../../utils/visual3d/dataScene';
 import { analyzeArchitecture } from '../../utils/visual3d/architecture';
 import type { TraceStep, WorkerErrorInfo } from '../../utils/pyodideRunner';
 import { THEMES_3D, Theme3DContext, Theme3DName, useTheme3D } from './theme3d';
 
 type Mode = 'data' | 'architecture';
+type Engine3D = 'realistic' | 'classic';
 const MODE_KEY = 'nexus_3d_mode';
+const ENGINE_KEY = 'nexus_3d_engine';
 
 interface ExplainedRow {
   startLine: number;
@@ -60,6 +63,20 @@ export const Code3DView: React.FC<Code3DViewProps> = (props) => {
     } catch {}
   };
 
+  const [engine, setEngine] = useState<Engine3D>(() => {
+    try {
+      const saved = localStorage.getItem(ENGINE_KEY);
+      if (saved === 'realistic' || saved === 'classic') return saved;
+    } catch {}
+    return 'realistic';
+  });
+  const changeEngine = (e: Engine3D) => {
+    setEngine(e);
+    try {
+      localStorage.setItem(ENGINE_KEY, e);
+    } catch {}
+  };
+
   // Static analysis (debounced so typing stays smooth)
   const [archFiles, setArchFiles] = useState(files);
   useEffect(() => {
@@ -81,10 +98,44 @@ export const Code3DView: React.FC<Code3DViewProps> = (props) => {
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ background: theme.chromeBg }}>
       {/* Mode switch */}
       <div className="h-10 shrink-0 flex items-center justify-between gap-3 px-3 border-b" style={{ background: theme.chromeBg, borderColor: theme.chromeBorder }}>
-        <div className={`flex items-center gap-1 rounded-lg border p-0.5 ${theme.tabGroup}`} role="tablist" aria-label="3D view mode">
-          <ModeTab active={effectiveMode === 'data'} disabled={!isPython} onClick={() => changeMode('data')} icon={Activity} label="Data in motion" />
-          <ModeTab active={effectiveMode === 'architecture'} onClick={() => changeMode('architecture')} icon={Network} label="Architecture" />
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-1 rounded-lg border p-0.5 ${theme.tabGroup}`} role="tablist" aria-label="3D view mode">
+            <ModeTab active={effectiveMode === 'data'} disabled={!isPython} onClick={() => changeMode('data')} icon={Activity} label="Data in motion" />
+            <ModeTab active={effectiveMode === 'architecture'} onClick={() => changeMode('architecture')} icon={Network} label="Architecture" />
+          </div>
+
+          {effectiveMode === 'architecture' && (
+            <div className="flex items-center gap-1 rounded-lg border border-slate-700/60 bg-slate-900/60 p-0.5" role="group" aria-label="3D rendering engine">
+              <button
+                type="button"
+                onClick={() => changeEngine('realistic')}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                  engine === 'realistic'
+                    ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Three.js WebGL Realistic PBR 3D"
+              >
+                <Sparkles className="w-3 h-3 text-cyan-300" />
+                Realistic WebGL
+              </button>
+              <button
+                type="button"
+                onClick={() => changeEngine('classic')}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                  engine === 'classic'
+                    ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Classic CSS 3D Boxes"
+              >
+                <Box className="w-3 h-3 text-slate-400" />
+                Classic
+              </button>
+            </div>
+          )}
         </div>
+
         <span className={`text-[11px] truncate hidden md:block ${theme.floorTextMuted}`}>
           {effectiveMode === 'data'
             ? 'Watch lists, pointers and values change at every step'
@@ -103,7 +154,35 @@ export const Code3DView: React.FC<Code3DViewProps> = (props) => {
         )
       ) : (
         <>
-          <ArchitectureWorld map={archMap} activeFile={activeFileName} activeLine={activeLine} onJumpToLine={props.onJumpToLine} />
+          {engine === 'realistic' ? (
+            <RealisticThreeWorld
+              mode="architecture"
+              archMap={archMap}
+              activeFile={activeFileName}
+              activeLine={activeLine}
+              onJumpToLine={props.onJumpToLine}
+              theme={props.theme === 'light' ? 'light' : 'dark'}
+              code={code}
+              stepTrace={stepTrace}
+              stepIndex={stepIndex}
+              isStepMode={isStepMode}
+              isPlaying={props.isPlaying}
+              isTracing={props.isTracing}
+              traceOutdated={props.traceOutdated}
+              onStartStep={props.onStartStep}
+              onStepNext={props.onStepNext}
+              onStepBack={props.onStepBack}
+              onTogglePlay={props.onTogglePlay}
+              onSeek={props.onSeek}
+            />
+          ) : (
+            <ArchitectureWorld
+              map={archMap}
+              activeFile={activeFileName}
+              activeLine={activeLine}
+              onJumpToLine={props.onJumpToLine}
+            />
+          )}
           {isStepMode && stepTrace.length > 0 && <Transport {...props} current={current} compact />}
         </>
       )}
