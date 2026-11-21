@@ -420,6 +420,25 @@ export function analyzeArchitecture(files: SourceFile[]): ArchitectureMap {
       imp.names.forEach((nm) => serviceOf.set(nm, id));
     }
 
+    // In-memory databases, state stores, and collections: items_db = {}, users_cache = dict(), db = ...
+    p.masked.forEach((ln, idx) => {
+      const dbMatch = /^\s*([A-Za-z_]\w*(?:_db|db_|database|items_db|users_db|cache|store))\s*(?::\s*[^=]+)?=\s*([A-Za-z_]\w*[\(\[\{]|\{\}|\[\])/i.exec(ln);
+      if (dbMatch) {
+        const varName = dbMatch[1];
+        const id = `svc:database:${varName}`;
+        addNode({
+          id,
+          label: varName.replace(/_/g, ' '),
+          kind: 'database',
+          file: fname,
+          module: 'in-memory',
+          lines: [idx + 1],
+          description: `In-memory data store (${varName})`,
+        });
+        serviceOf.set(varName, id);
+      }
+    });
+
     // Variables derived from services: conn = sqlite3.connect(...), client = OpenAI(), cur = conn.cursor()
     for (let pass = 0; pass < 3; pass++) {
       p.masked.forEach((ln) => {
@@ -480,10 +499,23 @@ export function analyzeArchitecture(files: SourceFile[]): ArchitectureMap {
     });
 
     // Routes are entered from the web server
-    const serverId = Array.from(nodes.values()).find((nd) => nd.kind === 'server' && nd.file === fname)?.id;
-    p.blocks
-      .filter((b) => b.kind === 'route')
-      .forEach((b) => serverId && addEdge(serverId, blockId(fname, b.name), 'request', fname, b.startLine));
+    let serverId = Array.from(nodes.values()).find((nd) => nd.kind === 'server' && nd.file === fname)?.id;
+    const routes = p.blocks.filter((b) => b.kind === 'route');
+    if (routes.length > 0 && !serverId) {
+      serverId = `svc:server:Web server`;
+      addNode({
+        id: serverId,
+        label: 'Web server',
+        kind: 'server',
+        file: fname,
+        module: 'fastapi',
+        lines: [routes[0].startLine],
+        description: 'Receives web requests and dispatches to route handlers',
+      });
+    }
+    if (serverId) {
+      routes.forEach((b) => addEdge(serverId!, blockId(fname, b.name), 'request', fname, b.startLine));
+    }
 
     const mainId = `main:${fname}`;
     const mainHasEdges = Array.from(edges.values()).some((e) => e.from === mainId);

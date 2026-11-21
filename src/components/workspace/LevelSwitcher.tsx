@@ -50,11 +50,7 @@ export const LevelSwitcher: React.FC<LevelSwitcherProps> = ({ level, onChange, s
         aria-label={`Experience level: ${current.label}`}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold transition-colors border focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
-          isLight
-            ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
-            : 'bg-[#21262d] hover:bg-[#30363d] border-[#30363d] text-slate-200'
-        }`}
+        className="nx-btn"
       >
         <CurrentIcon className={`w-3.5 h-3.5 ${LEVEL_ACCENT[level]}`} />
         {showLabel && <span className="hidden lg:inline">{current.label}</span>}

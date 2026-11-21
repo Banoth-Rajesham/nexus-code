@@ -2495,11 +2495,8 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
     }`}>
       {/* ─── SLIM UNIFIED WORKSPACE TOOLBAR (Ribbons 1 & 2 Merged, max ~42px height) ─── */}
       {!isToolbarCollapsed ? (
-        <div className={`h-[42px] max-h-[42px] min-h-[42px] flex items-center justify-between px-3 border-b shrink-0 gap-2.5 overflow-x-auto no-scrollbar select-none z-30 transition-colors ${
-          isLight
-            ? 'bg-white border-slate-200 text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
-            : 'bg-[#121214] border-[#27272a] text-zinc-200'
-        }`}>
+        <div className="nx-bar h-[48px] max-h-[48px] min-h-[48px] flex items-center justify-between px-3 shrink-0 gap-2.5 overflow-x-auto no-scrollbar select-none z-30">
+          <span className="nx-bar-accent" aria-hidden="true" />
           {/* Left: [Nexus logo] [file tab main.py + "+"] */}
           <div className="flex items-center gap-2 shrink-0 min-w-0">
             {/* Back to Home/Overview button */}
@@ -2513,19 +2510,15 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               }}
               title="Return to Nexus Code Overview"
               aria-label="Return to Nexus Code Overview"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-blue-500 border transition-colors shrink-0 group ${
-                isLight
-                  ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 hover:text-slate-900'
-                  : 'bg-[#18181b] hover:bg-[#27272a] border-[#27272a] text-zinc-200 hover:text-white'
-              }`}
+              className="nx-btn shrink-0 group !pl-1.5"
             >
-              <div className="w-5 h-5 rounded-md bg-[#2563eb] text-white flex items-center justify-center font-bold text-xs shadow-xs group-hover:scale-105 transition-transform">
+              <div className="nx-logo group-hover:scale-105 transition-transform">
                 <Code className="w-3.5 h-3.5" />
               </div>
               <span className="font-bold text-xs tracking-tight hidden sm:inline">NexusCode</span>
             </button>
 
-            <div className={`h-4 w-px shrink-0 ${isLight ? 'bg-slate-200' : 'bg-[#27272a]'}`} />
+            <div className="nx-divider" />
 
             {/* File Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 max-w-[260px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px]">
@@ -2544,15 +2537,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       setEditingTabId(file.id);
                       setTabRenameValue(file.name);
                     }}
-                    className={`group flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded-lg cursor-pointer transition-colors border shrink-0 ${
-                      isActive
-                        ? isLight
-                          ? 'bg-white border-blue-600 text-blue-700 font-bold shadow-xs'
-                          : 'bg-[#1e1e24] border-zinc-700 text-white font-bold'
-                        : isLight
-                          ? 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                          : 'bg-[#18181b] border-[#27272a] text-zinc-400 hover:text-zinc-200 hover:bg-[#27272a]'
-                    }`}
+                    className={`nx-tab group font-mono ${isActive ? 'is-active' : ''}`}
                   >
                     <FileIcon filename={file.name} width={14} height={14} />
                     {isEditingThisTab ? (
@@ -2576,11 +2561,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       <span className="truncate max-w-[90px]" title="Double click to rename">{file.name}</span>
                     )}
                     {file.isEntry && (
-                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full uppercase font-sans font-bold border ${
-                        isLight
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : 'bg-[#10b981] text-black border-transparent'
-                      }`}>
+                      <span className="nx-chip nx-chip-entry font-sans">
                         Entry
                       </span>
                     )}
@@ -2599,11 +2580,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 onClick={handleAddNewTab}
                 title="New file tab (+)"
                 aria-label="Create new file tab"
-                className={`p-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded-lg transition-colors shrink-0 ${
-                  isLight
-                    ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
-                    : 'text-zinc-400 hover:text-white hover:bg-[#27272a]'
-                }`}
+                className="nx-icon-btn"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -2618,11 +2595,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 onClick={() => setLangDropOpen((v) => !v)}
                 title="Select Programming Language"
                 aria-label="Select Programming Language"
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 border rounded-lg text-xs font-semibold transition-colors ${
-                  isLight
-                    ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
-                    : 'bg-[#18181b] hover:bg-[#27272a] border-[#27272a] text-zinc-200'
-                }`}
+                className="nx-btn"
               >
                 <LanguageIcon language={progLang} width={15} height={15} />
                 <span className="hidden sm:inline">{currentLang?.name || progLang}</span>
@@ -2664,11 +2637,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               }}
               defaultValue=""
               aria-label="Load preset sample programs"
-              className={`hidden xl:block text-xs px-2.5 py-1.5 rounded-lg outline-none cursor-pointer border transition-colors shrink-0 max-w-[140px] truncate ${
-                isLight
-                  ? 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200 focus:ring-1 focus:ring-blue-500'
-                  : 'bg-[#18181b] border-[#27272a] text-zinc-200 hover:bg-[#27272a] focus:ring-1 focus:ring-blue-500'
-              }`}
+              className="nx-btn hidden xl:block shrink-0 max-w-[150px] truncate"
             >
               <option value="" disabled>Load preset...</option>
               {(WORKSPACE_PRESETS[progLang] || WORKSPACE_PRESETS.python || []).map((preset) => (
@@ -2685,7 +2654,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 title="Stop Execution"
                 aria-label="Stop running program"
                 data-tour="run"
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#ef4444] hover:bg-[#dc2626] focus:outline-hidden focus:ring-2 focus:ring-red-400 text-white font-bold text-xs sm:text-sm rounded-lg transition-all shadow-sm active:scale-95 shrink-0"
+                className="nx-btn-stop shrink-0"
               >
                 <Square className="w-3.5 h-3.5 fill-white" />
                 <span>Stop</span>
@@ -2697,9 +2666,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 title={`Run ${activeFile.name} (Ctrl+Enter)`}
                 aria-label={`Run ${activeFile.name}`}
                 data-tour="run"
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#10b981] hover:bg-[#059669] focus:outline-hidden focus:ring-2 focus:ring-emerald-400 disabled:opacity-50 text-black font-bold text-xs sm:text-sm rounded-lg transition-all shadow-sm shadow-emerald-500/20 active:scale-95 shrink-0"
+                className="nx-btn-run shrink-0"
               >
-                <Play className="w-3.5 h-3.5 fill-black text-black" />
+                <Play className="w-3.5 h-3.5 fill-white text-white" />
                 <span className="whitespace-nowrap">Run {activeFile.name}</span>
               </button>
             )}
@@ -2734,20 +2703,12 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               data-tour="lessons"
               title="Lessons & progress"
               aria-label="Open lessons"
-              className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold transition-colors border shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
-                activeLesson
-                  ? isLight
-                    ? 'bg-blue-50 border-blue-400 text-blue-800'
-                    : 'bg-blue-600/20 border-blue-500/60 text-blue-200'
-                  : isLight
-                    ? 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'
-                    : 'bg-[#21262d] border-[#30363d] text-slate-300 hover:bg-[#30363d]'
-              }`}
+              className={`nx-btn shrink-0 ${activeLesson ? 'is-on' : ''}`}
             >
               <GraduationCap className="w-3.5 h-3.5" />
               <span className={levelFeatures.toolbarLabels ? 'hidden md:inline' : 'hidden xl:inline'}>Lessons</span>
               {completedLessons.length > 0 && (
-                <span className={`text-[10px] font-mono hidden md:inline ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                <span className="nx-chip nx-chip-muted hidden md:inline-flex">
                   {completedLessons.filter((id) => LESSONS.some((l) => l.id === id)).length}/{LESSONS.length}
                 </span>
               )}
@@ -2756,11 +2717,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
             {/* Experience level */}
             <LevelSwitcher level={experienceLevel} onChange={handleLevelChange} isLight={isLight} />
 
-            <div className={`h-4 w-px shrink-0 hidden sm:block ${isLight ? 'bg-slate-200' : 'bg-[#30363d]'}`} />
+            <div className="nx-divider hidden sm:block" />
             {/* 3-Segment Switcher: Source | Dual Split | Blueprint */}
-            <div className={`flex items-center border rounded-lg p-0.5 text-xs ${
-              isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#18181b] border-[#27272a]'
-            }`}>
+            <div className="nx-seg">
               <button
                 onClick={() => {
                   handleViewLayoutChange('english');
@@ -2768,13 +2727,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 }}
                 title="Show Source Code Only"
                 aria-label="Show Source Code Only"
-                className={`px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${
-                  viewLayout === 'english'
-                    ? isLight ? 'bg-white text-slate-900 font-bold shadow-xs' : 'bg-[#27272a] text-white font-bold shadow-xs'
-                    : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                }`}
+                className={`nx-seg-btn ${viewLayout === 'english' ? 'is-active' : ''}`}
               >
-                <FileCode className="w-3.5 h-3.5 text-sky-400" />
+                <FileCode className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Source</span>
               </button>
               <button
@@ -2783,13 +2738,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 }}
                 title="Dual Split View (Source + Visual Blueprint)"
                 aria-label="Dual Split View"
-                className={`px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${
-                  viewLayout === 'split'
-                    ? isLight ? 'bg-white text-slate-900 font-bold shadow-xs' : 'bg-[#27272a] text-white font-bold shadow-xs'
-                    : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                }`}
+                className={`nx-seg-btn ${viewLayout === 'split' ? 'is-active' : ''}`}
               >
-                <Columns className="w-3.5 h-3.5 text-[#10b981]" />
+                <Columns className="w-3.5 h-3.5" />
                 <span>Dual Split</span>
               </button>
               <button
@@ -2799,13 +2750,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 }}
                 title="Show Visual Blueprint Only"
                 aria-label="Show Visual Blueprint Only"
-                className={`px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5 transition-colors ${
-                  viewLayout === 'native'
-                    ? isLight ? 'bg-white text-slate-900 font-bold shadow-xs' : 'bg-[#27272a] text-white font-bold shadow-xs'
-                    : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                }`}
+                className={`nx-seg-btn ${viewLayout === 'native' ? 'is-active' : ''}`}
               >
-                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <Sparkles className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Blueprint</span>
               </button>
             </div>
@@ -2815,13 +2762,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               onClick={() => toggleConsole()}
               title="Toggle Terminal Console (Ctrl+`)"
               aria-label="Toggle Terminal Console"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
-                showConsole
-                  ? 'bg-[#2563eb] border-[#2563eb] text-white shadow-sm shadow-blue-500/20'
-                  : isLight
-                    ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
-                    : 'bg-[#18181b] border-[#27272a] text-zinc-300 hover:text-white hover:bg-[#27272a]'
-              }`}
+              className={`nx-btn shrink-0 ${showConsole ? 'is-on' : ''}`}
             >
               <Icon icon="flat-color-icons:command-line" width={15} height={15} className="shrink-0" />
               <span className="hidden md:inline">Console</span>
@@ -2832,7 +2773,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               ) : null}
             </button>
 
-            <div className={`h-4 w-px shrink-0 mx-0.5 ${isLight ? 'bg-slate-200' : 'bg-[#30363d]'}`} />
+            <div className="nx-divider mx-0.5" />
 
             {/* ─── HAYDEN BLEASEL THEME SWITCHER (System 🖥️ / Light ☀️ / Dark 🌙) ─── */}
             <ThemeSwitcher
@@ -2841,20 +2782,14 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               size="sm"
             />
 
-            <div className={`h-4 w-px shrink-0 mx-0.5 ${isLight ? 'bg-slate-200' : 'bg-[#30363d]'}`} />
+            <div className="nx-divider mx-0.5" />
 
             {/* Save Button */}
             <button
               onClick={handleSaveProject}
               title="Save Project (Ctrl+S)"
               aria-label="Save Project"
-              className={`p-1.5 rounded transition-colors shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
-                saveSuccess
-                  ? 'text-emerald-500 bg-emerald-500/10'
-                  : isLight
-                    ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-              }`}
+              className={`nx-icon-btn ${saveSuccess ? 'is-success' : ''}`}
             >
               {saveSuccess ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
             </button>
@@ -2864,9 +2799,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               onClick={() => setShowShortcutsModal(true)}
               title="Keyboard Shortcuts (?)"
               aria-label="View Keyboard Shortcuts Cheat Sheet"
-              className={`p-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors shrink-0 font-bold text-xs ${
-                isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-              }`}
+              className="nx-icon-btn"
             >
               <HelpCircle className="w-3.5 h-3.5" />
             </button>
@@ -2876,9 +2809,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               onClick={() => setTourOpen(true)}
               title="Take the guided tour"
               aria-label="Take the guided tour"
-              className={`p-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors shrink-0 ${
-                isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-              }`}
+              className="nx-icon-btn"
             >
               <Compass className="w-3.5 h-3.5" />
             </button>
@@ -2888,9 +2819,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               onClick={toggleToolbarCollapsed}
               title="Collapse Toolbar into Focus Mode (Ctrl+Shift+F)"
               aria-label="Collapse Toolbar"
-              className={`p-1.5 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors shrink-0 ${
-                isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-              }`}
+              className="nx-icon-btn"
             >
               <ChevronUp className="w-3.5 h-3.5" />
             </button>
@@ -2901,9 +2830,9 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
         <button
           onClick={toggleToolbarCollapsed}
           title="Exit Focus Mode & Expand Toolbar (Ctrl+Shift+F)"
-          className="absolute top-1.5 right-4 z-50 flex items-center gap-1.5 px-2.5 py-1 bg-[#161b22]/90 hover:bg-[#21262d] text-slate-300 hover:text-white border border-[#30363d] rounded-md text-xs font-semibold shadow-lg backdrop-blur-xs transition-all cursor-pointer"
+          className="nx-btn absolute top-1.5 right-4 z-50 shadow-lg backdrop-blur-xs"
         >
-          <ChevronDown className="w-3.5 h-3.5 text-blue-400" />
+          <ChevronDown className="w-3.5 h-3.5" />
           <span>Expand Toolbar (Ctrl+Shift+F)</span>
         </button>
       )}
@@ -3287,9 +3216,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
               >
                 {/* Left Pane Header — Single-line max 36px tall */}
                 <div className={`h-[36px] min-h-[36px] max-h-[36px] box-border px-3 border-b flex items-center justify-between text-xs sm:text-sm shrink-0 whitespace-nowrap overflow-hidden select-none transition-colors ${
-                  isLight
-                    ? 'bg-slate-50 border-slate-200 text-slate-800'
-                    : 'bg-[#161b22] border-[#30363d] text-slate-100'
+                  'nx-subbar'
                 }`}>
                   <div className="flex items-center gap-2 min-w-0 shrink">
                     {!showFileExplorer && (
@@ -3297,32 +3224,22 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         onClick={() => toggleFileExplorer(true)}
                         title="Open Side Menu (Ctrl+B)"
                         aria-label="Open Side Menu"
-                        className={`p-1 rounded transition-colors shrink-0 focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
-                          isLight
-                            ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
-                            : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-                        }`}
+                        className="nx-icon-btn nx-sm"
                       >
                         <PanelLeft className="w-3.5 h-3.5" />
                       </button>
                     )}
                     <FileIcon filename={activeFile.name} width={15} height={15} />
-                    <span className={`font-bold text-xs sm:text-sm truncate max-w-[130px] sm:max-w-[180px] ${
-                      isLight ? 'text-slate-800' : 'text-slate-100'
-                    }`}>
+                    <span className="nx-title truncate max-w-[130px] sm:max-w-[180px]">
                       {activeFile.name}
                     </span>
                     {activeFile.isEntry && (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-sans uppercase font-bold shrink-0 border ${
-                        isLight
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                      }`}>
+                      <span className="nx-chip nx-chip-entry font-sans">
                         Entry
                       </span>
                     )}
-                    <span className={`text-[11px] font-mono shrink-0 ${isLight ? 'text-slate-500 font-medium' : 'text-slate-400'}`}>
-                      Lines: {lineCount}
+                    <span className="nx-chip nx-chip-muted">
+                      {lineCount} lines
                     </span>
                   </div>
 
@@ -3333,13 +3250,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         onClick={() => setSettingsOpen((v) => !v)}
                         title="Editor Display Settings"
                         aria-label="Editor Display Settings"
-                        className={`p-1 rounded transition-colors focus:outline-hidden focus:ring-1 focus:ring-blue-500 ${
-                          settingsOpen
-                            ? isLight ? 'bg-slate-200 text-slate-900' : 'bg-[#30363d] text-white'
-                            : isLight
-                            ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
-                            : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-                        }`}
+                        className={`nx-icon-btn nx-sm ${settingsOpen ? 'is-on' : ''}`}
                       >
                         <Settings className="w-3.5 h-3.5" />
                       </button>
@@ -3510,9 +3421,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       onClick={handleCopyEnglish}
                       title="Copy Source Code"
                       aria-label="Copy Source Code"
-                      className={`p-1 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors ${
-                        isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-                      }`}
+                      className="nx-icon-btn nx-sm"
                     >
                       {copiedEnglish ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
@@ -3520,9 +3429,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       onClick={() => handleDownload(code, activeFile.name)}
                       title={`Download ${activeFile.name}`}
                       aria-label={`Download ${activeFile.name}`}
-                      className={`p-1 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors ${
-                        isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-                      }`}
+                      className="nx-icon-btn nx-sm"
                     >
                       <Download className="w-3.5 h-3.5" />
                     </button>
@@ -3797,14 +3704,10 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                 }`}
               >
                 {/* Right Header — Single-line max 42px tall */}
-                <div className={`h-[42px] min-h-[42px] max-h-[42px] box-border px-3 border-b flex items-center justify-between text-xs sm:text-sm shrink-0 whitespace-nowrap overflow-hidden select-none transition-colors ${
-                  isLight
-                    ? 'bg-slate-50 border-slate-200 text-slate-800'
-                    : 'bg-[#121214] border-[#27272a] text-zinc-100'
-                }`}>
+                <div className="nx-subbar h-[42px] min-h-[42px] max-h-[42px] box-border px-3 flex items-center justify-between text-xs sm:text-sm shrink-0 whitespace-nowrap overflow-hidden select-none">
                   <div className="flex items-center gap-2 min-w-0 shrink">
-                    <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse shrink-0" />
-                    <span className="font-bold text-xs sm:text-sm text-emerald-700 dark:text-[#10b981] truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[240px]">
+                    <span className="nx-live-dot" />
+                    <span className="nx-title nx-title-grad truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[240px]">
                       {blueprintMode === 'deep'
                         ? 'Deep Explanation'
                         : blueprintMode === '3d'
@@ -3813,7 +3716,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                     </span>
                     <span
                       title="Rows = statements explained. Steps = lines actually executed."
-                      className={`text-[11px] border px-2 py-0.5 rounded-full font-mono font-semibold shrink-0 whitespace-nowrap cursor-help ${isLight ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-[#10b981]/15 text-[#34d399] border-[#10b981]/30'}`}
+                      className="nx-chip nx-chip-accent cursor-help"
                     >
                       {blueprintMode === '3d'
                         ? 'Live'
@@ -3827,18 +3730,12 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     {/* View Switcher: Aligned Line Blueprint | Architecture Blocks | Pseudocode | Deep Explanation */}
-                    <div className={`flex border rounded-lg text-xs font-semibold overflow-hidden p-0.5 shrink-0 ${
-                      isLight ? 'bg-slate-100 border-slate-300' : 'bg-[#18181b] border-[#27272a]'
-                    }`}>
+                    <div className="nx-seg shrink-0">
                       {levelFeatures.blueprintModes.includes('aligned') && (
                       <button
                         onClick={() => handleBlueprintModeChange('aligned')}
                         aria-label="Line Blueprint View"
-                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
-                          blueprintMode === 'aligned'
-                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
-                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                        }`}
+                        className={`nx-seg-btn ${blueprintMode === 'aligned' ? 'is-active' : ''}`}
                         title="Line Blueprint: Line-by-line annotations aligned with editor"
                       >
                         <Icon icon="flat-color-icons:flow-chart" width={14} height={14} className="shrink-0" />
@@ -3849,11 +3746,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       <button
                         onClick={() => handleBlueprintModeChange('blocks')}
                         aria-label="Architecture Blocks View"
-                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
-                          blueprintMode === 'blocks'
-                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
-                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                        }`}
+                        className={`nx-seg-btn ${blueprintMode === 'blocks' ? 'is-active' : ''}`}
                         title="Architecture Blocks: Grouped architectural components"
                       >
                         <Icon icon="flat-color-icons:mind-map" width={14} height={14} className="shrink-0" />
@@ -3864,11 +3757,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       <button
                         onClick={() => handleBlueprintModeChange('code')}
                         aria-label="Pseudocode View"
-                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
-                          blueprintMode === 'code'
-                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
-                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                        }`}
+                        className={`nx-seg-btn ${blueprintMode === 'code' ? 'is-active' : ''}`}
                         title="Pseudocode: Pure pseudocode representation"
                       >
                         <Icon icon="flat-color-icons:document" width={14} height={14} className="shrink-0" />
@@ -3879,11 +3768,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       <button
                         onClick={() => handleBlueprintModeChange('flowchart')}
                         aria-label="Flowchart View"
-                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
-                          blueprintMode === 'flowchart'
-                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
-                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                        }`}
+                        className={`nx-seg-btn ${blueprintMode === 'flowchart' ? 'is-active' : ''}`}
                         title="Flowchart: Visual control flow diagram generated directly from parse tree"
                       >
                         <Icon icon="flat-color-icons:tree-structure" width={14} height={14} className="shrink-0" />
@@ -3894,11 +3779,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       <button
                         onClick={() => handleBlueprintModeChange('deep')}
                         aria-label="Deep Explanation View"
-                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
-                          blueprintMode === 'deep'
-                            ? isLight ? 'bg-white text-blue-600 font-bold shadow-xs' : 'bg-[#10b981] text-black font-bold shadow-xs'
-                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                        }`}
+                        className={`nx-seg-btn ${blueprintMode === 'deep' ? 'is-active' : ''}`}
                         title="Deep Explanation: 4-Layer WHAT, WHY, HOW, VERIFY"
                       >
                         <Icon icon="flat-color-icons:radar-plot" width={14} height={14} className="shrink-0" />
@@ -3909,11 +3790,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       <button
                         onClick={() => handleBlueprintModeChange('variables')}
                         aria-label="Variables Inspector View"
-                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
-                          blueprintMode === 'variables'
-                            ? isLight ? 'bg-amber-600 text-white font-bold shadow-xs' : 'bg-[#f59e0b] text-black font-bold shadow-xs'
-                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                        }`}
+                        className={`nx-seg-btn ${blueprintMode === 'variables' ? 'is-active' : ''}`}
                         title="Variables: Live variable scope, call stack, and loop counters"
                       >
                         <Icon icon="flat-color-icons:data-sheet" width={14} height={14} className="shrink-0" />
@@ -3925,12 +3802,8 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                         onClick={() => handleBlueprintModeChange('3d')}
                         aria-label="3D View"
                         data-tour="view-3d"
-                        className={`px-2.5 py-1 flex items-center gap-1.5 transition-all rounded-md ${
-                          blueprintMode === '3d'
-                            ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold shadow-xs'
-                            : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
-                        }`}
-                        title="3D View: watch data move and see the program's architecture in 3D"
+                        className={`nx-seg-btn ${blueprintMode === '3d' ? 'is-active' : ''}`}
+                        title="3D View: see the program's architecture as an isometric diagram"
                       >
                         <Box3DIcon className="w-3.5 h-3.5 shrink-0" />
                         <span className="hidden lg:inline">3D View</span>
@@ -3942,9 +3815,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       onClick={handleCopyRightPanel}
                       title="Copy Current Explanation"
                       aria-label="Copy Current Explanation"
-                      className={`p-1 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors ${
-                        isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-                      }`}
+                      className="nx-icon-btn nx-sm"
                     >
                       {copiedNative ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
@@ -3952,9 +3823,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
                       onClick={handleDownloadRightPanel}
                       title="Download Current Explanation"
                       aria-label="Download Current Explanation"
-                      className={`p-1 focus:outline-hidden focus:ring-1 focus:ring-blue-500 rounded transition-colors ${
-                        isLight ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200' : 'text-slate-400 hover:text-white hover:bg-[#21262d]'
-                      }`}
+                      className="nx-icon-btn nx-sm"
                     >
                       <Download className="w-3.5 h-3.5" />
                     </button>

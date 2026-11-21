@@ -71,9 +71,9 @@ export const StepControls: React.FC<StepControlsProps> = ({
         disabled={disabled}
         title="Step-by-step Execution with Variables & Call Stack (F10)"
         aria-label="Step-by-step execution"
-        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#f59e0b] hover:bg-[#d97706] focus:outline-hidden focus:ring-2 focus:ring-amber-400 disabled:opacity-50 text-black font-bold text-xs sm:text-sm rounded-lg transition-all shadow-sm shadow-amber-500/20 active:scale-95 shrink-0"
+        className="nx-btn-step shrink-0"
       >
-        <Footprints className="w-3.5 h-3.5 fill-black text-black" />
+        <Footprints className="w-3.5 h-3.5 text-white" />
         <span className="whitespace-nowrap">Step</span>
       </button>
     );
@@ -89,13 +89,13 @@ export const StepControls: React.FC<StepControlsProps> = ({
   const currentSpeedLabel = speedOptions.find((s) => s.value === playSpeedMs)?.label || `${playSpeedMs / 1000}s`;
 
   return (
-    <div className="flex items-center gap-1 ws-bg-surface border ws-border rounded p-0.5 text-xs shrink-0 animate-fadeIn">
+    <div className="nx-seg shrink-0 animate-fadeIn text-xs">
       {/* 1. Reset Button */}
       <button
         onClick={onReset}
         title="Exit / Reset Step Mode"
         aria-label="Exit / Reset Step Mode"
-        className="p-1 ws-text-muted ws-hover-strong ws-hover-bg rounded transition-colors focus:ring-1 focus:ring-slate-400"
+        className="nx-icon-btn nx-sm"
       >
         <RotateCcw className="w-3.5 h-3.5" />
       </button>
@@ -106,7 +106,7 @@ export const StepControls: React.FC<StepControlsProps> = ({
         disabled={stepIndex <= 0}
         title="Step Back to Previous Line"
         aria-label="Step Back"
-        className="p-1 ws-text-2 ws-hover-strong ws-hover-bg disabled:opacity-30 disabled:hover:bg-transparent rounded transition-colors focus:ring-1 focus:ring-slate-400"
+        className="nx-icon-btn nx-sm disabled:opacity-30"
       >
         <SkipBack className="w-3.5 h-3.5" />
       </button>
@@ -117,11 +117,11 @@ export const StepControls: React.FC<StepControlsProps> = ({
         disabled={stepIndex >= totalSteps - 1}
         title="Next Step (F10)"
         aria-label="Next Step"
-        className="flex items-center gap-1.5 px-2.5 py-1 bg-[#f59e0b] hover:bg-[#d97706] disabled:opacity-30 disabled:hover:bg-[#f59e0b] text-black font-bold rounded transition-colors focus:ring-1 focus:ring-amber-300 shadow-xs"
+        className="nx-btn-step nx-sm"
       >
-        <SkipForward className="w-3.5 h-3.5 fill-black" />
+        <SkipForward className="w-3.5 h-3.5 fill-white" />
         <span className="hidden sm:inline">Next</span>
-        <kbd className="hidden md:inline text-[9px] px-1 py-0.2 rounded bg-amber-700/30 text-amber-950 font-mono font-bold">F10</kbd>
+        <kbd className="hidden md:inline text-[9px] px-1 py-0.2 rounded bg-black/20 text-white/90 font-mono font-bold">F10</kbd>
       </button>
 
       {/* 4. Auto-Play / Pause Button */}
@@ -129,9 +129,7 @@ export const StepControls: React.FC<StepControlsProps> = ({
         onClick={onTogglePlay}
         title={isPlaying ? 'Pause Auto-play' : 'Auto-play through Steps'}
         aria-label={isPlaying ? 'Pause Auto-play' : 'Auto-play'}
-        className={`p-1 rounded transition-colors focus:ring-1 focus:ring-amber-400 ${
-          isPlaying ? 'bg-amber-500 text-slate-950 font-bold' : 'ws-text-2 ws-hover-strong ws-hover-bg'
-        }`}
+        className={`nx-icon-btn nx-sm ${isPlaying ? 'is-on' : ''}`}
       >
         {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
       </button>
@@ -142,7 +140,7 @@ export const StepControls: React.FC<StepControlsProps> = ({
           onClick={() => setSpeedMenuOpen((o) => !o)}
           title={`Auto-play Speed: ${currentSpeedLabel}`}
           aria-label="Change auto-play speed"
-          className="flex items-center gap-1 px-1.5 py-0.5 ws-text-muted ws-hover-strong ws-hover-bg rounded transition-colors focus:ring-1 focus:ring-slate-400 text-[11px]"
+          className="nx-seg-btn !h-6 !px-1.5 text-[11px]"
         >
           <Clock className="w-3 h-3 ws-text-muted" />
           <span className="hidden lg:inline">{playSpeedMs / 1000}s</span>
@@ -174,7 +172,7 @@ export const StepControls: React.FC<StepControlsProps> = ({
       {/* 6. Step Count Badge */}
       <span
         title="Rows = statements explained. Steps = lines actually executed."
-        className="px-1.5 py-0.5 text-[11px] ws-tx-amber font-mono font-bold bg-amber-950/40 rounded border border-amber-600/30 whitespace-nowrap cursor-help"
+        className="nx-chip nx-chip-muted cursor-help mx-0.5"
       >
         {isTraceOutdated
           ? 'Code changed'
