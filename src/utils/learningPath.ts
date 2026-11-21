@@ -18,6 +18,11 @@ export type ConceptKey =
   | 'strings'
   | 'errors'
   | 'classes'
+  | 'types'
+  | 'tuples'
+  | 'sets'
+  | 'modules'
+  | 'files'
   | 'recursion';
 
 export interface Concept {
@@ -32,12 +37,17 @@ export const CONCEPTS: Concept[] = [
   { key: 'input', title: 'Reading input', level: 'beginner' },
   { key: 'conditions', title: 'If / else decisions', level: 'beginner' },
   { key: 'loops', title: 'Loops', level: 'beginner' },
-  { key: 'lists', title: 'Lists', level: 'intermediate' },
-  { key: 'functions', title: 'Functions', level: 'intermediate' },
-  { key: 'strings', title: 'Working with text', level: 'intermediate' },
-  { key: 'dictionaries', title: 'Dictionaries', level: 'intermediate' },
-  { key: 'errors', title: 'Handling errors', level: 'senior' },
+  { key: 'lists', title: 'Lists', level: 'beginner' },
+  { key: 'functions', title: 'Functions', level: 'beginner' },
+  { key: 'strings', title: 'Working with text', level: 'beginner' },
+  { key: 'dictionaries', title: 'Dictionaries', level: 'beginner' },
+  { key: 'errors', title: 'Handling errors', level: 'beginner' },
   { key: 'classes', title: 'Classes & objects', level: 'senior' },
+  { key: 'types', title: 'Basic data types', level: 'beginner' },
+  { key: 'tuples', title: 'Tuples', level: 'beginner' },
+  { key: 'sets', title: 'Sets', level: 'beginner' },
+  { key: 'modules', title: 'Imports & modules', level: 'beginner' },
+  { key: 'files', title: 'Reading & writing files', level: 'beginner' },
   { key: 'recursion', title: 'Recursion', level: 'senior' },
 ];
 
@@ -95,6 +105,32 @@ export const LESSONS: Lesson[] = [
     },
   },
   {
+    id: 'basic_types',
+    concept: 'types',
+    level: 'beginner',
+    title: "Identify basic types",
+    goal: "Use type() to print the type names of a whole number, decimal, string, and Boolean, one per line.",
+    starterCode: "values = [7, 2.5, \"Python\", True]\n\n",
+    hint: "Use type(value).__name__ to get just the name.",
+    check: {
+      outputLines: ["int", "float", "str", "bool"],
+      codeMatches: [{ pattern: /\btype\s*\(/, message: "Use type(value).__name__ to get just the name." }],
+    },
+  },
+  {
+    id: 'arithmetic_operators',
+    concept: 'variables',
+    level: 'beginner',
+    title: "Divide and find the remainder",
+    goal: "Use // and % to split 17 items into groups of 5. Print the number of full groups, then the remainder.",
+    starterCode: "items = 17\nsize = 5\n\n",
+    hint: "Use items // size for full groups and items % size for the remainder.",
+    check: {
+      outputLines: ["3", "2"],
+      codeMatches: [{ pattern: /\/\/[^\n]+\n[\s\S]*%/, message: "Use items // size for full groups and items % size for the remainder." }],
+    },
+  },
+  {
     id: 'greet_input',
     concept: 'input',
     level: 'beginner',
@@ -109,6 +145,33 @@ export const LESSONS: Lesson[] = [
         { pattern: /input\s*\(/, message: 'Use input() to read the name.' },
         { pattern: /print\s*\([^\n]*\bname\b/, message: 'Print a greeting that uses the name variable.' },
       ],
+    },
+  },
+  {
+    id: 'convert_input',
+    concept: 'input',
+    level: 'beginner',
+    title: "Convert typed input to a number",
+    goal: "Read an age, add 1, and print the age next year. The Run button supplies 18.",
+    starterCode: "age_text = input()\n\n",
+    hint: "Convert with int(age_text) before adding 1.",
+    check: {
+      outputLines: ["19"],
+      codeMatches: [{ pattern: /\bint\s*\(/, message: "Convert with int(age_text) before adding 1." }],
+      stdin: ["18"],
+    },
+  },
+  {
+    id: 'slice_text',
+    concept: 'strings',
+    level: 'beginner',
+    title: "Index and slice a string",
+    goal: "Print the first letter of Python, then its first three letters, then the word in uppercase.",
+    starterCode: "word = \"Python\"\n\n",
+    hint: "Try word[0], word[:3], and word.upper().",
+    check: {
+      outputLines: ["P", "Pyt", "PYTHON"],
+      codeMatches: [{ pattern: /\bword\s*\[:3\]/, message: "Try word[0], word[:3], and word.upper()." }],
     },
   },
   {
@@ -129,6 +192,32 @@ export const LESSONS: Lesson[] = [
     },
   },
   {
+    id: 'elif_grades',
+    concept: 'conditions',
+    level: 'beginner',
+    title: "Choose between three outcomes",
+    goal: "Use if, elif, and else to print Distinction for scores of 90 or more, Pass for 50 or more, and Retry otherwise.",
+    starterCode: "for score in [95, 72, 40]:\n    # Write your grade conditions here.\n    pass\n\n",
+    hint: "Check score >= 90 first, then use elif score >= 50.",
+    check: {
+      outputLines: ["Distinction", "Pass", "Retry"],
+      codeMatches: [{ pattern: /\belif\b/, message: "Check score >= 90 first, then use elif score >= 50." }],
+    },
+  },
+  {
+    id: 'boolean_logic',
+    concept: 'conditions',
+    level: 'beginner',
+    title: "Combine conditions",
+    goal: "Print whether an 18-year-old with a ticket can enter, then whether they can enter without a ticket. Use and.",
+    starterCode: "age = 18\n\n",
+    hint: "Combine age >= 18 with a Boolean that says whether the person has a ticket.",
+    check: {
+      outputLines: ["True", "False"],
+      codeMatches: [{ pattern: /\band\b/, message: "Combine age >= 18 with a Boolean that says whether the person has a ticket." }],
+    },
+  },
+  {
     id: 'count_to_ten',
     concept: 'loops',
     level: 'beginner',
@@ -141,11 +230,49 @@ export const LESSONS: Lesson[] = [
       codeMatches: [{ pattern: /\b(for|while)\b/, message: 'Use a for or while loop instead of 10 print() lines.' }],
     },
   },
-  // ── Intermediate ──
+  {
+    id: 'while_countdown',
+    concept: 'loops',
+    level: 'beginner',
+    title: "Count down with while",
+    goal: "Use a while loop to print 3, 2, 1, then print Go! after the loop.",
+    starterCode: "number = 3\n\n",
+    hint: "Repeat while number > 0 and subtract 1 on each iteration.",
+    check: {
+      outputLines: ["3", "2", "1", "Go!"],
+      codeMatches: [{ pattern: /\bwhile\s+/, message: "Repeat while number > 0 and subtract 1 on each iteration." }],
+    },
+  },
+  {
+    id: 'break_continue',
+    concept: 'loops',
+    level: 'beginner',
+    title: "Skip and stop a loop",
+    goal: "Loop through 1 to 9. Skip 2 with continue and stop at 5 with break. Print only the numbers you visit before stopping.",
+    starterCode: "for number in range(1, 10):\n    # Add the conditions and print the remaining numbers.\n    pass\n\n",
+    hint: "Check number == 2 and number == 5 before calling print().",
+    check: {
+      outputLines: ["1", "3", "4"],
+      codeMatches: [{ pattern: /\bcontinue\b[\s\S]*\bbreak\b/, message: "Check number == 2 and number == 5 before calling print()." }],
+    },
+  },
+  {
+    id: 'edit_list',
+    concept: 'lists',
+    level: 'beginner',
+    title: "Read and update a list",
+    goal: "Append mango, replace apple with pear, and print the first item and the new list length, one per line.",
+    starterCode: "fruits = [\"apple\", \"banana\"]\n\n",
+    hint: "Use fruits.append(\"mango\"), fruits[0] = \"pear\", and len(fruits).",
+    check: {
+      outputLines: ["pear", "3"],
+      codeMatches: [{ pattern: /\.append\s*\(/, message: "Use fruits.append(\"mango\"), fruits[0] = \"pear\", and len(fruits)." }],
+    },
+  },
   {
     id: 'list_total',
     concept: 'lists',
-    level: 'intermediate',
+    level: 'beginner',
     title: 'Total of a list',
     goal: 'Add up marks = [72, 85, 90, 64] with a loop and print "Total: 311".',
     starterCode: 'marks = [72, 85, 90, 64]\ntotal = 0\n\n# Loop over the list and add each mark to total\n',
@@ -156,9 +283,48 @@ export const LESSONS: Lesson[] = [
     },
   },
   {
+    id: 'unpack_tuple',
+    concept: 'tuples',
+    level: 'beginner',
+    title: "Unpack a tuple",
+    goal: "Unpack the pair into x and y, then print the coordinates on separate lines.",
+    starterCode: "point = (4, 9)\n\n",
+    hint: "Use x, y = point to assign both coordinates.",
+    check: {
+      outputLines: ["4", "9"],
+      codeMatches: [{ pattern: /\bx\s*,\s*y\s*=\s*point\b/, message: "Use x, y = point to assign both coordinates." }],
+    },
+  },
+  {
+    id: 'unique_set',
+    concept: 'sets',
+    level: 'beginner',
+    title: "Remove duplicates with a set",
+    goal: "Use a set to find the number of distinct names, then print whether Maya is in the set.",
+    starterCode: "names = [\"Maya\", \"Ravi\", \"Maya\", \"Leah\"]\n\n",
+    hint: "Convert with set(names) and use len() and in on the set.",
+    check: {
+      outputLines: ["3", "True"],
+      codeMatches: [{ pattern: /\bset\s*\(/, message: "Convert with set(names) and use len() and in on the set." }],
+    },
+  },
+  {
+    id: 'lookup_dictionary',
+    concept: 'dictionaries',
+    level: 'beginner',
+    title: "Look up and update a dictionary",
+    goal: "Add a math score of 90 and print it. Then use get() to print 0 for a missing science score.",
+    starterCode: "scores = {\"english\": 75}\n\n",
+    hint: "Assign scores[\"math\"] = 90 and use scores.get(\"science\", 0).",
+    check: {
+      outputLines: ["90", "0"],
+      codeMatches: [{ pattern: /\.get\s*\(/, message: "Assign scores[\"math\"] = 90 and use scores.get(\"science\", 0)." }],
+    },
+  },
+  {
     id: 'function_area',
     concept: 'functions',
-    level: 'intermediate',
+    level: 'beginner',
     title: 'Write a function',
     goal: 'Write area(width, height) that returns width * height, then print area(4, 6) → 24.',
     starterCode: '# Define a function that returns the area of a rectangle\n\n',
@@ -171,6 +337,47 @@ export const LESSONS: Lesson[] = [
       ],
     },
   },
+  {
+    id: 'import_math',
+    concept: 'modules',
+    level: 'beginner',
+    title: "Import a standard library module",
+    goal: "Import math and print the square root of 81 using math.sqrt().",
+    starterCode: "# Add your code here.\n",
+    hint: "Use import math, then print(math.sqrt(81)).",
+    check: {
+      outputLines: ["9.0"],
+      codeMatches: [{ pattern: /\bimport\s+math\b/, message: "Use import math, then print(math.sqrt(81))." }],
+    },
+  },
+  {
+    id: 'read_write_file',
+    concept: 'files',
+    level: 'beginner',
+    title: "Write and read a text file",
+    goal: "Write hello to notes.txt, close it, then read it back and print the file contents.",
+    starterCode: "filename = \"notes.txt\"\n\n",
+    hint: "Use with open(filename, \"w\") to write and with open(filename) to read.",
+    check: {
+      outputLines: ["hello"],
+      codeMatches: [{ pattern: /\.write\s*\([\s\S]*\.read\s*\(/, message: "Use with open(filename, \"w\") to write and with open(filename) to read." }],
+    },
+  },
+  {
+    id: 'catch_bad_input',
+    concept: 'errors',
+    level: 'beginner',
+    title: "Handle invalid numeric input",
+    goal: "Try converting the supplied word to an integer. Catch ValueError and print Please enter a number.",
+    starterCode: "value = input()\n\n",
+    hint: "Put int(value) inside try and catch it with except ValueError.",
+    check: {
+      outputLines: ["Please enter a number"],
+      codeMatches: [{ pattern: /\bexcept\s+ValueError\s*:/, message: "Put int(value) inside try and catch it with except ValueError." }],
+      stdin: ["oops"],
+    },
+  },
+  // ── Intermediate ──
   {
     id: 'reverse_text',
     concept: 'strings',

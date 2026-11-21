@@ -746,14 +746,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               body={`${LESSONS.length} short lessons take you from your first print() to classes and recursion. Each one gives you a goal, checks your program when you run it, and tracks what you have mastered.`}
             />
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={openWorkspace}
+              <a
+                href="/workspace?lesson=first"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold px-5 py-3 transition-colors"
               >
                 Start the first lesson <ArrowRight className="w-4 h-4" />
-              </button>
+              </a>
             </div>
-            <p className="mt-3 text-xs text-slate-500">Open the workspace and choose “Lessons” in the toolbar.</p>
+            <p className="mt-3 text-xs text-slate-500">Start with Say hello, then use Next lesson to keep going.</p>
           </div>
           <ol className="grid sm:grid-cols-2 gap-3">
             {LESSONS.slice(0, 8).map((lesson, i) => (

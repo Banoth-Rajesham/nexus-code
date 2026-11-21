@@ -79,6 +79,21 @@ const SOLUTIONS: Record<string, { code: string; output: string }> = {
   safe_divide: { code: 'def safe_divide(a, b):\n    try:\n        return a / b\n    except ZeroDivisionError:\n        return "Cannot divide by zero"\nprint(safe_divide(10, 0))', output: 'Cannot divide by zero' },
   bank_account: { code: 'class BankAccount:\n    def __init__(self):\n        self.balance = 0\n    def deposit(self, amount):\n        self.balance += amount\nacc = BankAccount()\nacc.deposit(500)\nacc.deposit(250)\nprint(acc.balance)', output: '750' },
   factorial_recursion: { code: 'def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\nprint(factorial(5))', output: '120' },
+  basic_types: { code: "values = [7, 2.5, \"Python\", True]\nprint(type(values[0]).__name__)\nprint(type(values[1]).__name__)\nprint(type(values[2]).__name__)\nprint(type(values[3]).__name__)", output: "int\nfloat\nstr\nbool" },
+  arithmetic_operators: { code: "items = 17\nsize = 5\nprint(items // size)\nprint(items % size)", output: "3\n2" },
+  convert_input: { code: "age_text = input()\nprint(int(age_text) + 1)", output: "19" },
+  slice_text: { code: "word = \"Python\"\nprint(word[0])\nprint(word[:3])\nprint(word.upper())", output: "P\nPyt\nPYTHON" },
+  elif_grades: { code: "for score in [95, 72, 40]:\n    if score >= 90:\n        print(\"Distinction\")\n    elif score >= 50:\n        print(\"Pass\")\n    else:\n        print(\"Retry\")", output: "Distinction\nPass\nRetry" },
+  boolean_logic: { code: "age = 18\nprint(age >= 18 and True)\nprint(age >= 18 and False)", output: "True\nFalse" },
+  while_countdown: { code: "number = 3\nwhile number > 0:\n    print(number)\n    number -= 1\nprint(\"Go!\")", output: "3\n2\n1\nGo!" },
+  break_continue: { code: "for number in range(1, 10):\n    if number == 2:\n        continue\n    if number == 5:\n        break\n    print(number)", output: "1\n3\n4" },
+  edit_list: { code: "fruits = [\"apple\", \"banana\"]\nfruits.append(\"mango\")\nfruits[0] = \"pear\"\nprint(fruits[0])\nprint(len(fruits))", output: "pear\n3" },
+  unpack_tuple: { code: "point = (4, 9)\nx, y = point\nprint(x)\nprint(y)", output: "4\n9" },
+  unique_set: { code: "names = [\"Maya\", \"Ravi\", \"Maya\", \"Leah\"]\nunique = set(names)\nprint(len(unique))\nprint(\"Maya\" in unique)", output: "3\nTrue" },
+  lookup_dictionary: { code: "scores = {\"english\": 75}\nscores[\"math\"] = 90\nprint(scores[\"math\"])\nprint(scores.get(\"science\", 0))", output: "90\n0" },
+  import_math: { code: "import math\nprint(math.sqrt(81))", output: "9.0" },
+  read_write_file: { code: "filename = \"notes.txt\"\nwith open(filename, \"w\") as file:\n    file.write(\"hello\")\nwith open(filename) as file:\n    print(file.read())", output: "hello" },
+  catch_bad_input: { code: "value = input()\ntry:\n    print(int(value))\nexcept ValueError:\n    print(\"Please enter a number\")", output: "Please enter a number" },
 };
 for (const lesson of LESSONS) {
   const sol = SOLUTIONS[lesson.id];

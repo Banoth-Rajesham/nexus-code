@@ -107,6 +107,7 @@ import {
   checkLesson,
   generateQuiz,
   loadCompletedLessons,
+  nextLesson,
   saveCompletedLessons,
 } from '../utils/learningPath';
 import { LevelSwitcher } from '../components/workspace/LevelSwitcher';
@@ -211,16 +212,23 @@ export const FormattedExplanation: React.FC<{
 export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initialProject }) => {
   const { user, token, quota, refreshUser, openAuthModal } = useAuth();
 
+  const [initialLesson] = useState(() =>
+    new URLSearchParams(window.location.search).get('lesson') === 'first' ? LESSONS[0] : null
+  );
+
   // Project & Multi-file state
   const [projectId, setProjectId] = useState<string | null>(initialProject?.id || null);
   const [projectTitle, setProjectTitle] = useState(initialProject?.title || 'my_project');
-  const [progLang, setProgLang] = useState(initialProject?.programmingLanguage || 'python');
+  const [progLang, setProgLang] = useState(initialLesson ? 'python' : initialProject?.programmingLanguage || 'python');
   const [nativeLang, setNativeLang] = useState<NativeLanguageKey>(
     initialProject?.nativeLanguage || (user?.defaultLanguage as NativeLanguageKey) || 'english'
   );
 
   // Files state (persisted to localStorage)
   const [files, setFiles] = useState<ProjectFile[]>(() => {
+    if (initialLesson) {
+      return [{ id: 'f_lesson', name: 'main.py', content: initialLesson.starterCode, isEntry: true }];
+    }
     if (initialProject?.code) {
       return [
         {
@@ -243,6 +251,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
   // Open tabs state (persisted to localStorage)
   const [openTabIds, setOpenTabIds] = useState<string[]>(() => {
+    if (initialLesson) return [files[0].id];
     try {
       const saved = localStorage.getItem('bhashacode_open_tabs_v2');
       if (saved) {
@@ -262,14 +271,15 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     return files[0]?.id || 'f_main';
   });
 
-  // Persist files and tabs to localStorage
+  // Keep homepage lesson practice separate from the regular workspace draft.
   useEffect(() => {
+    if (initialLesson) return;
     try {
       localStorage.setItem('bhashacode_files_v2', JSON.stringify(files));
       localStorage.setItem('bhashacode_open_tabs_v2', JSON.stringify(openTabIds));
       localStorage.setItem('bhashacode_active_file_v2', activeFileId);
     } catch {}
-  }, [files, openTabIds, activeFileId]);
+  }, [files, openTabIds, activeFileId, initialLesson]);
 
   // Active file helper
   const activeFile = useMemo(() => {
@@ -289,6 +299,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     setFiles((prev) =>
       prev.map((f) => (f.id === activeFile.id ? { ...f, content: newCode } : f))
     );
+    if (initialLesson) return;
     try {
       localStorage.setItem(`nexus_autosave_${activeFile.id}`, newCode);
     } catch {}
@@ -346,6 +357,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     output: string;
     timeMs: number;
     success: boolean;
+    lessonRun?: { id: string; code: string; fileId: string };
     exitCode?: number;
     language?: string;
     engine?: string;
@@ -391,7 +403,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     }
   }, [settingsOpen]);
 
-  const [stdinInput, setStdinInput] = useState('');
+  const [stdinInput, setStdinInput] = useState(() => (initialLesson?.check.stdin || []).join('\n'));
 
   // ─── STAGE 1: STEP-BY-STEP PYTHON EXECUTION STATE ───
   const [isStepMode, setIsStepMode] = useState(false);
@@ -1600,6 +1612,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
     setConsoleTab('terminal');
     setTerminalOutput(null);
 
+    const lessonRun = progLang === 'python' && activeLessonId
+      ? { id: activeLessonId, code, fileId: activeFile.id }
+      : undefined;
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
@@ -1610,6 +1625,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
         abortControllerRef.current = null;
         setLoadingAction(null);
         setTerminalOutput({
+          lessonRun,
           output: '[Execution Timed Out]: Program exceeded the 25-second safety limit (potential infinite loop or blocking I/O detected). Execution aborted.',
           timeMs: 25000,
           success: false,
@@ -1662,6 +1678,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
           runTimeoutRef.current = null;
         }
         setTerminalOutput({
+          lessonRun,
           output: runRes.output,
           timeMs: runRes.timeMs,
           success: runRes.success,
@@ -1705,6 +1722,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onNavigate, initia
 
       const data = await res.json();
       setTerminalOutput({
+        lessonRun,
         output: data.output || (res.ok ? '(Program finished with no output)' : data.error || 'Execution failed'),
         timeMs: data.executionTimeMs || 0,
         success: !!data.success,
@@ -2356,7 +2374,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
   // Levels only hide extra tools by default; Senior shows the complete workspace.
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>(() => loadExperienceLevel() || 'beginner');
   const levelFeatures = LEVEL_FEATURES[experienceLevel];
-  const [tourOpen, setTourOpen] = useState<boolean>(() => !isTourCompleted());
+  const [tourOpen, setTourOpen] = useState<boolean>(() => !initialLesson && !isTourCompleted());
 
   const handleLevelChange = (level: ExperienceLevel) => {
     setExperienceLevel(level);
@@ -2382,13 +2400,16 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
   // ─── LESSONS & LEARNING PROGRESS ───
   const [lessonsOpen, setLessonsOpen] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<string[]>(() => loadCompletedLessons());
-  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(initialLesson?.id ?? null);
   const [lessonResult, setLessonResult] = useState<LessonResult | null>(null);
   const activeLesson = useMemo(() => LESSONS.find((l) => l.id === activeLessonId) || null, [activeLessonId]);
 
+  const passedCurrentCode = lessonResult?.passed && terminalOutput?.lessonRun?.code === code
+    && terminalOutput.lessonRun.fileId === activeFile.id && terminalOutput.lessonRun.id === activeLessonId;
+
   const handleStartLesson = (lesson: Lesson) => {
     if (progLang !== 'python') return;
-    if (code.trim() && isDirty && activeLessonId !== lesson.id) {
+    if (code.trim() && isDirty && activeLessonId !== lesson.id && !passedCurrentCode) {
       const ok = window.confirm(`Start the lesson "${lesson.title}"? This replaces the code in ${activeFile.name}.`);
       if (!ok) return;
     }
@@ -2414,10 +2435,13 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
 
   // Check the active lesson every time a run finishes
   useEffect(() => {
-    if (!activeLesson || !terminalOutput) return;
-    const result = checkLesson(activeLesson, code, terminalOutput.output || '', !!terminalOutput.success);
+    const run = terminalOutput?.lessonRun;
+    if (!terminalOutput || !activeLesson || run?.id !== activeLesson.id || run.fileId !== activeFile.id || run.code !== code) return;
+    const result = checkLesson(activeLesson, run.code, terminalOutput.output || '', !!terminalOutput.success);
     setLessonResult(result);
-    if (result.passed && !completedLessons.includes(activeLesson.id)) {
+    if (!result.passed) return;
+    setLessonsOpen(true);
+    if (!completedLessons.includes(activeLesson.id)) {
       const next = [...completedLessons, activeLesson.id];
       setCompletedLessons(next);
       saveCompletedLessons(next);
@@ -2427,7 +2451,7 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
   const nextLessonAfterActive = useMemo(() => {
     if (!activeLesson) return null;
     const idx = LESSONS.findIndex((l) => l.id === activeLesson.id);
-    return LESSONS.slice(idx + 1).find((l) => !completedLessons.includes(l.id)) || LESSONS[idx + 1] || null;
+    return LESSONS.slice(idx + 1).find((l) => !completedLessons.includes(l.id)) || nextLesson(completedLessons);
   }, [activeLesson, completedLessons]);
 
   // ─── QUIZ ME ───
@@ -5081,6 +5105,8 @@ ${d.verify.testCases.map((tc) => `### Case: ${tc.title} (${tc.category})\n- Inpu
         onClose={() => setLessonsOpen(false)}
         completed={completedLessons}
         activeLessonId={activeLessonId}
+        passedLessonTitle={passedCurrentCode ? activeLesson?.title : undefined}
+        suggestedLesson={passedCurrentCode ? nextLessonAfterActive : nextLesson(completedLessons)}
         level={experienceLevel}
         isPython={progLang === 'python'}
         onStartLesson={handleStartLesson}

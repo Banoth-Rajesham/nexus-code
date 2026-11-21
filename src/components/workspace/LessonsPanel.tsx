@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, GraduationCap, CheckCircle2, Circle, PlayCircle, Target, Lightbulb, Trophy, Lock, LogOut, ChevronRight } from 'lucide-react';
-import { CONCEPTS, LESSONS, Lesson, LessonResult, masteredConcepts, nextLesson } from '../../utils/learningPath';
+import { CONCEPTS, LESSONS, Lesson, LessonResult, masteredConcepts } from '../../utils/learningPath';
 import { ExperienceLevel, LEVEL_META } from '../../utils/experienceLevel';
 import { LEVEL_ACCENT } from './LevelSwitcher';
 
@@ -9,6 +9,8 @@ interface LessonsPanelProps {
   onClose: () => void;
   completed: string[];
   activeLessonId: string | null;
+  passedLessonTitle?: string;
+  suggestedLesson: Lesson | null;
   level: ExperienceLevel;
   isPython: boolean;
   onStartLesson: (lesson: Lesson) => void;
@@ -21,6 +23,8 @@ export const LessonsPanel: React.FC<LessonsPanelProps> = ({
   onClose,
   completed,
   activeLessonId,
+  passedLessonTitle,
+  suggestedLesson: upNext,
   level,
   isPython,
   onStartLesson,
@@ -28,7 +32,6 @@ export const LessonsPanel: React.FC<LessonsPanelProps> = ({
 }) => {
   const done = useMemo(() => new Set(completed), [completed]);
   const mastered = useMemo(() => masteredConcepts(completed), [completed]);
-  const upNext = nextLesson(completed);
   const pct = Math.round((completed.filter((id) => LESSONS.some((l) => l.id === id)).length / LESSONS.length) * 100);
 
   useEffect(() => {
@@ -52,7 +55,7 @@ export const LessonsPanel: React.FC<LessonsPanelProps> = ({
                 <GraduationCap className="w-4 h-4" /> Learning path
               </div>
               <h2 className="text-lg font-bold ws-text-strong mt-1">Python lessons</h2>
-              <p className="text-xs ws-text-muted mt-0.5">Pick a lesson, write the code, press Run. It is checked automatically.</p>
+              <p className="text-xs ws-text-muted mt-0.5">{passedLessonTitle ? `Lesson complete! You passed “${passedLessonTitle}”.` : 'Pick a lesson, write the code, press Run. It is checked automatically.'}</p>
             </div>
             <button onClick={onClose} aria-label="Close lessons" className="p-1.5 rounded ws-text-muted ws-hover-strong ws-hover-bg">
               <X className="w-4 h-4" />
@@ -80,7 +83,7 @@ export const LessonsPanel: React.FC<LessonsPanelProps> = ({
             >
               <PlayCircle className="w-5 h-5 ws-text-strong shrink-0" />
               <span className="min-w-0 flex-1">
-                <span className="block text-[10px] font-bold uppercase tracking-wider ws-tx-blue-soft">Up next</span>
+                <span className="block text-[10px] font-bold uppercase tracking-wider ws-tx-blue-soft">{passedLessonTitle ? 'Start next lesson' : 'Up next'}</span>
                 <span className="block text-sm font-bold ws-text-strong truncate">{upNext.title}</span>
               </span>
               <ChevronRight className="w-4 h-4 ws-text-strong" />
@@ -164,7 +167,7 @@ export const LessonsPanel: React.FC<LessonsPanelProps> = ({
                         <span className="min-w-0">
                           <span className="flex items-center gap-2">
                             <span className="text-xs font-bold ws-text-strong">{lesson.title}</span>
-                            {isActive && <span className="text-[9px] font-bold uppercase ws-tx-blue bg-blue-500/20 px-1.5 py-0.5 rounded">In progress</span>}
+                            {isActive && !isDone && <span className="text-[9px] font-bold uppercase ws-tx-blue bg-blue-500/20 px-1.5 py-0.5 rounded">In progress</span>}
                           </span>
                           <span className="block text-[11px] ws-text-muted leading-snug mt-0.5">{lesson.goal}</span>
                         </span>

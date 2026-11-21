@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LESSONS } from '../../utils/learningPath';
 import { ListOrdered, Footprints, Wrench, GraduationCap, Check, ArrowRight, AlertOctagon, Lightbulb, Trophy, Target } from 'lucide-react';
 
 type TabKey = 'explain' | 'step' | 'errors' | 'learn';
@@ -122,7 +123,7 @@ const Visual: React.FC<{ tab: TabKey }> = ({ tab }) => {
       </div>
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex items-center justify-between text-xs mb-1.5">
-          <span className="font-semibold text-slate-700">5 of 12 lessons complete</span>
+          <span className="font-semibold text-slate-700">5 of {LESSONS.length} lessons complete</span>
           <span className="font-mono text-slate-500">42%</span>
         </div>
         <div className="h-2 rounded-full bg-slate-100 overflow-hidden">

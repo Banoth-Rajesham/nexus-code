@@ -4,6 +4,7 @@ import React, { useRef } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { TimelineContent } from "@/components/ui/timeline-animation";
 import NumberFlow from "@number-flow/react";
+import { LESSONS } from "@/utils/learningPath";
 import { Briefcase, CheckCheck, Database, Server, Sparkles, School, GraduationCap, Zap, ArrowRight } from "lucide-react";
 
 export interface PricingFeature {
@@ -44,7 +45,7 @@ export const NEXUS_PLANS: PricingPlan[] = [
       "Included free, forever:",
       "Full interactive workspace",
       "Step-by-step execution, flowcharts & 3D view",
-      "All 12 guided lessons with automatic checks",
+      `All ${LESSONS.length} guided lessons with automatic checks`,
       "Save unlimited projects with a free account",
     ],
   },
